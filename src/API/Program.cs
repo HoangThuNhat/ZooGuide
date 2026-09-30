@@ -1,44 +1,80 @@
+using Microsoft.EntityFrameworkCore;
+using ZooGuide.Infrastructure.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Configure EF Core with SQL Server
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Server=.;Database=ZooGuide;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+
+builder.Services.AddDbContext<ZooGuideDbContext>(options =>
+{
+    options.UseSqlServer(connectionString, sqlOptions =>
+    {
+        sqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+    });
+});
+
+// Configure CORS for web frontend
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+app.UseCors("AllowAll");
 app.UseHttpsRedirection();
+app.UseAuthorization();
+app.MapControllers();
 
-var summaries = new[]
+// Health check / DB ping endpoint
+app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 {
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
+    var canConnect = await dbContext.Database.CanConnectAsync();
+    var userCount = canConnect ? await dbContext.Users.CountAsync() : 0;
+    var animalCount = canConnect ? await dbContext.Animals.CountAsync() : 0;
+    var areaCount = canConnect ? await dbContext.Areas.CountAsync() : 0;
 
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
+    return Results.Ok(new
+    {
+        status = "Healthy",
+        databaseConnected = canConnect,
+        timestamp = DateTime.UtcNow,
+        counts = new
+        {
+            users = userCount,
+            animals = animalCount,
+            areas = areaCount
+        }
+    });
 })
-.WithName("GetWeatherForecast")
+.WithName("HealthCheck")
 .WithOpenApi();
 
-app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+// Seed initial data if development
+if (app.Environment.IsDevelopment())
 {
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+    await ZooGuideDataSeeder.SeedAsync(dbContext);
 }
+
+app.Run();
