@@ -858,7 +858,8 @@ export const ZooApi = {
                     ticketCode: t.ticketCode,
                     customerName: "Khách hàng",
                     ticketType: t.ticketTypeName || "Standard",
-                    validDate: t.validUntil ? t.validUntil.split('T')[0] : new Date().toISOString().split('T')[0],
+                    validFromDate: t.validFrom ? new Date(t.validFrom).toLocaleString('vi-VN') : '',
+                    validUntilDate: t.validUntil ? new Date(t.validUntil).toLocaleString('vi-VN') : '',
                     status: statusStr,
                     zonesAllowed: ["ALL"]
                 };
@@ -873,9 +874,9 @@ export const ZooApi = {
         try {
             const reqData = {
                 ticketTypeId: parseInt(data.ticketTypeId),
-                ticketCode: data.ticketCode || "",
-                validFrom: new Date().toISOString(),
-                validUntil: data.validDate ? new Date(data.validDate).toISOString() : new Date(Date.now() + 86400000).toISOString(),
+                ticketCode: "",
+                validFrom: new Date(data.validFrom).toISOString(),
+                validUntil: new Date(data.validUntil).toISOString(),
                 status: 1
             };
             const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
@@ -891,7 +892,8 @@ export const ZooApi = {
             return { success: true, data: {
                 ticketCode: created.ticketCode,
                 status: 'Active',
-                validDate: created.validUntil.split('T')[0],
+                validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
+                validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
                 customerName: data.customerName || "Khách hàng",
                 ticketType: created.ticketTypeName || "Standard",
                 zonesAllowed: ["ALL"]
