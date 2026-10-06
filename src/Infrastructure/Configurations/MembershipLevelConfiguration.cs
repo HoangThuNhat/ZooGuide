@@ -34,7 +34,7 @@ public class MembershipLevelConfiguration : IEntityTypeConfiguration<MembershipL
 
         builder.Property(ml => ml.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(ml => ml.UpdatedAt)
             .IsRequired(false);

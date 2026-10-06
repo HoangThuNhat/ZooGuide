@@ -34,7 +34,7 @@ public class TicketTypeConfiguration : IEntityTypeConfiguration<TicketType>
 
         builder.Property(tt => tt.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(tt => tt.UpdatedAt)
             .IsRequired(false);

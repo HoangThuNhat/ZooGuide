@@ -13,7 +13,7 @@ public class TicketSessionConfiguration : IEntityTypeConfiguration<TicketSession
 
         builder.HasKey(ts => ts.SessionId);
         builder.Property(ts => ts.SessionId)
-            .HasDefaultValueSql("NEWID()");
+            .HasDefaultValueSql("gen_random_uuid()");
 
         builder.Property(ts => ts.TicketId)
             .IsRequired();
@@ -24,7 +24,7 @@ public class TicketSessionConfiguration : IEntityTypeConfiguration<TicketSession
 
         builder.Property(ts => ts.StartedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(ts => ts.ExpiredAt)
             .IsRequired();

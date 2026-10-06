@@ -24,11 +24,11 @@ public class ChatMessageConfiguration : IEntityTypeConfiguration<ChatMessage>
 
         builder.Property(cm => cm.Content)
             .IsRequired()
-            .HasColumnType("nvarchar(max)");
+            ;
 
         builder.Property(cm => cm.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.HasOne(cm => cm.ChatSession)
             .WithMany(cs => cs.Messages)

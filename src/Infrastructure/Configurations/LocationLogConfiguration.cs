@@ -30,7 +30,7 @@ public class LocationLogConfiguration : IEntityTypeConfiguration<LocationLog>
 
         builder.Property(ll => ll.RecordedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.HasOne(ll => ll.Session)
             .WithMany(s => s.LocationLogs)

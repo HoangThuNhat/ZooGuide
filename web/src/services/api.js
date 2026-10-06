@@ -5,7 +5,7 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5142/api',
     USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
         ? import.meta.env.VITE_USE_MOCK === 'true'
         : true,
@@ -484,44 +484,6 @@ export const ZooApi = {
         }
 
         const normalizedCode = ticketCode.trim().toUpperCase();
-
-        if (API_CONFIG.USE_MOCK) {
-            await this._simulateLatency(350);
-            const ticket = MOCK_DB.tickets.find(t => t.ticketCode.toUpperCase() === normalizedCode);
-            
-            if (!ticket) {
-                return { 
-                    success: false, 
-                    message: "Không tìm thấy vé trong hệ thống! Vui lòng kiểm tra lại mã in trên vé hoặc liên hệ quầy vé ZooGuide." 
-                };
-            }
-
-            if (ticket.status === "Expired") {
-                return { 
-                    success: false, 
-                    message: `Vé ${ticket.ticketCode} đã hết hạn sử dụng vào ngày ${ticket.validDate}. Vui lòng đổi vé mới.` 
-                };
-            }
-
-            // Create TicketSession
-            const session = {
-                sessionId: "SES-" + Date.now().toString(36).toUpperCase(),
-                ticketCode: ticket.ticketCode,
-                customerName: ticket.customerName,
-                ticketType: ticket.ticketType,
-                validDate: ticket.validDate,
-                zonesAllowed: ticket.zonesAllowed,
-                hasAudioGuide: ticket.hasAudioGuide,
-                activatedAt: new Date().toISOString(),
-                expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString() // Valid 8 hours
-            };
-
-            return {
-                success: true,
-                message: "Xác thực vé thành công! Phiên tham quan đã được mở khóa.",
-                session: session
-            };
-        }
 
         // Live API call
         try {
