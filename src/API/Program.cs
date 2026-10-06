@@ -8,15 +8,27 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure EF Core with SQL Server
+// // Configure EF Core with SQL Server
+// var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+//     ?? "Server=.;Database=ZooGuide;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+
+// builder.Services.AddDbContext<ZooGuideDbContext>(options =>
+// {
+//     options.UseSqlServer(connectionString, sqlOptions =>
+//     {
+//         sqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+//     });
+// });
+
+// Configure EF Core with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=.;Database=ZooGuide;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+    ?? throw new InvalidOperationException("DefaultConnection is not configured.");
 
 builder.Services.AddDbContext<ZooGuideDbContext>(options =>
 {
-    options.UseSqlServer(connectionString, sqlOptions =>
+    options.UseNpgsql(connectionString, npgsqlOptions =>
     {
-        sqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+        npgsqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
     });
 });
 
@@ -69,12 +81,12 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 .WithName("HealthCheck")
 .WithOpenApi();
 
-// Seed initial data if development
-if (app.Environment.IsDevelopment())
-{
-    using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
-    await ZooGuideDataSeeder.SeedAsync(dbContext);
-}
+// // Seed initial data if development
+// if (app.Environment.IsDevelopment())
+// {
+//     using var scope = app.Services.CreateScope();
+//     var dbContext = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+//     await ZooGuideDataSeeder.SeedAsync(dbContext);
+// }
 
 app.Run();
