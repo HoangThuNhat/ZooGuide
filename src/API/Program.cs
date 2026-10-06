@@ -8,6 +8,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+
 // // Configure EF Core with SQL Server
 // var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
 //     ?? "Server=.;Database=ZooGuide;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
@@ -21,6 +22,17 @@ builder.Services.AddSwaggerGen();
 // });
 
 // Configure EF Core with PostgreSQL
+
+
+// Application Services
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.ISpeciesService, ZooGuide.Infrastructure.Services.SpeciesService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketTypeService, ZooGuide.Infrastructure.Services.TicketTypeService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketService, ZooGuide.Infrastructure.Services.TicketService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketSessionService, ZooGuide.Infrastructure.Services.TicketSessionService>();
+
+
+// Configure EF Core with SQL Server
+
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DefaultConnection is not configured.");
 
