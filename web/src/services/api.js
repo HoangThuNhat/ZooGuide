@@ -729,7 +729,7 @@ export const ZooApi = {
                 id: s.speciesId,
                 nameVi: s.name,
                 nameEn: s.scientificName || s.name,
-                scientificOrder: s.conservationStatus || "N/A",
+                conservationStatus: s.conservationStatus || "N/A",
                 description: s.description || ""
             }));
             return { success: true, data: mapped };
@@ -744,7 +744,7 @@ export const ZooApi = {
                 name: data.nameVi,
                 scientificName: data.nameEn,
                 description: data.description,
-                conservationStatus: data.scientificOrder,
+                conservationStatus: data.conservationStatus,
                 imageUrl: ""
             };
             const res = await fetch(`${API_CONFIG.BASE_URL}/species`, {
@@ -846,8 +846,7 @@ export const ZooApi = {
                     ticketType: t.ticketTypeName || "Standard",
                     validDate: t.validUntil ? t.validUntil.split('T')[0] : new Date().toISOString().split('T')[0],
                     status: statusStr,
-                    zonesAllowed: ["ALL"],
-                    hasAudioGuide: true
+                    zonesAllowed: ["ALL"]
                 };
             });
             return { success: true, data: mapped };
@@ -881,8 +880,7 @@ export const ZooApi = {
                 validDate: created.validUntil.split('T')[0],
                 customerName: data.customerName || "Khách hàng",
                 ticketType: created.ticketTypeName || "Standard",
-                zonesAllowed: ["ALL"],
-                hasAudioGuide: data.hasAudioGuide !== false
+                zonesAllowed: ["ALL"]
             }};
         } catch (err) {
             console.error(err);
@@ -931,7 +929,8 @@ export const ZooApi = {
                 code: "TYPE-" + t.ticketTypeId,
                 name: t.name,
                 price: t.price,
-                description: t.description || ''
+                description: t.description || '',
+                isActive: t.isActive
             }));
             return { success: true, data: mapped };
         } catch (err) {
@@ -960,9 +959,47 @@ export const ZooApi = {
                 code: data.code || 'TYPE-' + created.ticketTypeId,
                 name: created.name,
                 price: created.price,
-                description: created.description
+                description: created.description,
+                isActive: created.isActive
             }};
         } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
+    },
+    async updateTicketType(id, data) {
+        try {
+            const reqData = {
+                name: data.name,
+                description: data.description,
+                price: Number(data.price) || 0,
+                durationMinutes: 240,
+                isActive: data.isActive !== false
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Lỗi cập nhật loại vé");
+            }
+            return { success: true };
+        } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
+    },
+    async deleteTicketType(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Lỗi xóa loại vé");
+            }
+            return { success: true, message: "Đã xóa loại vé thành công" };
+        } catch(err) {
             console.error(err);
             return { success: false, error: err.message };
         }

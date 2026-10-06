@@ -9,8 +9,7 @@ export default function AdminTicketsPage() {
     const [formData, setFormData] = useState({
         ticketTypeId: '',
         customerName: '',
-        validDate: new Date().toISOString().split('T')[0],
-        hasAudioGuide: true
+        validDate: new Date().toISOString().split('T')[0]
     });
 
     const loadData = async () => {
@@ -37,8 +36,7 @@ export default function AdminTicketsPage() {
             setFormData({
                 ticketTypeId: '',
                 customerName: '',
-                validDate: new Date().toISOString().split('T')[0],
-                hasAudioGuide: true
+                validDate: new Date().toISOString().split('T')[0]
             });
             loadData();
         } else {
@@ -52,6 +50,8 @@ export default function AdminTicketsPage() {
         if (res.success) {
             showToast(`Đã chuyển trạng thái vé sang: ${newStatus}`, "info");
             loadData();
+        } else {
+            showToast(res.message || "Không thể cập nhật trạng thái", "error");
         }
     };
 
@@ -63,7 +63,7 @@ export default function AdminTicketsPage() {
                         Quản Lý Vé Tham Quan (Tickets Management)
                     </h2>
                     <p style={{ color: '#64748B', margin: 0, fontSize: '0.9rem' }}>
-                        Danh sách vé đã phát hành, tra cứu mã vé QR/Barcode, ngày hiệu lực và quyền nghe Audio Guide.
+                        Danh sách vé đã phát hành, tra cứu mã vé QR/Barcode, ngày hiệu lực.
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
@@ -84,7 +84,6 @@ export default function AdminTicketsPage() {
                                     <th>Hạng vé</th>
                                     <th>Hạn sử dụng</th>
                                     <th>Trạng thái</th>
-                                    <th>Audio Guide</th>
                                     <th>Hành động</th>
                                 </tr>
                             </thead>
@@ -99,9 +98,6 @@ export default function AdminTicketsPage() {
                                             <span className={`badge ${t.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>
                                                 {t.status}
                                             </span>
-                                        </td>
-                                        <td>
-                                            <span className="chip chip-sm">{t.hasAudioGuide ? 'Có quyền' : 'Không'}</span>
                                         </td>
                                         <td>
                                             <button 
@@ -155,17 +151,6 @@ export default function AdminTicketsPage() {
                                 value={formData.validDate}
                                 onChange={(e) => setFormData({ ...formData, validDate: e.target.value })}
                             />
-                        </div>
-                        <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input 
-                                type="checkbox" 
-                                id="has-audio" 
-                                checked={formData.hasAudioGuide}
-                                onChange={(e) => setFormData({ ...formData, hasAudioGuide: e.target.checked })}
-                            />
-                            <label htmlFor="has-audio" style={{ fontSize: '0.85rem', cursor: 'pointer' }}>
-                                Cho phép mở khóa quyền Thuyết Minh Audio Guide
-                            </label>
                         </div>
                         <button type="submit" className="btn btn-primary w-full" style={{ width: '100%' }}>
                             Phát Hành Vé Điện Tử
