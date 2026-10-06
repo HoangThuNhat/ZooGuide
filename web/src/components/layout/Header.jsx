@@ -43,6 +43,19 @@ export default function Header() {
                         <span>Bản Đồ</span>
                     </a>
                     <a 
+                        href="#species-audio" 
+                        className={`nav-link ${currentTab === 'species-audio' ? 'active' : ''}`}
+                        onClick={(e) => { e.preventDefault(); switchTab('species-audio'); }}
+                        role="tab" 
+                        aria-selected={currentTab === 'species-audio'}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                            <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                        </svg>
+                        <span>Thuyết Minh Loài</span>
+                    </a>
+                    <a 
                         href="#animals" 
                         className={`nav-link ${currentTab === 'animals' ? 'active' : ''}`}
                         onClick={(e) => { e.preventDefault(); switchTab('animals'); }}
@@ -52,7 +65,7 @@ export default function Header() {
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                             <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                         </svg>
-                        <span>Khám Phá</span>
+                        <span>Cá Thể (Animals)</span>
                     </a>
                     <a 
                         href="#tickets" 

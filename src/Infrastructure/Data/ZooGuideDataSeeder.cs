@@ -235,13 +235,13 @@ public static class ZooGuideDataSeeder
         };
         context.UserLoyalties.Add(userLoyalty);
 
-        // 9. Seed SPECIES
+        // 9. Seed SPECIES (Bộ dữ liệu sinh thái đa dạng 27 loài trên thế giới)
         var spLion = new Species
         {
             Name = "Sư tử Châu Phi",
             ScientificName = "Panthera leo",
-            Description = "Loài động vật săn mồi hàng đầu tại các đồng cỏ xavan châu Phi.",
-            ConservationStatus = "VU (Sắp nguy cấp)",
+            Description = "Loài mèo lớn săn mồi hàng đầu tại các đồng cỏ xavan châu Phi, sống theo cấu trúc bầy đàn có tính xã hội cao.",
+            ConservationStatus = "VU - Sắp nguy cấp",
             ImageUrl = "https://images.unsplash.com/photo-1614027164847-1b28cfe1df60?w=800"
         };
 
@@ -249,8 +249,8 @@ public static class ZooGuideDataSeeder
         {
             Name = "Hổ Bengal",
             ScientificName = "Panthera tigris tigris",
-            Description = "Phân loài hổ lớn thứ hai thế giới, sinh sống ở Nam Á và Đông Nam Á.",
-            ConservationStatus = "EN (Nguy cấp)",
+            Description = "Phân loài hổ lớn thứ hai thế giới, sinh sống ở Nam Á và Đông Nam Á, bơi lội giỏi và thích ngâm mình dưới nước.",
+            ConservationStatus = "EN - Nguy cấp",
             ImageUrl = "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=800"
         };
 
@@ -258,8 +258,8 @@ public static class ZooGuideDataSeeder
         {
             Name = "Voi Châu Á",
             ScientificName = "Elephas maximus",
-            Description = "Loài thú ăn cỏ trên cạn lớn nhất tại khu vực Châu Á.",
-            ConservationStatus = "EN (Nguy cấp)",
+            Description = "Loài thú ăn cỏ trên cạn lớn nhất khu vực Châu Á, có vai trò sinh thái và văn hóa quan trọng trong các khu rừng nhiệt đới.",
+            ConservationStatus = "EN - Nguy cấp",
             ImageUrl = "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800"
         };
 
@@ -267,12 +267,225 @@ public static class ZooGuideDataSeeder
         {
             Name = "Đại bàng Hoàng Gia",
             ScientificName = "Aquila heliaca",
-            Description = "Loài chim săn mồi dũng mãnh với sải cánh rộng và tầm nhìn siêu việt.",
-            ConservationStatus = "VU (Sắp nguy cấp)",
+            Description = "Loài chim săn mồi dũng mãnh với sải cánh rộng hơn 2 mét và tầm nhìn siêu việt gấp 8 lần con người.",
+            ConservationStatus = "VU - Sắp nguy cấp",
             ImageUrl = "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=800"
         };
 
-        context.Species.AddRange(spLion, spTiger, spElephant, spEagle);
+        var spPanda = new Species
+        {
+            Name = "Gấu Trúc Khổng Lồ",
+            ScientificName = "Ailuropoda melanoleuca",
+            Description = "Loài gấu đặc hữu của vùng núi rừng tre trúc Trung Quốc, với chế độ ăn tới 99% là các loài tre nứa.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1564349683136-77e08dba1ef6?w=800"
+        };
+
+        var spIndochinaTiger = new Species
+        {
+            Name = "Hổ Đông Dương",
+            ScientificName = "Panthera tigris corbetti",
+            Description = "Phân loài hổ bản địa bán đảo Đông Dương, hiện đang đối mặt nguy cơ tuyệt chủng nghiêm trọng do mất sinh cảnh.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?w=800"
+        };
+
+        var spLeopard = new Species
+        {
+            Name = "Báo hoa mai",
+            ScientificName = "Panthera pardus",
+            Description = "Một trong năm loài lớn thuộc chi Báo, nổi bật với khả năng leo trèo điêu luyện và hoa văn đốm hoa mai đặc trưng.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1456926631375-92c8ce872def?w=800"
+        };
+
+        var spSnowLeopard = new Species
+        {
+            Name = "Báo tuyết",
+            ScientificName = "Panthera uncia",
+            Description = "Loài mèo lớn sống tại các vùng núi cao Trung và Nam Á, có bộ lông dày màu xám khói và đuôi dài giúp thăng bằng trên vách đá.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800"
+        };
+
+        var spAfricanElephant = new Species
+        {
+            Name = "Voi châu Phi",
+            ScientificName = "Loxodonta africana",
+            Description = "Động vật trên cạn lớn nhất hành tinh, có đôi tai hình lục địa châu Phi và cặp ngà lớn ấn tượng.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800"
+        };
+
+        var spGiraffe = new Species
+        {
+            Name = "Hươu cao cổ",
+            ScientificName = "Giraffa camelopardalis",
+            Description = "Loài động vật có vú trên cạn cao nhất thế giới, cổ dài thích nghi ăn lá cây keo trên tầng cao thảo nguyên châu Phi.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=800"
+        };
+
+        var spRhino = new Species
+        {
+            Name = "Tê giác trắng",
+            ScientificName = "Ceratotherium simum",
+            Description = "Loài động vật có vú trên cạn lớn thứ hai thế giới, đặc trưng bởi chiếc miệng rộng thích nghi ăn cỏ trên các đồng bằng xavan.",
+            ConservationStatus = "NT - Sắp bị đe dọa",
+            ImageUrl = "https://images.unsplash.com/photo-1575550959106-5a7defe28b56?w=800"
+        };
+
+        var spHippo = new Species
+        {
+            Name = "Hà mã",
+            ScientificName = "Hippopotamus amphibius",
+            Description = "Động vật bán thủy sinh khổng lồ ở châu Phi hạ Sahara, dành phần lớn ban ngày ngâm mình dưới nước hoặc đầm lầy bùn.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1534188753412-3e26d0d618d6?w=800"
+        };
+
+        var spChimp = new Species
+        {
+            Name = "Tinh tinh",
+            ScientificName = "Pan troglodytes",
+            Description = "Loài linh trưởng thông minh có quan hệ di truyền gần gũi nhất với loài người, biết chế tạo và sử dụng công cụ tinh vi.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=800"
+        };
+
+        var spGorilla = new Species
+        {
+            Name = "Khỉ đột",
+            ScientificName = "Gorilla gorilla",
+            Description = "Loài linh trưởng lớn nhất thế giới, sinh sống tại các khu rừng nhiệt đới xích đạo châu Phi với cấu trúc gia đình lưng bạc bảo vệ đàn.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1535083783855-76ae62b2914e?w=800"
+        };
+
+        var spOrangutan = new Species
+        {
+            Name = "Đười ươi Bornean",
+            ScientificName = "Pongo pygmaeus",
+            Description = "Loài vượn người lớn đặc hữu đảo Borneo, dành phần lớn cuộc đời trên cây với bộ lông màu nâu đỏ và cánh tay dài khỏe khoắn.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1579888944880-d9834124570c?w=800"
+        };
+
+        var spPolarBear = new Species
+        {
+            Name = "Gấu Bắc Cực",
+            ScientificName = "Ursus maritimus",
+            Description = "Loài thú ăn thịt trên cạn lớn nhất, sống ở vùng băng tuyết Bắc Cực, chuyên săn hải cẩu trên các tảng băng trôi.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800"
+        };
+
+        var spBrownBear = new Species
+        {
+            Name = "Gấu nâu",
+            ScientificName = "Ursus arctos",
+            Description = "Loài gấu ăn tạp phân bố rộng khắp Bắc Mỹ và lục địa Á - Âu, sở hữu sức mạnh cơ bắp phi thường và giác quan nhạy bén.",
+            ConservationStatus = "LC - Ít quan tâm",
+            ImageUrl = "https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?w=800"
+        };
+
+        var spBaldEagle = new Species
+        {
+            Name = "Đại bàng đầu trắng",
+            ScientificName = "Haliaeetus leucocephalus",
+            Description = "Loài chim săn mồi biểu tượng Bắc Mỹ, nổi tiếng với đầu lông trắng muốt, sải cánh rộng và khả năng bắt cá điêu luyện trên mặt nước.",
+            ConservationStatus = "LC - Ít quan tâm",
+            ImageUrl = "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=800"
+        };
+
+        var spFlamingo = new Species
+        {
+            Name = "Hồng hạc",
+            ScientificName = "Phoenicopterus roseus",
+            Description = "Loài chim lội nước có bộ lông hồng phấn rực rỡ từ sắc tố carotenoid, đôi chân dài mảnh khảnh và chiếc mỏ chuyên lọc sinh vật phù du.",
+            ConservationStatus = "LC - Ít quan tâm",
+            ImageUrl = "https://images.unsplash.com/photo-1539418561314-565804e349c0?w=800"
+        };
+
+        var spPenguin = new Species
+        {
+            Name = "Chim cánh cụt Hoàng đế",
+            ScientificName = "Aptenodytes forsteri",
+            Description = "Loài chim cánh cụt cao và nặng nhất còn sống, sinh sản trong mùa đông băng giá khắc nghiệt tại Nam Cực.",
+            ConservationStatus = "NT - Sắp bị đe dọa",
+            ImageUrl = "https://images.unsplash.com/photo-1598439210625-5067c578f3f6?w=800"
+        };
+
+        var spCrocodile = new Species
+        {
+            Name = "Cá sấu nước mặn",
+            ScientificName = "Crocodylus porosus",
+            Description = "Loài bò sát còn sống lớn nhất hành tinh, có lực cắn mạnh hàng đầu thế giới tự nhiên và phân bố khắp Ấn Độ Dương - Thái Bình Dương.",
+            ConservationStatus = "LC - Ít quan tâm",
+            ImageUrl = "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=800"
+        };
+
+        var spSeaTurtle = new Species
+        {
+            Name = "Rùa biển xanh",
+            ScientificName = "Chelonia mydas",
+            Description = "Loài rùa biển lớn ăn thực vật tại các vùng biển nhiệt đới, đóng vai trò then chốt trong việc duy trì sức khỏe các đồng cỏ biển.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
+        };
+
+        var spKomodo = new Species
+        {
+            Name = "Kỳ đà Komodo",
+            ScientificName = "Varanus komodoensis",
+            Description = "Loài thằn lằn lớn nhất thế giới đặc hữu các đảo của Indonesia, sở hữu nọc độc và khả năng phục kích hạ gục con mồi to lớn.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1584824486509-112e4181ff6b?w=800"
+        };
+
+        var spPoisonFrog = new Species
+        {
+            Name = "Ếch phi tiêu độc",
+            ScientificName = "Dendrobatidae",
+            Description = "Họ ếch nhỏ mang màu sắc cảnh báo rực rỡ ở rừng mưa Trung và Nam Mỹ, da tiết chất độc alkaloid cực mạnh để phòng vệ.",
+            ConservationStatus = "LC - Ít quan tâm",
+            ImageUrl = "https://images.unsplash.com/photo-1563810022204-c36b48baec57?w=800"
+        };
+
+        var spAxolotl = new Species
+        {
+            Name = "Kỳ giông Axolotl",
+            ScientificName = "Ambystoma mexicanum",
+            Description = "Loài lưỡng cư độc đáo giữ lại hình thái ấu trùng suốt đời với các chùm mang ngoài và khả năng tái tạo tế bào, chi cơ thể hoàn hảo.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800"
+        };
+
+        var spGreatWhiteShark = new Species
+        {
+            Name = "Cá mập trắng lớn",
+            ScientificName = "Carcharodon carcharias",
+            Description = "Loài cá săn mồi đầu bảng tại các vùng biển ven bờ đại dương ôn đới, có tốc độ bơi vượt trội và hàm răng tam giác sắc lẹm.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1560275619-4662e36fa65c?w=800"
+        };
+
+        var spMantaRay = new Species
+        {
+            Name = "Cá đuối manta",
+            ScientificName = "Mobula birostris",
+            Description = "Loài cá đuối đại dương khổng lồ có sải vây tới 7 mét, bơi lội duyên dáng trong làn nước xanh và lọc ăn sinh vật phù du bằng mang.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=800"
+        };
+
+        context.Species.AddRange(
+            spLion, spTiger, spElephant, spEagle, spPanda, spIndochinaTiger,
+            spLeopard, spSnowLeopard, spAfricanElephant, spGiraffe, spRhino, spHippo,
+            spChimp, spGorilla, spOrangutan, spPolarBear, spBrownBear, spBaldEagle,
+            spFlamingo, spPenguin, spCrocodile, spSeaTurtle, spKomodo, spPoisonFrog,
+            spAxolotl, spGreatWhiteShark, spMantaRay
+        );
         await context.SaveChangesAsync();
 
         // 10. Seed AREAS (Khu Sư tử, Khu Hổ, Khu Voi, Khu Chim)

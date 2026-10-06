@@ -9,6 +9,7 @@ export const translations = {
     vi: {
         appTitle: "ZooGuide • Thuyết Minh Tự Động Sở Thú",
         tabMap: "Bản Đồ",
+        tabSpeciesAudio: "Thuyết Minh Loài",
         tabAnimals: "Khám Phá",
         tabTicket: "Vé Tham Quan",
         tabAdmin: "Khu Quản Lý",
@@ -23,6 +24,7 @@ export const translations = {
     en: {
         appTitle: "ZooGuide • Smart Zoo Audio Tour",
         tabMap: "Interactive Map",
+        tabSpeciesAudio: "Species Audio",
         tabAnimals: "Discover Animals",
         tabTicket: "My Ticket",
         tabAdmin: "Staff & Admin",
@@ -37,10 +39,10 @@ export const translations = {
 };
 
 export function AppProvider({ children }) {
-    // Current Active Visitor Tab: 'map' | 'animals' | 'tickets'
+    // Current Active Visitor Tab: 'map' | 'species-audio' | 'animals' | 'tickets'
     const [currentTab, setCurrentTab] = useState(() => {
         const hash = window.location.hash.replace('#', '');
-        return ['map', 'animals', 'tickets'].includes(hash) ? hash : 'map';
+        return ['map', 'species-audio', 'animals', 'tickets'].includes(hash) ? hash : 'map';
     });
 
     // Language state
@@ -112,7 +114,7 @@ export function AppProvider({ children }) {
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#', '') || 'map';
-            if (['map', 'animals', 'tickets'].includes(hash)) {
+            if (['map', 'species-audio', 'animals', 'tickets'].includes(hash)) {
                 setCurrentTab(hash);
             }
         };

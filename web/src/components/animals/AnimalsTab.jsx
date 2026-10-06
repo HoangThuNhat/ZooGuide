@@ -34,9 +34,11 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
     }, [searchTerm, filterZone, selectedIucn]);
 
     const getIucnBadgeClass = (status) => {
-        if (status.includes('Cực kỳ')) return 'badge-danger';
-        if (status.includes('Nguy cấp')) return 'badge-warning';
-        if (status.includes('Sắp bị')) return 'badge-amber';
+        if (!status) return 'badge-success';
+        const s = status.toUpperCase();
+        if (s.includes('CR') || s.includes('CỰC KỲ') || s.includes('EX') || s.includes('EW')) return 'badge-danger';
+        if (s.includes('EN') || (s.includes('NGUY CẤP') && !s.includes('SẮP'))) return 'badge-warning';
+        if (s.includes('VU') || s.includes('NT') || s.includes('SẮP')) return 'badge-amber';
         return 'badge-success';
     };
 
@@ -76,6 +78,7 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                         <option value="all">Tất cả tình trạng bảo tồn (IUCN)</option>
                         <option value="Cực kỳ nguy cấp">Cực kỳ nguy cấp (CR)</option>
                         <option value="Nguy cấp">Nguy cấp (EN)</option>
+                        <option value="Sắp nguy cấp">Sắp nguy cấp (VU)</option>
                         <option value="Sắp bị đe dọa">Sắp bị đe dọa (NT)</option>
                         <option value="Ít quan tâm">Ít quan tâm (LC)</option>
                     </select>

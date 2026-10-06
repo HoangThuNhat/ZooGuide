@@ -6,28 +6,28 @@ export default function AdminAnimalsPage() {
     const { showToast } = useApp();
     const [animals, setAnimals] = useState([]);
     const [areas, setAreas] = useState([]);
-    const [speciesList, setSpeciesList] = useState([]);
+    const [speciesOptions, setSpeciesOptions] = useState([]);
     const [isEditing, setIsEditing] = useState(null);
 
     const initialForm = {
         nameVi: '',
         nameEn: '',
         scientificName: '',
-        speciesId: 1,
         species: 'Sư tử Châu Phi',
-        zoneId: 'zone-a',
-        zoneCode: 'A',
-        zoneName: 'Khu Sư Tử',
+        speciesId: 1,
+        zoneId: 'zone-b',
+        zoneCode: 'B',
+        zoneName: 'Khu Động Vật Ăn Thịt Hoàng Gia',
         areaId: 1,
         gender: 'Male',
         origin: '',
         diet: '',
         weight: '',
         lifespan: '',
-        iucnStatus: 'Nguy cấp (EN)',
+        iucnStatus: 'VU - Sắp nguy cấp',
         healthStatus: 'Khỏe mạnh',
         breedingStatus: 'Bình thường',
-        imageUrl: 'https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80'
+        imageUrl: 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=800&q=80'
     };
 
     const [formData, setFormData] = useState(initialForm);
@@ -36,18 +36,19 @@ export default function AdminAnimalsPage() {
         const resA = await ZooApi.getAnimals();
         if (resA.success) setAnimals(resA.data);
         const resZ = await ZooApi.getAreas();
-        if (resZ.success) {
-            setAreas(resZ.data);
-            if (resZ.data.length > 0 && !formData.zoneId) {
-                setFormData(prev => ({
-                    ...prev,
-                    zoneId: resZ.data[0].id || `zone-${resZ.data[0].code?.toLowerCase()}`,
-                    areaId: resZ.data[0].areaId || resZ.data[0].id
-                }));
-            }
-        }
-        const resS = await ZooApi.getSpecies();
-        if (resS.success) setSpeciesList(resS.data);
+if (resZ.success) {
+    setAreas(resZ.data);
+    if (resZ.data.length > 0 && !formData.zoneId) {
+        setFormData(prev => ({
+            ...prev,
+            zoneId: resZ.data[0].id || `zone-${resZ.data[0].code?.toLowerCase()}`,
+            areaId: resZ.data[0].areaId || resZ.data[0].id
+        }));
+    }
+}
+
+const resS = await ZooApi.getSpecies();
+if (resS.success) setSpeciesOptions(resS.data);
     };
 
     useEffect(() => {
@@ -63,6 +64,26 @@ export default function AdminAnimalsPage() {
             zoneCode: area ? area.code : 'A',
             zoneName: area ? (area.nameVi || area.name) : ''
         });
+    };
+
+    const handleSpeciesChange = (speciesId) => {
+        const sp = speciesOptions.find(s => String(s.id) === String(speciesId));
+        if (sp) {
+            setFormData({
+                ...formData,
+                speciesId: sp.id,
+                species: sp.nameVi,
+                scientificName: sp.nameEn || formData.scientificName,
+                iucnStatus: sp.conservationStatus || formData.iucnStatus,
+                imageUrl: formData.imageUrl || sp.imageUrl || ''
+            });
+        } else {
+            setFormData({
+                ...formData,
+                speciesId: null,
+                species: ''
+            });
+        }
     };
 
     const handleSubmit = async (e) => {
@@ -104,6 +125,14 @@ export default function AdminAnimalsPage() {
         }
     };
 
+    const getIucnBadgeClass = (status) => {
+        const s = (status || '').toUpperCase();
+        if (s.includes('CR') || s.includes('CỰC KỲ') || s.includes('EX') || s.includes('EW')) return 'badge-danger';
+        if (s.includes('EN') || (s.includes('NGUY CẤP') && !s.includes('SẮP'))) return 'badge-warning';
+        if (s.includes('VU') || s.includes('NT') || s.includes('SẮP')) return 'badge-amber';
+        return 'badge-success';
+    };
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -112,7 +141,7 @@ export default function AdminAnimalsPage() {
                         Quản Lý Động Vật (Animal Records CMS)
                     </h2>
                     <p style={{ color: '#64748B', margin: 0, fontSize: '0.9rem' }}>
-                        Hồ sơ các cá thể thú, định vị chuồng trại trên bản đồ, tình trạng bảo tồn IUCN và chế độ dinh dưỡng.
+                        Hồ sơ các cá thể thú, liên kết phân loại loài (Species), định vị chuồng trại trên bản đồ và tình trạng bảo tồn IUCN.
                     </p>
                 </div>
                 <span className="chip font-bold">{animals.length} cá thể động vật</span>
@@ -126,7 +155,7 @@ export default function AdminAnimalsPage() {
                             <thead>
                                 <tr>
                                     <th>Mã / Hình</th>
-                                    <th>Tên loài & Tên Latin</th>
+                                    <th>Tên cá thể & Loài sinh học</th>
                                     <th>Phân khu</th>
                                     <th>Bảo tồn (IUCN)</th>
                                     <th>Hồ sơ sức khỏe</th>
@@ -144,13 +173,16 @@ export default function AdminAnimalsPage() {
                                         </td>
                                         <td>
                                             <strong>{a.nameVi}</strong>
-                                            <div className="text-xs text-muted italic">{a.scientificName}</div>
+                                            <div className="text-xs text-muted">
+                                                <span className="font-semibold text-primary">{a.species}</span>
+                                                {a.scientificName && <span> • <em className="italic">{a.scientificName}</em></span>}
+                                            </div>
                                         </td>
                                         <td>
                                             <span className="chip chip-sm">Khu {a.zoneCode}</span>
                                         </td>
                                         <td>
-                                            <span className="badge badge-amber">{a.iucnStatus}</span>
+                                            <span className={`badge ${getIucnBadgeClass(a.iucnStatus)}`}>{a.iucnStatus}</span>
                                         </td>
                                         <td className="text-xs text-success">{a.healthStatus}</td>
                                         <td>
@@ -184,40 +216,60 @@ export default function AdminAnimalsPage() {
                     </h3>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
-                            <label className="form-label">Tên cá thể động vật</label>
+
+
+                            <label className="form-label">Tên cá thể động vật (Tiếng Việt)</label>
+
                             <input 
                                 type="text" 
                                 className="form-input" 
                                 required
-                                placeholder="VD: Simba, Bé Na, Cường Đô..."
+
+                                placeholder="VD: Sư tử Simba"
+
                                 value={formData.nameVi}
                                 onChange={(e) => setFormData({ ...formData, nameVi: e.target.value })}
                             />
                         </div>
 
+
+                        <div className="form-group">
+                            <label className="form-label">Thuộc Loài sinh học (Species)</label>
+                            <select 
+                                className="form-select"
+                                value={formData.speciesId || ''}
+                                onChange={(e) => handleSpeciesChange(e.target.value)}
+                            >
+                                <option value="">-- Chọn loài sinh học --</option>
+                                {speciesOptions.map(sp => (
+                                    <option key={sp.id} value={sp.id}>
+                                        {sp.nameVi} ({sp.nameEn}) - {sp.conservationStatus}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         <div className="form-grid-2">
                             <div className="form-group">
-                                <label className="form-label">Giống loài sinh học (Species)</label>
-                                <select 
-                                    className="form-select"
-                                    value={formData.speciesId || (speciesList[0] ? speciesList[0].id : 1)}
-                                    onChange={(e) => {
-                                        const sId = Number(e.target.value);
-                                        const found = speciesList.find(s => s.id === sId);
-                                        setFormData({
-                                            ...formData,
-                                            speciesId: sId,
-                                            species: found ? found.nameVi : formData.species,
-                                            nameEn: found ? (found.nameEn || found.name) : formData.nameEn,
-                                            scientificName: found ? (found.scientificName || found.nameEn || '') : formData.scientificName,
-                                            iucnStatus: found ? (found.conservationStatus || formData.iucnStatus) : formData.iucnStatus
-                                        });
-                                    }}
-                                >
-                                    {speciesList.map(s => (
-                                        <option key={s.id} value={s.id}>{s.nameVi} ({s.nameEn || s.scientificName || ''})</option>
-                                    ))}
-                                </select>
+                                <label className="form-label">Tên quốc tế</label>
+                                <input 
+                                    type="text" 
+                                    className="form-input" 
+                                    placeholder="African Lion Simba"
+                                    value={formData.nameEn}
+                                    onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Tên khoa học (Latin)</label>
+                                <input 
+                                    type="text" 
+                                    className="form-input" 
+                                    placeholder="Panthera leo"
+                                    value={formData.scientificName}
+                                    onChange={(e) => setFormData({ ...formData, scientificName: e.target.value })}
+                                />
+
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Phân khu nuôi thả</label>
@@ -253,11 +305,15 @@ export default function AdminAnimalsPage() {
                                     value={formData.iucnStatus}
                                     onChange={(e) => setFormData({ ...formData, iucnStatus: e.target.value })}
                                 >
-                                    <option value="Cực kỳ nguy cấp (CR)">Cực kỳ nguy cấp (CR)</option>
-                                    <option value="Nguy cấp (EN)">Nguy cấp (EN)</option>
-                                    <option value="Sắp nguy cấp (VU)">Sắp nguy cấp (VU)</option>
-                                    <option value="Sắp bị đe dọa (NT)">Sắp bị đe dọa (NT)</option>
-                                    <option value="Ít quan tâm (LC)">Ít quan tâm (LC)</option>
+                                    <option value="CR - Cực kỳ nguy cấp">CR - Cực kỳ nguy cấp</option>
+                                    <option value="EN - Nguy cấp">EN - Nguy cấp</option>
+                                    <option value="VU - Sắp nguy cấp">VU - Sắp nguy cấp</option>
+                                    <option value="NT - Sắp bị đe dọa">NT - Sắp bị đe dọa</option>
+                                    <option value="LC - Ít quan tâm">LC - Ít quan tâm</option>
+                                    <option value="EW - Tuyệt chủng trong tự nhiên">EW - Tuyệt chủng trong tự nhiên</option>
+                                    <option value="EX - Tuyệt chủng">EX - Tuyệt chủng</option>
+                                    <option value="DD - Thiếu dữ liệu">DD - Thiếu dữ liệu</option>
+                                    <option value="NE - Chưa được đánh giá">NE - Chưa được đánh giá</option>
                                 </select>
                             </div>
                         </div>
@@ -268,7 +324,7 @@ export default function AdminAnimalsPage() {
                                 <input 
                                     type="text" 
                                     className="form-input" 
-                                    placeholder="VD: Ấn Độ"
+                                    placeholder="VD: Tanzania, Serengeti"
                                     value={formData.origin}
                                     onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
                                 />
@@ -278,7 +334,7 @@ export default function AdminAnimalsPage() {
                                 <input 
                                     type="text" 
                                     className="form-input" 
-                                    placeholder="VD: Thịt hươu, thịt bò"
+                                    placeholder="VD: Thịt bò tươi, hươu nai"
                                     value={formData.diet}
                                     onChange={(e) => setFormData({ ...formData, diet: e.target.value })}
                                 />
@@ -291,7 +347,7 @@ export default function AdminAnimalsPage() {
                                 <input 
                                     type="text" 
                                     className="form-input" 
-                                    placeholder="180 - 260 kg"
+                                    placeholder="VD: 190 kg"
                                     value={formData.weight}
                                     onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
                                 />
@@ -301,7 +357,7 @@ export default function AdminAnimalsPage() {
                                 <input 
                                     type="text" 
                                     className="form-input" 
-                                    placeholder="15 - 20 năm"
+                                    placeholder="VD: 14 - 18 năm"
                                     value={formData.lifespan}
                                     onChange={(e) => setFormData({ ...formData, lifespan: e.target.value })}
                                 />
