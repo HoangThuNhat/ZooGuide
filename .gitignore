@@ -27,5 +27,12 @@
 ## OS
 .DS_Store
 Thumbs.db
+
 src/API/appsettings.Development.json
 node_modules/
+
+**/bin/
+**/obj/
+
+dist/
+**/dist/

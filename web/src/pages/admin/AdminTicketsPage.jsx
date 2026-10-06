@@ -5,10 +5,10 @@ import { useApp } from '../../context/AppContext';
 export default function AdminTicketsPage() {
     const { showToast } = useApp();
     const [tickets, setTickets] = useState([]);
+    const [ticketTypes, setTicketTypes] = useState([]);
     const [formData, setFormData] = useState({
-        ticketCode: '',
+        ticketTypeId: '',
         customerName: '',
-        ticketType: 'VIP Family Pass',
         validDate: new Date().toISOString().split('T')[0],
         hasAudioGuide: true
     });
@@ -16,6 +16,8 @@ export default function AdminTicketsPage() {
     const loadData = async () => {
         const res = await ZooApi.getTickets();
         if (res.success) setTickets(res.data);
+        const resTypes = await ZooApi.getTicketTypes();
+        if (resTypes.success) setTicketTypes(resTypes.data);
     };
 
     useEffect(() => {
@@ -24,19 +26,23 @@ export default function AdminTicketsPage() {
 
     const handleCreateTicket = async (e) => {
         e.preventDefault();
-        if (!formData.customerName.trim()) return;
+        if (!formData.customerName.trim() || !formData.ticketTypeId) {
+            showToast("Vui lòng nhập tên khách hàng và chọn hạng vé", "error");
+            return;
+        }
 
         const res = await ZooApi.createTicket(formData);
         if (res.success) {
-            showToast("Phát hành vé tham quan mới thành công!", "success");
+            showToast(`Phát hành vé ${res.data.ticketCode} thành công!`, "success");
             setFormData({
-                ticketCode: '',
+                ticketTypeId: '',
                 customerName: '',
-                ticketType: 'VIP Family Pass',
                 validDate: new Date().toISOString().split('T')[0],
                 hasAudioGuide: true
             });
             loadData();
+        } else {
+            showToast(res.message || res.error || "Có lỗi xảy ra", "error");
         }
     };
 
@@ -131,13 +137,13 @@ export default function AdminTicketsPage() {
                             <label className="form-label">Hạng vé tham quan</label>
                             <select 
                                 className="form-select"
-                                value={formData.ticketType}
-                                onChange={(e) => setFormData({ ...formData, ticketType: e.target.value })}
+                                value={formData.ticketTypeId}
+                                onChange={(e) => setFormData({ ...formData, ticketTypeId: e.target.value })}
                             >
-                                <option value="VIP Family Pass">VIP Family Pass</option>
-                                <option value="Standard Adult">Standard Adult (Người lớn)</option>
-                                <option value="Standard Child">Standard Child (Trẻ em)</option>
-                                <option value="Student Pass">Student Pass (Học sinh/Sinh viên)</option>
+                                <option value="">-- Chọn loại vé --</option>
+                                {ticketTypes.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name}</option>
+                                ))}
                             </select>
                         </div>
                         <div className="form-group">

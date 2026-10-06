@@ -70,7 +70,7 @@ public class TicketService : ITicketService
             throw new ArgumentException("TicketType not found");
 
         if (string.IsNullOrWhiteSpace(request.TicketCode))
-            throw new ArgumentException("TicketCode is required");
+            request.TicketCode = "ZOO-" + DateTime.UtcNow.ToString("yyyyMMdd") + "-" + Guid.NewGuid().ToString("N").Substring(0, 5).ToUpper();
 
         if (request.ValidUntil <= request.ValidFrom)
             throw new ArgumentException("ValidUntil must be after ValidFrom");
@@ -101,12 +101,7 @@ public class TicketService : ITicketService
         var ticket = await _context.Tickets.FindAsync(id);
         if (ticket == null) return null;
 
-        if (ticket.Status == TicketStatus.Used || ticket.Status == TicketStatus.Expired || ticket.Status == TicketStatus.Cancelled)
-        {
-            // Business rule: only specific fields can be changed or maybe block updates
-            if (request.Status != ticket.Status) 
-                throw new InvalidOperationException("Cannot update status of a used, expired, or cancelled ticket.");
-        }
+        // Allowed by Admin UI to toggle status
 
         if (request.ValidUntil <= request.ValidFrom)
             throw new ArgumentException("ValidUntil must be after ValidFrom");
