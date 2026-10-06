@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ZooGuide.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+72c58a7fddca0a599bc828cd1850d11a24466556")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+adfb091d29057ca8b8d6254a4fc8a1be77643f06")]
 [assembly: System.Reflection.AssemblyProductAttribute("ZooGuide.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ZooGuide.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

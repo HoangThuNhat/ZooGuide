@@ -10,3 +10,15 @@ C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\src\Domain\obj\D
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\src\Domain\obj\Debug\net8.0\refint\ZooGuide.Domain.dll
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.pdb
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\src\Domain\obj\Debug\net8.0\ref\ZooGuide.Domain.dll
+D:\CNPM\src\Domain\bin\Debug\net8.0\ZooGuide.Domain.deps.json
+D:\CNPM\src\Domain\bin\Debug\net8.0\ZooGuide.Domain.dll
+D:\CNPM\src\Domain\bin\Debug\net8.0\ZooGuide.Domain.pdb
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.GeneratedMSBuildEditorConfig.editorconfig
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.AssemblyInfoInputs.cache
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.AssemblyInfo.cs
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.csproj.CoreCompileInputs.cache
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.sourcelink.json
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.dll
+D:\CNPM\src\Domain\obj\Debug\net8.0\refint\ZooGuide.Domain.dll
+D:\CNPM\src\Domain\obj\Debug\net8.0\ZooGuide.Domain.pdb
+D:\CNPM\src\Domain\obj\Debug\net8.0\ref\ZooGuide.Domain.dll

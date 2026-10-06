@@ -1,5 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using ZooGuide.API.Filters;
+using ZooGuide.Application.Interfaces;
+using ZooGuide.Application.Services;
 using ZooGuide.Infrastructure.Data;
+using ZooGuide.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,6 +23,20 @@ builder.Services.AddDbContext<ZooGuideDbContext>(options =>
         sqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
     });
 });
+
+// Register Repositories for Areas, Animals, Tickets
+builder.Services.AddScoped<IAreaRepository, AreaRepository>();
+builder.Services.AddScoped<IAnimalRepository, AnimalRepository>();
+builder.Services.AddScoped<ITicketRepository, TicketRepository>();
+builder.Services.AddScoped<ITicketSessionRepository, TicketSessionRepository>();
+
+// Register Application Services for Areas, Animals, Tickets
+builder.Services.AddScoped<IAreaService, AreaService>();
+builder.Services.AddScoped<IAnimalService, AnimalService>();
+builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
+
+// Register Session Filter
+builder.Services.AddScoped<RequireTicketSessionFilter>();
 
 // Configure CORS for web frontend
 builder.Services.AddCors(options =>

@@ -1,0 +1,216 @@
+using ZooGuide.Application.DTOs;
+using ZooGuide.Application.Interfaces;
+using ZooGuide.Domain.Entities;
+using ZooGuide.Domain.Enums;
+
+namespace ZooGuide.Application.Services;
+
+/// <summary>
+/// Xử lý nghiệp vụ quản lý hồ sơ cá thể động vật (Animals) và phân loại giống loài
+/// </summary>
+public class AnimalService : IAnimalService
+{
+    private readonly IAnimalRepository _animalRepository;
+
+    public AnimalService(IAnimalRepository animalRepository)
+    {
+        _animalRepository = animalRepository;
+    }
+
+    public async Task<IEnumerable<AnimalResponseDto>> GetAnimalsAsync(AnimalFilterDto? filter)
+    {
+        var animals = await _animalRepository.GetAllWithDetailsAsync(
+            filter?.Search,
+            filter?.AreaId,
+            filter?.ZoneId,
+            filter?.SpeciesId,
+            filter?.IucnStatus);
+
+        return animals.Select(MapToResponseDto);
+    }
+
+    public async Task<AnimalDetailDto?> GetAnimalByIdAsync(int animalId)
+    {
+        var animal = await _animalRepository.GetByIdWithDetailsAsync(animalId);
+        if (animal == null) return null;
+
+        var dto = MapToResponseDto(animal);
+        return new AnimalDetailDto
+        {
+            AnimalId = dto.AnimalId,
+            SpeciesId = dto.SpeciesId,
+            SpeciesName = dto.SpeciesName,
+            ScientificName = dto.ScientificName,
+            ConservationStatus = dto.ConservationStatus,
+            AreaId = dto.AreaId,
+            AreaName = dto.AreaName,
+            Name = dto.Name,
+            Description = dto.Description,
+            Gender = dto.Gender,
+            DateOfBirth = dto.DateOfBirth,
+            Origin = dto.Origin,
+            HealthStatus = dto.HealthStatus,
+            ConservationNote = dto.ConservationNote,
+            ImageUrl = dto.ImageUrl,
+            Status = dto.Status,
+            CreatedAt = dto.CreatedAt,
+            UpdatedAt = dto.UpdatedAt,
+            Species = animal.Species == null ? null : new SpeciesDetailDto
+            {
+                SpeciesId = animal.Species.SpeciesId,
+                Name = animal.Species.Name,
+                ScientificName = animal.Species.ScientificName,
+                Description = animal.Species.Description,
+                ConservationStatus = animal.Species.ConservationStatus,
+                ImageUrl = animal.Species.ImageUrl
+            },
+            Area = animal.Area == null ? null : new AreaResponseDto
+            {
+                AreaId = animal.Area.AreaId,
+                Name = animal.Area.Name,
+                Description = animal.Area.Description,
+                Latitude = animal.Area.Latitude,
+                Longitude = animal.Area.Longitude,
+                RadiusMeters = animal.Area.RadiusMeters,
+                MapImageUrl = animal.Area.MapImageUrl,
+                Status = animal.Area.Status.ToString()
+            }
+        };
+    }
+
+    public async Task<(AnimalResponseDto? Data, string? ErrorMessage)> CreateAnimalAsync(CreateAnimalDto dto)
+    {
+        // 1. Kiểm tra giống loài (SpeciesId) có tồn tại trong DB không
+        bool speciesExists = await _animalRepository.SpeciesExistsAsync(dto.SpeciesId);
+        if (!speciesExists)
+        {
+            return (null, $"Giống loài với SpeciesId = {dto.SpeciesId} không tồn tại trong hệ thống.");
+        }
+
+        // 2. Kiểm tra phân khu chuồng trại (AreaId) có tồn tại không
+        bool areaExists = await _animalRepository.AreaExistsAsync(dto.AreaId);
+        if (!areaExists)
+        {
+            return (null, $"Khu vực phân chuồng với AreaId = {dto.AreaId} không tồn tại trong hệ thống.");
+        }
+
+        // 3. Khởi tạo cá thể động vật
+        var animal = new Animal
+        {
+            SpeciesId = dto.SpeciesId,
+            AreaId = dto.AreaId,
+            Name = dto.Name.Trim(),
+            Description = dto.Description?.Trim(),
+            Gender = dto.Gender,
+            DateOfBirth = dto.DateOfBirth,
+            Origin = dto.Origin?.Trim(),
+            HealthStatus = dto.HealthStatus?.Trim(),
+            ConservationNote = dto.ConservationNote?.Trim(),
+            ImageUrl = dto.ImageUrl?.Trim(),
+            Status = dto.Status,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        var created = await _animalRepository.AddAsync(animal);
+        var createdWithDetails = await _animalRepository.GetByIdWithDetailsAsync(created.AnimalId);
+
+        return (MapToResponseDto(createdWithDetails ?? created), null);
+    }
+
+    public async Task<(AnimalResponseDto? Data, string? ErrorMessage, bool NotFound)> UpdateAnimalAsync(int animalId, UpdateAnimalDto dto)
+    {
+        var animal = await _animalRepository.GetByIdWithDetailsAsync(animalId);
+        if (animal == null)
+        {
+            return (null, "Không tìm thấy hồ sơ động vật.", true);
+        }
+
+        // Kiểm tra giống loài mới nếu có thay đổi
+        if (animal.SpeciesId != dto.SpeciesId)
+        {
+            bool speciesExists = await _animalRepository.SpeciesExistsAsync(dto.SpeciesId);
+            if (!speciesExists)
+            {
+                return (null, $"Giống loài mới SpeciesId = {dto.SpeciesId} không tồn tại trong hệ thống.", false);
+            }
+        }
+
+        // Kiểm tra khu vực mới nếu có thay đổi
+        if (animal.AreaId != dto.AreaId)
+        {
+            bool areaExists = await _animalRepository.AreaExistsAsync(dto.AreaId);
+            if (!areaExists)
+            {
+                return (null, $"Phân khu mới AreaId = {dto.AreaId} không tồn tại trong hệ thống.", false);
+            }
+        }
+
+        // Cập nhật thông tin
+        animal.SpeciesId = dto.SpeciesId;
+        animal.AreaId = dto.AreaId;
+        animal.Name = dto.Name.Trim();
+        animal.Description = dto.Description?.Trim();
+        animal.Gender = dto.Gender;
+        animal.DateOfBirth = dto.DateOfBirth;
+        animal.Origin = dto.Origin?.Trim();
+        animal.HealthStatus = dto.HealthStatus?.Trim();
+        animal.ConservationNote = dto.ConservationNote?.Trim();
+        animal.ImageUrl = dto.ImageUrl?.Trim();
+        animal.Status = dto.Status;
+        animal.UpdatedAt = DateTime.UtcNow;
+
+        await _animalRepository.UpdateAsync(animal);
+        var updated = await _animalRepository.GetByIdWithDetailsAsync(animalId);
+
+        return (MapToResponseDto(updated ?? animal), null, false);
+    }
+
+    public async Task<(bool Success, bool NotFound, bool HasConflict, string? Message)> DeleteAnimalAsync(int animalId)
+    {
+        var animal = await _animalRepository.GetByIdAsync(animalId);
+        if (animal == null)
+        {
+            return (false, true, false, "Không tìm thấy hồ sơ động vật.");
+        }
+
+        // Kiểm tra các bài thuyết minh liên quan
+        bool hasNarrations = await _animalRepository.HasNarrationsAsync(animalId);
+        if (hasNarrations)
+        {
+            // Có dữ liệu thuyết minh -> Chuyển sang trạng thái Transferred (đã chuyển giao) để giữ nguyên vẹn dữ liệu
+            animal.Status = AnimalStatus.Transferred;
+            animal.UpdatedAt = DateTime.UtcNow;
+            await _animalRepository.UpdateAsync(animal);
+            return (true, false, true, "Động vật đang có các bài thuyết minh liên kết. Đã chuyển trạng thái sang 'Transferred' (Đã chuyển đi) thay vì xóa hoàn toàn.");
+        }
+
+        // Không có ràng buộc -> Xóa an toàn
+        await _animalRepository.DeleteAsync(animal);
+        return (true, false, false, "Đã xóa hồ sơ động vật thành công.");
+    }
+
+    private static AnimalResponseDto MapToResponseDto(Animal a)
+    {
+        return new AnimalResponseDto
+        {
+            AnimalId = a.AnimalId,
+            SpeciesId = a.SpeciesId,
+            SpeciesName = a.Species?.Name ?? string.Empty,
+            ScientificName = a.Species?.ScientificName,
+            ConservationStatus = a.Species?.ConservationStatus,
+            AreaId = a.AreaId,
+            AreaName = a.Area?.Name ?? string.Empty,
+            Name = a.Name,
+            Description = a.Description,
+            Gender = a.Gender.ToString(),
+            DateOfBirth = a.DateOfBirth,
+            Origin = a.Origin,
+            HealthStatus = a.HealthStatus,
+            ConservationNote = a.ConservationNote,
+            ImageUrl = a.ImageUrl,
+            Status = a.Status.ToString(),
+            CreatedAt = a.CreatedAt,
+            UpdatedAt = a.UpdatedAt
+        };
+    }
+}
