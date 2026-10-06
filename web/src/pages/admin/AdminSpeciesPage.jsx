@@ -8,7 +8,7 @@ export default function AdminSpeciesPage() {
     const [formData, setFormData] = useState({
         nameVi: '',
         nameEn: '',
-        scientificOrder: '',
+        conservationStatus: '',
         description: ''
     });
 
@@ -28,7 +28,7 @@ export default function AdminSpeciesPage() {
         const res = await ZooApi.createSpecies(formData);
         if (res.success) {
             showToast("Thêm loài mới thành công!", "success");
-            setFormData({ nameVi: '', nameEn: '', scientificOrder: '', description: '' });
+            setFormData({ nameVi: '', nameEn: '', conservationStatus: '', description: '' });
             loadData();
         }
     };
@@ -64,7 +64,7 @@ export default function AdminSpeciesPage() {
                                 <tr>
                                     <th>Tên Tiếng Việt</th>
                                     <th>Tên Khoa Học / Quốc Tế</th>
-                                    <th>Bộ (Order)</th>
+                                    <th>Tình trạng bảo tồn</th>
                                     <th>Mô tả sinh thái</th>
                                     <th>Thao tác</th>
                                 </tr>
@@ -74,7 +74,7 @@ export default function AdminSpeciesPage() {
                                     <tr key={s.id}>
                                         <td className="font-bold text-primary">{s.nameVi}</td>
                                         <td className="italic">{s.nameEn}</td>
-                                        <td><span className="chip chip-sm">{s.scientificOrder}</span></td>
+                                        <td><span className="chip chip-sm">{s.conservationStatus}</span></td>
                                         <td className="text-xs text-muted" style={{ maxWidth: '280px' }}>{s.description}</td>
                                         <td>
                                             <button 
@@ -119,14 +119,14 @@ export default function AdminSpeciesPage() {
                             />
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Bộ khoa học (Order)</label>
+                            <label className="form-label">Tình trạng bảo tồn (IUCN)</label>
                             <input 
                                 type="text" 
                                 className="form-input" 
-                                placeholder="VD: Carnivora"
+                                placeholder="VD: Nguy cấp (EN)"
                                 required
-                                value={formData.scientificOrder}
-                                onChange={(e) => setFormData({ ...formData, scientificOrder: e.target.value })}
+                                value={formData.conservationStatus}
+                                onChange={(e) => setFormData({ ...formData, conservationStatus: e.target.value })}
                             />
                         </div>
                         <div className="form-group">

@@ -5,8 +5,10 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: 'http://localhost:5000/api',
-    USE_MOCK: true, // Set to false when backend ZooGuide.API is running
+    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
+        ? import.meta.env.VITE_USE_MOCK === 'true'
+        : true,
     TIMEOUT_MS: 8000
 };
 
@@ -463,6 +465,18 @@ export const MOCK_DB = {
 // API CLIENT IMPLEMENTATION
 // ==========================================
 export const ZooApi = {
+    // 0. HEALTH CHECK
+    async checkHealth() {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/health`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            console.error("Health check error:", err);
+            return { status: "Unhealthy", error: err.message };
+        }
+    },
+
     // 1. TICKET & SESSION
     async validateTicket(ticketCode) {
         if (!ticketCode || !ticketCode.trim()) {
@@ -516,8 +530,41 @@ export const ZooApi = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ticketCode: normalizedCode })
             });
-            if (!res.ok) throw new Error("Lỗi kết nối máy chủ");
-            return await res.json();
+
+            if (!res.ok) {
+                try {
+                    const errorData = await res.json();
+                    if (errorData && errorData.message) {
+                        return { success: false, message: errorData.message };
+                    }
+                } catch (e) {
+                    // Fallback to throw if JSON parsing fails
+                }
+                throw new Error("Lỗi kết nối máy chủ");
+            }
+            
+            const data = await res.json();
+            
+            if (data.valid) {
+                const session = {
+                    sessionId: data.sessionId || "SES-LIVE",
+                    ticketCode: data.ticketCode || normalizedCode,
+                    customerName: "Khách hàng",
+                    ticketType: "Vé điện tử",
+                    validDate: data.validUntil ? data.validUntil.split('T')[0] : new Date().toISOString().split('T')[0],
+                    zonesAllowed: ["ALL"],
+                    hasAudioGuide: true,
+                    activatedAt: new Date().toISOString(),
+                    expiresAt: data.validUntil || new Date(Date.now() + 8 * 3600 * 1000).toISOString()
+                };
+                return {
+                    success: true,
+                    message: data.message || "Xác thực vé thành công! Phiên tham quan đã được mở khóa.",
+                    session: session
+                };
+            } else {
+                return { success: false, message: data.message || "Vé không hợp lệ." };
+            }
         } catch (err) {
             console.warn("Live API failed, fallback to mock:", err);
             return { success: false, message: "Không thể kết nối đến máy chủ vé." };
@@ -566,10 +613,49 @@ export const ZooApi = {
         }
 
         try {
-            const query = new URLSearchParams(filters).toString();
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals?${query}`);
-            return await res.json();
+            const res = await fetch(`${API_CONFIG.BASE_URL}/species`);
+            if (!res.ok) throw new Error("Lỗi kết nối");
+            const speciesData = await res.json();
+
+            let results = speciesData.map((s) => ({
+                id: s.speciesId,
+                code: `SPECIES-${s.speciesId}`,
+                nameVi: s.name,
+                nameEn: s.scientificName || s.name,
+                scientificName: s.scientificName || s.name,
+                species: "Loài vật",
+                zoneId: "zone-a",
+                zoneCode: "A",
+                zoneName: "Khu vực chung",
+                mapX: 300,
+                mapY: 300,
+                imageUrl: s.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
+                origin: "Không rõ",
+                diet: "Tự nhiên",
+                lifespan: "Không rõ",
+                weight: "Không rõ",
+                iucnStatus: s.conservationStatus || "Ít quan tâm",
+                healthStatus: "Tốt",
+                breedingStatus: "Bình thường",
+                funFactsVi: [s.description || "Chưa có thông tin mô tả chi tiết."],
+                funFactsEn: [s.description || "No information yet."]
+            }));
+
+            if (filters.search) {
+                const q = filters.search.toLowerCase().trim();
+                results = results.filter(a => 
+                    (a.nameVi && a.nameVi.toLowerCase().includes(q)) || 
+                    (a.scientificName && a.scientificName.toLowerCase().includes(q))
+                );
+            }
+
+            if (filters.iucnStatus && filters.iucnStatus !== 'all') {
+                results = results.filter(a => a.iucnStatus.includes(filters.iucnStatus));
+            }
+
+            return { success: true, count: results.length, data: results };
         } catch (err) {
+            console.warn("Live API /species failed:", err);
             return { success: true, count: MOCK_DB.animals.length, data: MOCK_DB.animals };
         }
     },
@@ -649,19 +735,54 @@ export const ZooApi = {
 
     // 8. ADMIN: SPECIES CRUD
     async getSpecies() {
-        await this._simulateLatency(150);
-        return { success: true, data: MOCK_DB.species };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/species`);
+            if (!res.ok) throw new Error("API lỗi");
+            const data = await res.json();
+            const mapped = data.map(s => ({
+                id: s.speciesId,
+                nameVi: s.name,
+                nameEn: s.scientificName || s.name,
+                conservationStatus: s.conservationStatus || "N/A",
+                description: s.description || ""
+            }));
+            return { success: true, data: mapped };
+        } catch (err) {
+            console.error(err);
+            return { success: false, data: MOCK_DB.species, error: err.message };
+        }
     },
     async createSpecies(data) {
-        await this._simulateLatency(200);
-        const newItem = { id: Date.now(), ...data };
-        MOCK_DB.species.push(newItem);
-        return { success: true, data: newItem };
+        try {
+            const reqData = {
+                name: data.nameVi,
+                scientificName: data.nameEn,
+                description: data.description,
+                conservationStatus: data.conservationStatus,
+                imageUrl: ""
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/species`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) throw new Error("Lỗi tạo species");
+            const created = await res.json();
+            return { success: true, data: created };
+        } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
     },
     async deleteSpecies(id) {
-        await this._simulateLatency(200);
-        MOCK_DB.species = MOCK_DB.species.filter(s => s.id !== id);
-        return { success: true };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/species/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error("Lỗi xóa species");
+            return { success: true };
+        } catch(err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
     },
 
     // 9. ADMIN: ANIMALS CRUD
@@ -725,42 +846,177 @@ export const ZooApi = {
 
     // 11. ADMIN: TICKETS CRUD
     async getTickets() {
-        await this._simulateLatency(150);
-        return { success: true, data: MOCK_DB.tickets };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
+            if (!res.ok) throw new Error("Lỗi kết nối");
+            const data = await res.json();
+            const mapped = data.map(t => {
+                let statusStr = 'Active';
+                if (t.status === 2) statusStr = 'Used';
+                if (t.status === 3) statusStr = 'Expired';
+                return {
+                    ticketCode: t.ticketCode,
+                    customerName: "Khách hàng",
+                    ticketType: t.ticketTypeName || "Standard",
+                    validDate: t.validUntil ? t.validUntil.split('T')[0] : new Date().toISOString().split('T')[0],
+                    status: statusStr,
+                    zonesAllowed: ["ALL"]
+                };
+            });
+            return { success: true, data: mapped };
+        } catch (err) {
+            console.error(err);
+            return { success: false, data: MOCK_DB.tickets, error: err.message };
+        }
     },
     async createTicket(data) {
-        await this._simulateLatency(200);
-        const newTicket = {
-            ticketCode: data.ticketCode || `ZOO-${Math.floor(1000 + Math.random() * 9000)}-STD`,
-            status: "Active",
-            validDate: data.validDate || new Date().toISOString().split('T')[0],
-            hasAudioGuide: data.hasAudioGuide !== false,
-            zonesAllowed: data.zonesAllowed || ["ALL"],
-            ...data
-        };
-        MOCK_DB.tickets.unshift(newTicket);
-        return { success: true, data: newTicket };
+        try {
+            const reqData = {
+                ticketTypeId: parseInt(data.ticketTypeId),
+                ticketCode: data.ticketCode || "",
+                validFrom: new Date().toISOString(),
+                validUntil: data.validDate ? new Date(data.validDate).toISOString() : new Date(Date.now() + 86400000).toISOString(),
+                status: 1
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Lỗi tạo vé");
+            }
+            const created = await res.json();
+            return { success: true, data: {
+                ticketCode: created.ticketCode,
+                status: 'Active',
+                validDate: created.validUntil.split('T')[0],
+                customerName: data.customerName || "Khách hàng",
+                ticketType: created.ticketTypeName || "Standard",
+                zonesAllowed: ["ALL"]
+            }};
+        } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
     },
     async updateTicketStatus(code, status) {
-        await this._simulateLatency(200);
-        const ticket = MOCK_DB.tickets.find(t => t.ticketCode === code);
-        if (ticket) {
-            ticket.status = status;
-            return { success: true, data: ticket };
+        try {
+            const allRes = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
+            const allData = await allRes.json();
+            const ticket = allData.find(t => t.ticketCode === code);
+            if (!ticket) throw new Error("Không tìm thấy vé");
+
+            let statusCode = 1;
+            if (status === 'Used') statusCode = 2;
+            if (status === 'Expired') statusCode = 3;
+
+            const updateReq = {
+                ticketTypeId: ticket.ticketTypeId,
+                ticketCode: ticket.ticketCode,
+                validFrom: ticket.validFrom,
+                validUntil: ticket.validUntil,
+                status: statusCode
+            };
+
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${ticket.ticketId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updateReq)
+            });
+            if (!res.ok) throw new Error("Lỗi cập nhật");
+            return { success: true, data: { ticketCode: code, status: status } };
+        } catch (err) {
+            return { success: false, message: err.message || "Lỗi cập nhật trạng thái vé" };
         }
-        return { success: false, message: "Không tìm thấy vé" };
     },
 
     // 12. ADMIN: TICKET TYPES CRUD
     async getTicketTypes() {
-        await this._simulateLatency(150);
-        return { success: true, data: MOCK_DB.ticketTypes };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types`);
+            if (!res.ok) throw new Error("Lỗi kết nối");
+            const data = await res.json();
+            const mapped = data.map(t => ({
+                id: t.ticketTypeId,
+                code: "TYPE-" + t.ticketTypeId,
+                name: t.name,
+                price: t.price,
+                description: t.description || '',
+                isActive: t.isActive
+            }));
+            return { success: true, data: mapped };
+        } catch (err) {
+            console.error(err);
+            return { success: false, data: MOCK_DB.ticketTypes, error: err.message };
+        }
     },
     async createTicketType(data) {
-        await this._simulateLatency(200);
-        const newType = { id: Date.now(), ...data };
-        MOCK_DB.ticketTypes.push(newType);
-        return { success: true, data: newType };
+        try {
+            const reqData = {
+                name: data.name,
+                description: data.description,
+                price: Number(data.price) || 0,
+                durationMinutes: 240,
+                isActive: true
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) throw new Error("Lỗi tạo");
+            const created = await res.json();
+            return { success: true, data: {
+                id: created.ticketTypeId,
+                code: data.code || 'TYPE-' + created.ticketTypeId,
+                name: created.name,
+                price: created.price,
+                description: created.description,
+                isActive: created.isActive
+            }};
+        } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
+    },
+    async updateTicketType(id, data) {
+        try {
+            const reqData = {
+                name: data.name,
+                description: data.description,
+                price: Number(data.price) || 0,
+                durationMinutes: 240,
+                isActive: data.isActive !== false
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Lỗi cập nhật loại vé");
+            }
+            return { success: true };
+        } catch (err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
+    },
+    async deleteTicketType(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.message || "Lỗi xóa loại vé");
+            }
+            return { success: true, message: "Đã xóa loại vé thành công" };
+        } catch(err) {
+            console.error(err);
+            return { success: false, error: err.message };
+        }
     },
 
     // 13. ADMIN: TICKET SESSIONS

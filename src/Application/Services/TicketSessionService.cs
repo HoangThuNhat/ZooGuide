@@ -21,6 +21,28 @@ public class TicketSessionService : ITicketSessionService
         _sessionRepository = sessionRepository;
     }
 
+    public async Task<TicketSession> CreateSessionAsync(int ticketId)
+    {
+        var ticket = await _ticketRepository.GetByIdWithDetailsAsync(ticketId);
+        if (ticket == null) throw new ArgumentException("Ticket not found");
+
+        int durationMinutes = ticket.TicketType?.DurationMinutes ?? 480;
+        var startedAt = DateTime.UtcNow;
+        var expiredAt = startedAt.AddMinutes(durationMinutes);
+
+        var session = new TicketSession
+        {
+            SessionId = Guid.NewGuid(),
+            TicketId = ticketId,
+            UserId = null,
+            StartedAt = startedAt,
+            ExpiredAt = expiredAt,
+            Status = SessionStatus.Active
+        };
+
+        return await _sessionRepository.AddAsync(session);
+    }
+
     public async Task<(bool Success, string Message, TicketSessionDto? Session, int StatusCode, string? ErrorCode)> ValidateTicketAsync(
         ValidateTicketRequestDto request)
     {

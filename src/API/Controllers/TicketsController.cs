@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
+using ZooGuide.Application.DTOs.Ticket;
 using ZooGuide.Application.Interfaces;
 
 namespace ZooGuide.API.Controllers;
@@ -9,36 +10,102 @@ namespace ZooGuide.API.Controllers;
 [Route("api/[controller]")]
 public class TicketsController : ControllerBase
 {
+    private readonly ITicketService _ticketService;
     private readonly ITicketSessionService _ticketSessionService;
 
-    public TicketsController(ITicketSessionService ticketSessionService)
+    public TicketsController(
+        ITicketService ticketService, 
+        ITicketSessionService ticketSessionService)
     {
+        _ticketService = ticketService;
         _ticketSessionService = ticketSessionService;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll()
+    {
+        var tickets = await _ticketService.GetAllAsync();
+        return Ok(tickets);
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<TicketDto>> GetById(int id)
+    {
+        var ticket = await _ticketService.GetByIdAsync(id);
+        if (ticket == null)
+            return NotFound(new { message = "Ticket not found" });
+
+        return Ok(ticket);
+    }
+
+    [HttpPost]
+    public async Task<ActionResult<TicketDto>> Create([FromBody] TicketCreateRequest request)
+    {
+        try
+        {
+            var created = await _ticketService.CreateAsync(request);
+            return CreatedAtAction(nameof(GetById), new { id = created.TicketId }, created);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<TicketDto>> Update(int id, [FromBody] TicketUpdateRequest request)
+    {
+        try
+        {
+            var updated = await _ticketService.UpdateAsync(id, request);
+            if (updated == null)
+                return NotFound(new { message = "Ticket not found" });
+
+            return Ok(updated);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult> Delete(int id)
+    {
+        try
+        {
+            var success = await _ticketService.DeleteAsync(id);
+            if (!success)
+                return NotFound(new { message = "Ticket not found" });
+
+            return NoContent();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { message = ex.Message });
+        }
     }
 
     /// <summary>
     /// Xác thực mã vé (QR/Barcode) từ du khách và khởi tạo phiên tham quan (Ticket Session)
     /// </summary>
     [HttpPost("validate")]
-    [ProducesResponseType(typeof(TicketValidationResponseDto), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(TicketValidationResponseDto), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(TicketValidationResponseDto), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ValidateTicket([FromBody] ValidateTicketRequestDto request)
+    public async Task<ActionResult<ValidateTicketResponse>> Validate([FromBody] ValidateTicketRequest request)
     {
-        if (!ModelState.IsValid || string.IsNullOrWhiteSpace(request.TicketCode))
+        var response = await _ticketService.ValidateAsync(request);
+        if (!response.Valid)
         {
-            return BadRequest(TicketValidationResponseDto.Fail("Vui lòng nhập mã vé hợp lệ.", "INVALID_INPUT"));
+            return BadRequest(response);
         }
-
-        var result = await _ticketSessionService.ValidateTicketAsync(request);
-
-        if (!result.Success)
-        {
-            var errorResponse = TicketValidationResponseDto.Fail(result.Message, result.ErrorCode);
-            return StatusCode(result.StatusCode, errorResponse);
-        }
-
-        return Ok(TicketValidationResponseDto.Ok(result.Session!, result.Message));
+        return Ok(response);
     }
 
     /// <summary>

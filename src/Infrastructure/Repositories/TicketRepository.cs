@@ -23,6 +23,14 @@ public class TicketRepository : ITicketRepository
             .FirstOrDefaultAsync(t => t.TicketCode.ToUpper() == normalized);
     }
 
+    public async Task<Ticket?> GetByIdWithDetailsAsync(int ticketId)
+    {
+        return await _context.Tickets
+            .Include(t => t.TicketType)
+            .Include(t => t.TicketSessions)
+            .FirstOrDefaultAsync(t => t.TicketId == ticketId);
+    }
+
     public async Task UpdateAsync(Ticket ticket)
     {
         _context.Tickets.Update(ticket);

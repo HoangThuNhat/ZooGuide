@@ -784,7 +784,7 @@ GO
 PRINT N'=== 8. Logic khoảng cách Geofencing (Khoảng cách Haversine tham khảo) ===';
 -- Ví dụ: Tính khoảng cách từ vị trí khách (10.787500, 106.705100) tới các khu vực
 DECLARE @UserLat FLOAT = 10.787500;
-DECLARE @UserLon FLOAT = 10.705100;
+DECLARE @UserLon FLOAT = 106.705100;
 
 SELECT 
     AreaId,

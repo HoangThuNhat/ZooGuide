@@ -5,6 +5,8 @@ import { useApp } from '../../context/AppContext';
 export default function AdminTicketTypesPage() {
     const { showToast } = useApp();
     const [ticketTypes, setTicketTypes] = useState([]);
+    const [editMode, setEditMode] = useState(false);
+    const [editId, setEditId] = useState(null);
     const [formData, setFormData] = useState({
         code: '',
         name: '',
@@ -25,15 +27,58 @@ export default function AdminTicketTypesPage() {
         e.preventDefault();
         if (!formData.name.trim() || !formData.code.trim()) return;
 
-        const res = await ZooApi.createTicketType({
+        const payload = {
             ...formData,
             price: Number(formData.price) || 0
-        });
+        };
 
-        if (res.success) {
-            showToast("Thêm loại vé mới thành công!", "success");
-            setFormData({ code: '', name: '', price: '', description: '' });
-            loadData();
+        if (editMode) {
+            const res = await ZooApi.updateTicketType(editId, payload);
+            if (res.success) {
+                showToast("Cập nhật loại vé thành công!", "success");
+                cancelEdit();
+                loadData();
+            } else {
+                showToast(res.message || res.error || "Lỗi cập nhật", "error");
+            }
+        } else {
+            const res = await ZooApi.createTicketType(payload);
+            if (res.success) {
+                showToast("Thêm loại vé mới thành công!", "success");
+                setFormData({ code: '', name: '', price: '', description: '' });
+                loadData();
+            } else {
+                showToast(res.message || res.error || "Lỗi tạo loại vé", "error");
+            }
+        }
+    };
+
+    const handleEditClick = (t) => {
+        setEditMode(true);
+        setEditId(t.id);
+        setFormData({
+            code: t.code,
+            name: t.name,
+            price: t.price,
+            description: t.description || ''
+        });
+    };
+
+    const cancelEdit = () => {
+        setEditMode(false);
+        setEditId(null);
+        setFormData({ code: '', name: '', price: '', description: '' });
+    };
+
+    const handleDeleteClick = async (id) => {
+        if (window.confirm("Bạn có chắc chắn muốn xóa loại vé này? Nếu loại vé đang được sử dụng, nó sẽ bị chuyển sang trạng thái Ngừng Bán.")) {
+            const res = await ZooApi.deleteTicketType(id);
+            if (res.success) {
+                showToast(res.message || "Đã xóa loại vé thành công!", "info");
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Không thể xóa loại vé này.", "error");
+            }
         }
     };
 
@@ -65,16 +110,29 @@ export default function AdminTicketTypesPage() {
                                     <th>Mã loại vé</th>
                                     <th>Tên hạng vé</th>
                                     <th>Giá vé niêm yết</th>
-                                    <th>Mô tả quyền lợi</th>
+                                    <th>Trạng thái</th>
+                                    <th>Hành động</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {ticketTypes.map(t => (
                                     <tr key={t.id}>
                                         <td className="font-mono font-bold">{t.code}</td>
-                                        <td><strong>{t.name}</strong></td>
+                                        <td>
+                                            <strong>{t.name}</strong>
+                                            <div className="text-xs text-muted" style={{ maxWidth: '200px' }}>{t.description}</div>
+                                        </td>
                                         <td className="font-bold text-primary">{formatVND(t.price)}</td>
-                                        <td className="text-xs text-muted" style={{ maxWidth: '300px' }}>{t.description}</td>
+                                        <td>
+                                            {t.isActive !== false ? 
+                                                <span className="badge badge-success">Đang bán</span> : 
+                                                <span className="badge badge-danger">Ngừng bán</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            <button className="btn btn-sm btn-outline mr-2" onClick={() => handleEditClick(t)}>Sửa</button>
+                                            <button className="btn btn-sm btn-outline text-danger" style={{ borderColor: '#FCA5A5', color: '#DC2626' }} onClick={() => handleDeleteClick(t.id)}>Xóa</button>
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -82,9 +140,9 @@ export default function AdminTicketTypesPage() {
                     </div>
                 </div>
 
-                {/* Add Form */}
+                {/* Add/Edit Form */}
                 <div className="admin-card">
-                    <h3 className="font-bold text-base mb-3">Tạo Loại Vé Mới</h3>
+                    <h3 className="font-bold text-base mb-3">{editMode ? 'Chỉnh Sửa Loại Vé' : 'Tạo Loại Vé Mới'}</h3>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label className="form-label">Mã hạng vé (Code)</label>
@@ -95,6 +153,7 @@ export default function AdminTicketTypesPage() {
                                 required
                                 value={formData.code}
                                 onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                                disabled={editMode}
                             />
                         </div>
                         <div className="form-group">
@@ -129,9 +188,16 @@ export default function AdminTicketTypesPage() {
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             ></textarea>
                         </div>
-                        <button type="submit" className="btn btn-primary w-full" style={{ width: '100%' }}>
-                            Lưu Loại Vé
-                        </button>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                {editMode ? 'Lưu Thay Đổi' : 'Lưu Loại Vé'}
+                            </button>
+                            {editMode && (
+                                <button type="button" className="btn btn-secondary" onClick={cancelEdit}>
+                                    Hủy
+                                </button>
+                            )}
+                        </div>
                     </form>
                 </div>
             </div>

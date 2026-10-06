@@ -8,6 +8,7 @@ namespace ZooGuide.Application.Interfaces;
 /// </summary>
 public interface ITicketSessionService
 {
+    Task<TicketSession> CreateSessionAsync(int ticketId);
     Task<(bool Success, string Message, TicketSessionDto? Session, int StatusCode, string? ErrorCode)> ValidateTicketAsync(ValidateTicketRequestDto request);
     Task<TicketSession?> GetValidSessionAsync(Guid sessionId);
     Task<IEnumerable<TicketSessionDto>> GetAllSessionsAsync();

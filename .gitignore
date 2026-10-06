@@ -1,6 +1,8 @@
 ## .NET Core
 [Bb]in/
 [Oo]bj/
+**/bin/
+**/obj/
 *.user
 *.userosscache
 *.sln.docstates
@@ -27,3 +29,19 @@
 ## OS
 .DS_Store
 Thumbs.db
+
+## Environment variables & Secrets
+.env
+.env.*
+!/.env.example
+*.local
+
+## App secrets
+src/API/appsettings.Development.json
+
+## Node
+node_modules/
+
+## Build output
+dist/
+**/dist/

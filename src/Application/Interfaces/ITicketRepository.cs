@@ -8,5 +8,6 @@ namespace ZooGuide.Application.Interfaces;
 public interface ITicketRepository
 {
     Task<Ticket?> GetByCodeWithDetailsAsync(string ticketCode);
+    Task<Ticket?> GetByIdWithDetailsAsync(int ticketId);
     Task UpdateAsync(Ticket ticket);
 }
