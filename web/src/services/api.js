@@ -851,6 +851,19 @@ export const ZooApi = {
                 throw new Error(errData.message || "Lỗi tạo vé");
             }
             const created = await res.json();
+            console.log("CREATE TICKET API RESPONSE:", created);
+            console.log("CREATE TICKET RESULT:", {
+    success: true,
+    data: {
+        ticketCode: created.ticketCode,
+        status: 'Active',
+        validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
+        validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
+        customerName: data.customerName || "Khách hàng",
+        ticketType: created.ticketTypeName || "Standard",
+        zonesAllowed: ["ALL"]
+    }
+});
             return { success: true, data: {
                 ticketCode: created.ticketCode,
                 status: 'Active',
