@@ -5,7 +5,7 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5142/api',
     USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
         ? import.meta.env.VITE_USE_MOCK === 'true'
         : true,
@@ -485,44 +485,6 @@ export const ZooApi = {
 
         const normalizedCode = ticketCode.trim().toUpperCase();
 
-        if (API_CONFIG.USE_MOCK) {
-            await this._simulateLatency(350);
-            const ticket = MOCK_DB.tickets.find(t => t.ticketCode.toUpperCase() === normalizedCode);
-            
-            if (!ticket) {
-                return { 
-                    success: false, 
-                    message: "Không tìm thấy vé trong hệ thống! Vui lòng kiểm tra lại mã in trên vé hoặc liên hệ quầy vé ZooGuide." 
-                };
-            }
-
-            if (ticket.status === "Expired") {
-                return { 
-                    success: false, 
-                    message: `Vé ${ticket.ticketCode} đã hết hạn sử dụng vào ngày ${ticket.validDate}. Vui lòng đổi vé mới.` 
-                };
-            }
-
-            // Create TicketSession
-            const session = {
-                sessionId: "SES-" + Date.now().toString(36).toUpperCase(),
-                ticketCode: ticket.ticketCode,
-                customerName: ticket.customerName,
-                ticketType: ticket.ticketType,
-                validDate: ticket.validDate,
-                zonesAllowed: ticket.zonesAllowed,
-                hasAudioGuide: ticket.hasAudioGuide,
-                activatedAt: new Date().toISOString(),
-                expiresAt: new Date(Date.now() + 8 * 3600 * 1000).toISOString() // Valid 8 hours
-            };
-
-            return {
-                success: true,
-                message: "Xác thực vé thành công! Phiên tham quan đã được mở khóa.",
-                session: session
-            };
-        }
-
         // Live API call
         try {
             const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/validate`, {
@@ -858,7 +820,8 @@ export const ZooApi = {
                     ticketCode: t.ticketCode,
                     customerName: "Khách hàng",
                     ticketType: t.ticketTypeName || "Standard",
-                    validDate: t.validUntil ? t.validUntil.split('T')[0] : new Date().toISOString().split('T')[0],
+                    validFromDate: t.validFrom ? new Date(t.validFrom).toLocaleString('vi-VN') : '',
+                    validUntilDate: t.validUntil ? new Date(t.validUntil).toLocaleString('vi-VN') : '',
                     status: statusStr,
                     zonesAllowed: ["ALL"]
                 };
@@ -873,9 +836,9 @@ export const ZooApi = {
         try {
             const reqData = {
                 ticketTypeId: parseInt(data.ticketTypeId),
-                ticketCode: data.ticketCode || "",
-                validFrom: new Date().toISOString(),
-                validUntil: data.validDate ? new Date(data.validDate).toISOString() : new Date(Date.now() + 86400000).toISOString(),
+                ticketCode: "",
+                validFrom: new Date(data.validFrom).toISOString(),
+                validUntil: new Date(data.validUntil).toISOString(),
                 status: 1
             };
             const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
@@ -891,7 +854,8 @@ export const ZooApi = {
             return { success: true, data: {
                 ticketCode: created.ticketCode,
                 status: 'Active',
-                validDate: created.validUntil.split('T')[0],
+                validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
+                validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
                 customerName: data.customerName || "Khách hàng",
                 ticketType: created.ticketTypeName || "Standard",
                 zonesAllowed: ["ALL"]

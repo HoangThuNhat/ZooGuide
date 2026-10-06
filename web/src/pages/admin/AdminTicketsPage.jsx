@@ -6,10 +6,26 @@ export default function AdminTicketsPage() {
     const { showToast } = useApp();
     const [tickets, setTickets] = useState([]);
     const [ticketTypes, setTicketTypes] = useState([]);
+    
+    // Default validFrom to current time, validUntil to end of day
+    const getDefaultValidFrom = () => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    };
+    
+    const getDefaultValidUntil = () => {
+        const now = new Date();
+        now.setHours(23, 59, 0, 0);
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    };
+
     const [formData, setFormData] = useState({
         ticketTypeId: '',
         customerName: '',
-        validDate: new Date().toISOString().split('T')[0]
+        validFrom: getDefaultValidFrom(),
+        validUntil: getDefaultValidUntil()
     });
 
     const loadData = async () => {
@@ -25,18 +41,28 @@ export default function AdminTicketsPage() {
 
     const handleCreateTicket = async (e) => {
         e.preventDefault();
-        if (!formData.customerName.trim() || !formData.ticketTypeId) {
-            showToast("Vui lòng nhập tên khách hàng và chọn hạng vé", "error");
+        
+        if (!formData.ticketTypeId) {
+            showToast("Vui lòng chọn hạng vé", "error");
+            return;
+        }
+
+        const vf = new Date(formData.validFrom);
+        const vu = new Date(formData.validUntil);
+        
+        if (vu <= vf) {
+            showToast("Thời gian kết thúc phải sau thời gian bắt đầu.", "error");
             return;
         }
 
         const res = await ZooApi.createTicket(formData);
         if (res.success) {
-            showToast(`Phát hành vé ${res.data.ticketCode} thành công!`, "success");
+            showToast(`Phát hành vé thành công. Mã vé: ${res.data.ticketCode}`, "success");
             setFormData({
                 ticketTypeId: '',
                 customerName: '',
-                validDate: new Date().toISOString().split('T')[0]
+                validFrom: getDefaultValidFrom(),
+                validUntil: getDefaultValidUntil()
             });
             loadData();
         } else {
@@ -80,9 +106,9 @@ export default function AdminTicketsPage() {
                             <thead>
                                 <tr>
                                     <th>Mã vé</th>
-                                    <th>Khách hàng</th>
                                     <th>Hạng vé</th>
-                                    <th>Hạn sử dụng</th>
+                                    <th>Bắt đầu</th>
+                                    <th>Hết hạn</th>
                                     <th>Trạng thái</th>
                                     <th>Hành động</th>
                                 </tr>
@@ -91,9 +117,9 @@ export default function AdminTicketsPage() {
                                 {tickets.map(t => (
                                     <tr key={t.ticketCode}>
                                         <td className="font-mono font-bold">{t.ticketCode}</td>
-                                        <td><strong>{t.customerName}</strong></td>
                                         <td>{t.ticketType}</td>
-                                        <td>{t.validDate}</td>
+                                        <td>{t.validFromDate}</td>
+                                        <td>{t.validUntilDate}</td>
                                         <td>
                                             <span className={`badge ${t.status === 'Active' ? 'badge-success' : 'badge-danger'}`}>
                                                 {t.status}
@@ -123,8 +149,7 @@ export default function AdminTicketsPage() {
                             <input 
                                 type="text" 
                                 className="form-input" 
-                                required
-                                placeholder="VD: Hoàng Tuấn Anh"
+                                placeholder="VD: Hoàng Tuấn Anh (Tùy chọn)"
                                 value={formData.customerName}
                                 onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
                             />
@@ -133,6 +158,7 @@ export default function AdminTicketsPage() {
                             <label className="form-label">Hạng vé tham quan</label>
                             <select 
                                 className="form-select"
+                                required
                                 value={formData.ticketTypeId}
                                 onChange={(e) => setFormData({ ...formData, ticketTypeId: e.target.value })}
                             >
@@ -143,13 +169,23 @@ export default function AdminTicketsPage() {
                             </select>
                         </div>
                         <div className="form-group">
-                            <label className="form-label">Ngày hiệu lực</label>
+                            <label className="form-label">Thời gian bắt đầu (Valid From)</label>
                             <input 
-                                type="date" 
+                                type="datetime-local" 
                                 className="form-input" 
                                 required
-                                value={formData.validDate}
-                                onChange={(e) => setFormData({ ...formData, validDate: e.target.value })}
+                                value={formData.validFrom}
+                                onChange={(e) => setFormData({ ...formData, validFrom: e.target.value })}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Thời gian kết thúc (Valid Until)</label>
+                            <input 
+                                type="datetime-local" 
+                                className="form-input" 
+                                required
+                                value={formData.validUntil}
+                                onChange={(e) => setFormData({ ...formData, validUntil: e.target.value })}
                             />
                         </div>
                         <button type="submit" className="btn btn-primary w-full" style={{ width: '100%' }}>

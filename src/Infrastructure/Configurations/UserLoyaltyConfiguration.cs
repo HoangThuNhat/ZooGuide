@@ -22,7 +22,7 @@ public class UserLoyaltyConfiguration : IEntityTypeConfiguration<UserLoyalty>
 
         builder.Property(ul => ul.UpdatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         // Relationships
         builder.HasOne(ul => ul.User)

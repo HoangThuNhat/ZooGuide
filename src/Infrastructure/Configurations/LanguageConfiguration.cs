@@ -30,7 +30,7 @@ public class LanguageConfiguration : IEntityTypeConfiguration<Language>
 
         builder.Property(l => l.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(l => l.UpdatedAt)
             .IsRequired(false);

@@ -12,14 +12,14 @@ public class ChatSessionConfiguration : IEntityTypeConfiguration<ChatSession>
 
         builder.HasKey(cs => cs.ChatSessionId);
         builder.Property(cs => cs.ChatSessionId)
-            .HasDefaultValueSql("NEWID()");
+            .HasDefaultValueSql("gen_random_uuid()");
 
         builder.Property(cs => cs.SessionId)
             .IsRequired();
 
         builder.Property(cs => cs.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(cs => cs.EndedAt)
             .IsRequired(false);

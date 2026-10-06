@@ -38,7 +38,7 @@ public class SpeciesConfiguration : IEntityTypeConfiguration<Species>
 
         builder.Property(s => s.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(s => s.UpdatedAt)
             .IsRequired(false);

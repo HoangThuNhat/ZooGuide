@@ -17,15 +17,15 @@ builder.Services.AddScoped<ZooGuide.Application.Interfaces.ISpeciesService, ZooG
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketTypeService, ZooGuide.Infrastructure.Services.TicketTypeService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketService, ZooGuide.Infrastructure.Services.TicketService>();
 
-// Configure EF Core with SQL Server
+// Configure EF Core with PostgreSQL
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Server=.;Database=ZooGuide;Trusted_Connection=True;TrustServerCertificate=True;MultipleActiveResultSets=true;";
+    ?? "Host=localhost;Database=postgres;Username=postgres;Password=postgres";
 
 builder.Services.AddDbContext<ZooGuideDbContext>(options =>
 {
-    options.UseSqlServer(connectionString, sqlOptions =>
+    options.UseNpgsql(connectionString, pgOptions =>
     {
-        sqlOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+        pgOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
     });
 });
 

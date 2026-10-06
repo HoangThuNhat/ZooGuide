@@ -26,7 +26,7 @@ public class NarrationConfiguration : IEntityTypeConfiguration<Narration>
 
         builder.Property(n => n.Content)
             .IsRequired()
-            .HasColumnType("nvarchar(max)");
+            ;
 
         builder.Property(n => n.AudioUrl)
             .HasMaxLength(500)
@@ -45,7 +45,7 @@ public class NarrationConfiguration : IEntityTypeConfiguration<Narration>
 
         builder.Property(n => n.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(n => n.UpdatedAt)
             .IsRequired(false);

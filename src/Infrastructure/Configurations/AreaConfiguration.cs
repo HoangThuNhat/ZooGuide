@@ -50,7 +50,7 @@ public class AreaConfiguration : IEntityTypeConfiguration<Area>
 
         builder.Property(a => a.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(a => a.UpdatedAt)
             .IsRequired(false);

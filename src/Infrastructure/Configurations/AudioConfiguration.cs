@@ -43,7 +43,7 @@ public class AudioConfiguration : IEntityTypeConfiguration<Audio>
 
         builder.Property(au => au.CreatedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         builder.Property(au => au.UpdatedAt)
             .IsRequired(false);

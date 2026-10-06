@@ -24,7 +24,7 @@ public class VisitHistoryConfiguration : IEntityTypeConfiguration<VisitHistory>
 
         builder.Property(vh => vh.VisitedAt)
             .IsRequired()
-            .HasDefaultValueSql("GETUTCDATE()");
+            .HasDefaultValueSql("now()");
 
         // Relationships: Restrict delete to preserve audit log
         builder.HasOne(vh => vh.User)
