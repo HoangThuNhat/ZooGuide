@@ -31,6 +31,12 @@ public class AreaService : IAreaService
 
     public async Task<AreaResponseDto> CreateAreaAsync(CreateAreaDto dto)
     {
+        var existing = await _areaRepository.GetByNameAsync(dto.Name.Trim());
+        if (existing != null)
+        {
+            throw new InvalidOperationException($"Tên khu vực '{dto.Name}' đã tồn tại trong hệ thống.");
+        }
+
         // Khởi tạo entity khu vực mới
         var area = new Area
         {
@@ -52,6 +58,12 @@ public class AreaService : IAreaService
     {
         var area = await _areaRepository.GetByIdWithAnimalsAsync(areaId);
         if (area == null) return null;
+
+        var existing = await _areaRepository.GetByNameAsync(dto.Name.Trim());
+        if (existing != null && existing.AreaId != areaId)
+        {
+            throw new InvalidOperationException($"Tên khu vực '{dto.Name}' đã được sử dụng bởi khu vực khác.");
+        }
 
         // Cập nhật thông tin và tọa độ kiểm định
         area.Name = dto.Name.Trim();

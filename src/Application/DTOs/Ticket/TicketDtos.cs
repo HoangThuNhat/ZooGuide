@@ -43,10 +43,13 @@ public class ValidateTicketRequest
 public class ValidateTicketResponse
 {
     public bool Valid { get; set; }
+    public string? ErrorCode { get; set; }
     public int? TicketId { get; set; }
     public string? TicketCode { get; set; }
     public int? TicketTypeId { get; set; }
+    public string? TicketTypeName { get; set; }
     public string? Message { get; set; }
     public Guid? SessionId { get; set; }
     public DateTime? ValidUntil { get; set; }
+    public DateTime? ExpiresAt { get; set; }
 }

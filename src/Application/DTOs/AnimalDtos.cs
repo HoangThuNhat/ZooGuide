@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using ZooGuide.Domain.Enums;
 
 namespace ZooGuide.Application.DTOs;
@@ -60,23 +61,54 @@ public class SpeciesDetailDto
 /// </summary>
 public class CreateAnimalDto
 {
-    [Required(ErrorMessage = "SpeciesId (giống loài) không được để trống")]
-    public int SpeciesId { get; set; }
+    public int SpeciesId { get; set; } = 1;
 
-    [Required(ErrorMessage = "AreaId (phân khu) không được để trống")]
-    public int AreaId { get; set; }
+    private int _areaId;
+    public int AreaId 
+    { 
+        get 
+        {
+            if (_areaId > 0) return _areaId;
+            if (int.TryParse(ZoneCode, out int parsedCode)) return parsedCode;
+            if (int.TryParse(ZoneId, out int parsedZone)) return parsedZone;
+            if (!string.IsNullOrWhiteSpace(ZoneCode) && ZoneCode.Length == 1 && char.IsLetter(ZoneCode[0]))
+                return char.ToUpper(ZoneCode[0]) - 'A' + 1;
+            if (!string.IsNullOrWhiteSpace(ZoneId) && ZoneId.StartsWith("zone-", StringComparison.OrdinalIgnoreCase))
+            {
+                var suffix = ZoneId.Substring(5);
+                if (int.TryParse(suffix, out int parsedSuffix))
+                    return parsedSuffix;
+                if (suffix.Length == 1 && char.IsLetter(suffix[0]))
+                    return char.ToUpper(suffix[0]) - 'A' + 1;
+            }
+            return _areaId;
+        }
+        set => _areaId = value; 
+    }
 
+    public string? ZoneId { get; set; }
+    public string? ZoneCode { get; set; }
+
+    private string _name = string.Empty;
     [Required(ErrorMessage = "Tên động vật không được để trống")]
     [MaxLength(100, ErrorMessage = "Tên động vật tối đa 100 ký tự")]
-    public string Name { get; set; } = string.Empty;
+    public string Name 
+    { 
+        get => string.IsNullOrWhiteSpace(_name) ? NameVi : _name; 
+        set => _name = value; 
+    }
+
+    public string NameVi { get; set; } = string.Empty;
 
     public string? Description { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalGender Gender { get; set; } = AnimalGender.Unknown;
     public DateOnly? DateOfBirth { get; set; }
     public string? Origin { get; set; }
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalStatus Status { get; set; } = AnimalStatus.Active;
 }
 
@@ -85,23 +117,54 @@ public class CreateAnimalDto
 /// </summary>
 public class UpdateAnimalDto
 {
-    [Required(ErrorMessage = "SpeciesId (giống loài) không được để trống")]
-    public int SpeciesId { get; set; }
+    public int SpeciesId { get; set; } = 1;
 
-    [Required(ErrorMessage = "AreaId (phân khu) không được để trống")]
-    public int AreaId { get; set; }
+    private int _areaId;
+    public int AreaId 
+    { 
+        get 
+        {
+            if (_areaId > 0) return _areaId;
+            if (int.TryParse(ZoneCode, out int parsedCode)) return parsedCode;
+            if (int.TryParse(ZoneId, out int parsedZone)) return parsedZone;
+            if (!string.IsNullOrWhiteSpace(ZoneCode) && ZoneCode.Length == 1 && char.IsLetter(ZoneCode[0]))
+                return char.ToUpper(ZoneCode[0]) - 'A' + 1;
+            if (!string.IsNullOrWhiteSpace(ZoneId) && ZoneId.StartsWith("zone-", StringComparison.OrdinalIgnoreCase))
+            {
+                var suffix = ZoneId.Substring(5);
+                if (int.TryParse(suffix, out int parsedSuffix))
+                    return parsedSuffix;
+                if (suffix.Length == 1 && char.IsLetter(suffix[0]))
+                    return char.ToUpper(suffix[0]) - 'A' + 1;
+            }
+            return _areaId;
+        }
+        set => _areaId = value; 
+    }
 
+    public string? ZoneId { get; set; }
+    public string? ZoneCode { get; set; }
+
+    private string _name = string.Empty;
     [Required(ErrorMessage = "Tên động vật không được để trống")]
     [MaxLength(100, ErrorMessage = "Tên động vật tối đa 100 ký tự")]
-    public string Name { get; set; } = string.Empty;
+    public string Name 
+    { 
+        get => string.IsNullOrWhiteSpace(_name) ? NameVi : _name; 
+        set => _name = value; 
+    }
+
+    public string NameVi { get; set; } = string.Empty;
 
     public string? Description { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalGender Gender { get; set; } = AnimalGender.Unknown;
     public DateOnly? DateOfBirth { get; set; }
     public string? Origin { get; set; }
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalStatus Status { get; set; } = AnimalStatus.Active;
 }
 

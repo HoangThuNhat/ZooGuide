@@ -575,32 +575,35 @@ export const ZooApi = {
         }
 
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/species`);
-            if (!res.ok) throw new Error("Lỗi kết nối");
-            const speciesData = await res.json();
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals`);
+            if (!res.ok) throw new Error("Lỗi kết nối /animals");
+            const animalsData = await res.json();
+            const rawList = Array.isArray(animalsData) ? animalsData : (animalsData.data || []);
 
-            let results = speciesData.map((s) => ({
-                id: s.speciesId,
-                code: `SPECIES-${s.speciesId}`,
-                nameVi: s.name,
-                nameEn: s.scientificName || s.name,
-                scientificName: s.scientificName || s.name,
-                species: "Loài vật",
-                zoneId: "zone-a",
-                zoneCode: "A",
-                zoneName: "Khu vực chung",
+            let results = rawList.map((a) => ({
+                id: a.animalId || a.id,
+                code: a.code || `ANI-${String(a.animalId || a.id).padStart(3, '0')}`,
+                nameVi: a.nameVi || a.name,
+                nameEn: a.name || a.nameVi,
+                scientificName: a.scientificName || a.speciesName || "Chưa có tên khoa học",
+                speciesId: a.speciesId || 1,
+                species: a.speciesName || "Chưa phân loại",
+                zoneId: a.zoneId || (a.areaId ? `zone-${String.fromCharCode(96 + a.areaId)}` : "zone-a"),
+                zoneCode: a.zoneCode || (a.areaId ? String.fromCharCode(64 + a.areaId) : "A"),
+                zoneName: a.areaName || "Khu vực chung",
+                areaId: a.areaId || 1,
                 mapX: 300,
                 mapY: 300,
-                imageUrl: s.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
-                origin: "Không rõ",
+                imageUrl: a.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
+                origin: a.origin || "Tự nhiên",
                 diet: "Tự nhiên",
                 lifespan: "Không rõ",
                 weight: "Không rõ",
-                iucnStatus: s.conservationStatus || "Ít quan tâm",
-                healthStatus: "Tốt",
+                iucnStatus: a.conservationStatus || "Ít quan tâm",
+                healthStatus: a.healthStatus || "Tốt",
                 breedingStatus: "Bình thường",
-                funFactsVi: [s.description || "Chưa có thông tin mô tả chi tiết."],
-                funFactsEn: [s.description || "No information yet."]
+                funFactsVi: [a.description || "Chưa có thông tin mô tả chi tiết."],
+                funFactsEn: [a.description || "No information yet."]
             }));
 
             if (filters.search) {
@@ -611,13 +614,17 @@ export const ZooApi = {
                 );
             }
 
+            if (filters.zoneId && filters.zoneId !== 'all') {
+                results = results.filter(a => a.zoneId === filters.zoneId);
+            }
+
             if (filters.iucnStatus && filters.iucnStatus !== 'all') {
-                results = results.filter(a => a.iucnStatus.includes(filters.iucnStatus));
+                results = results.filter(a => a.iucnStatus && a.iucnStatus.includes(filters.iucnStatus));
             }
 
             return { success: true, count: results.length, data: results };
         } catch (err) {
-            console.warn("Live API /species failed:", err);
+            console.warn("Live API /animals failed, fallback to mock:", err);
             return { success: true, count: MOCK_DB.animals.length, data: MOCK_DB.animals };
         }
     },
@@ -749,61 +756,205 @@ export const ZooApi = {
 
     // 9. ADMIN: ANIMALS CRUD
     async createAnimal(data) {
-        await this._simulateLatency(200);
-        const newId = MOCK_DB.animals.length ? Math.max(...MOCK_DB.animals.map(a => a.id)) + 1 : 1;
-        const newItem = {
-            id: newId,
-            code: `ANI-${String(newId).padStart(3, '0')}`,
-            funFactsVi: data.funFactsVi || [],
-            funFactsEn: data.funFactsEn || [],
-            mapX: data.mapX || 300,
-            mapY: data.mapY || 300,
-            ...data
-        };
-        MOCK_DB.animals.push(newItem);
-        return { success: true, data: newItem };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            const newId = MOCK_DB.animals.length ? Math.max(...MOCK_DB.animals.map(a => a.id)) + 1 : 1;
+            const newItem = {
+                id: newId,
+                code: `ANI-${String(newId).padStart(3, '0')}`,
+                ...data
+            };
+            MOCK_DB.animals.push(newItem);
+            return { success: true, data: newItem };
+        }
+
+        try {
+            const reqData = {
+                name: data.nameVi || data.name,
+                nameVi: data.nameVi || data.name,
+                speciesId: parseInt(data.speciesId) || 1,
+                areaId: parseInt(data.areaId) || (data.zoneId ? (parseInt(data.zoneId.replace('zone-', '')) || 1) : 1),
+                zoneId: data.zoneId,
+                zoneCode: data.zoneCode,
+                gender: data.gender || "Unknown",
+                status: data.status || "Active",
+                description: data.description || (data.diet ? `Chế độ ăn: ${data.diet}` : ""),
+                healthStatus: data.healthStatus || "Khỏe mạnh",
+                origin: data.origin || "",
+                imageUrl: data.imageUrl || ""
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi tạo động vật trên máy chủ");
+            }
+            const created = await res.json();
+            return { success: true, data: created.data || created };
+        } catch (err) {
+            console.error("createAnimal API error:", err);
+            return { success: false, error: err.message };
+        }
     },
     async updateAnimal(id, data) {
-        await this._simulateLatency(200);
-        const idx = MOCK_DB.animals.findIndex(a => a.id === id);
-        if (idx !== -1) {
-            MOCK_DB.animals[idx] = { ...MOCK_DB.animals[idx], ...data };
-            return { success: true, data: MOCK_DB.animals[idx] };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            const idx = MOCK_DB.animals.findIndex(a => a.id === id);
+            if (idx !== -1) {
+                MOCK_DB.animals[idx] = { ...MOCK_DB.animals[idx], ...data };
+                return { success: true, data: MOCK_DB.animals[idx] };
+            }
+            return { success: false, message: "Không tìm thấy động vật" };
         }
-        return { success: false, message: "Không tìm thấy động vật" };
+
+        try {
+            const reqData = {
+                name: data.nameVi || data.name,
+                nameVi: data.nameVi || data.name,
+                speciesId: parseInt(data.speciesId) || 1,
+                areaId: parseInt(data.areaId) || (data.zoneId ? (parseInt(data.zoneId.replace('zone-', '')) || 1) : 1),
+                zoneId: data.zoneId,
+                zoneCode: data.zoneCode,
+                gender: data.gender || "Unknown",
+                status: data.status || "Active",
+                description: data.description || (data.diet ? `Chế độ ăn: ${data.diet}` : ""),
+                healthStatus: data.healthStatus || "Khỏe mạnh",
+                origin: data.origin || "",
+                imageUrl: data.imageUrl || ""
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi cập nhật động vật trên máy chủ");
+            }
+            const updated = await res.json();
+            return { success: true, data: updated.data || updated };
+        } catch (err) {
+            console.error("updateAnimal API error:", err);
+            return { success: false, error: err.message };
+        }
     },
     async deleteAnimal(id) {
-        await this._simulateLatency(200);
-        MOCK_DB.animals = MOCK_DB.animals.filter(a => a.id !== id);
-        return { success: true };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            MOCK_DB.animals = MOCK_DB.animals.filter(a => a.id !== id);
+            return { success: true };
+        }
+
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error("Lỗi xóa động vật trên máy chủ");
+            return { success: true };
+        } catch (err) {
+            console.error("deleteAnimal API error:", err);
+            return { success: false, error: err.message };
+        }
     },
 
     // 10. ADMIN: AREAS CRUD
     async createArea(data) {
-        await this._simulateLatency(200);
-        const newId = `zone-${data.code.toLowerCase()}`;
-        const newItem = {
-            id: newId,
-            animalCount: 0,
-            mapCoords: { x: 300, y: 300, radius: 90 },
-            ...data
-        };
-        MOCK_DB.areas.push(newItem);
-        return { success: true, data: newItem };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            const newId = `zone-${data.code.toLowerCase()}`;
+            const newItem = {
+                id: newId,
+                animalCount: 0,
+                mapCoords: { x: 300, y: 300, radius: 90 },
+                ...data
+            };
+            MOCK_DB.areas.push(newItem);
+            return { success: true, data: newItem };
+        }
+
+        try {
+            const reqData = {
+                name: data.nameVi || data.name,
+                description: data.description || "",
+                latitude: parseFloat(data.latitude) || 10.7875,
+                longitude: parseFloat(data.longitude) || 106.7052,
+                radiusMeters: parseFloat(data.radiusMeters) || 50,
+                mapImageUrl: data.mapImageUrl || ""
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/areas`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi tạo khu vực trên máy chủ");
+            }
+            const created = await res.json();
+            return { success: true, data: created.data || created };
+        } catch (err) {
+            console.error("createArea API error:", err);
+            return { success: false, error: err.message };
+        }
     },
     async updateArea(id, data) {
-        await this._simulateLatency(200);
-        const idx = MOCK_DB.areas.findIndex(a => a.id === id);
-        if (idx !== -1) {
-            MOCK_DB.areas[idx] = { ...MOCK_DB.areas[idx], ...data };
-            return { success: true, data: MOCK_DB.areas[idx] };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            const idx = MOCK_DB.areas.findIndex(a => a.id === id);
+            if (idx !== -1) {
+                MOCK_DB.areas[idx] = { ...MOCK_DB.areas[idx], ...data };
+                return { success: true, data: MOCK_DB.areas[idx] };
+            }
+            return { success: false, message: "Không tìm thấy khu vực" };
         }
-        return { success: false, message: "Không tìm thấy khu vực" };
+
+        try {
+            const numId = typeof id === 'number' ? id : (parseInt(String(id).replace('zone-', '')) || 1);
+            const reqData = {
+                name: data.nameVi || data.name,
+                description: data.description || "",
+                latitude: parseFloat(data.latitude) || 10.7875,
+                longitude: parseFloat(data.longitude) || 106.7052,
+                radiusMeters: parseFloat(data.radiusMeters) || 50,
+                mapImageUrl: data.mapImageUrl || ""
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi cập nhật khu vực");
+            }
+            const updated = await res.json();
+            return { success: true, data: updated.data || updated };
+        } catch (err) {
+            console.error("updateArea API error:", err);
+            return { success: false, error: err.message };
+        }
     },
     async deleteArea(id) {
-        await this._simulateLatency(200);
-        MOCK_DB.areas = MOCK_DB.areas.filter(a => a.id !== id);
-        return { success: true };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(200);
+            MOCK_DB.areas = MOCK_DB.areas.filter(a => a.id !== id);
+            return { success: true };
+        }
+
+        try {
+            const numId = typeof id === 'number' ? id : (parseInt(String(id).replace('zone-', '')) || 1);
+            const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) throw new Error("Lỗi xóa khu vực");
+            return { success: true };
+        } catch (err) {
+            console.error("deleteArea API error:", err);
+            return { success: false, error: err.message };
+        }
     },
 
     // 11. ADMIN: TICKETS CRUD

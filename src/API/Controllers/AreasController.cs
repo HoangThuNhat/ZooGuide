@@ -80,8 +80,15 @@ public class AreasController : ControllerBase
             return BadRequest(ApiResponse<AreaResponseDto>.Fail("Bán kính phát hiện (RadiusMeters) phải lớn hơn 0."));
         }
 
-        var created = await _areaService.CreateAreaAsync(dto);
-        return CreatedAtAction(nameof(GetAreaById), new { id = created.AreaId }, ApiResponse<AreaResponseDto>.Ok(created, "Thêm mới khu vực thành công!"));
+        try
+        {
+            var created = await _areaService.CreateAreaAsync(dto);
+            return CreatedAtAction(nameof(GetAreaById), new { id = created.AreaId }, ApiResponse<AreaResponseDto>.Ok(created, "Thêm mới khu vực thành công!"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<AreaResponseDto>.Fail(ex.Message));
+        }
     }
 
     /// <summary>
@@ -114,13 +121,20 @@ public class AreasController : ControllerBase
             return BadRequest(ApiResponse<AreaResponseDto>.Fail("Bán kính phát hiện (RadiusMeters) phải lớn hơn 0."));
         }
 
-        var updated = await _areaService.UpdateAreaAsync(id, dto);
-        if (updated == null)
+        try
         {
-            return NotFound(ApiResponse<AreaResponseDto>.Fail($"Không tìm thấy khu vực với mã ID = {id} để cập nhật."));
-        }
+            var updated = await _areaService.UpdateAreaAsync(id, dto);
+            if (updated == null)
+            {
+                return NotFound(ApiResponse<AreaResponseDto>.Fail($"Không tìm thấy khu vực với mã ID = {id} để cập nhật."));
+            }
 
-        return Ok(ApiResponse<AreaResponseDto>.Ok(updated, "Cập nhật khu vực thành công!"));
+            return Ok(ApiResponse<AreaResponseDto>.Ok(updated, "Cập nhật khu vực thành công!"));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<AreaResponseDto>.Fail(ex.Message));
+        }
     }
 
     /// <summary>
@@ -148,11 +162,13 @@ public class AreasController : ControllerBase
     }
 
     /// <summary>
-    /// Tính khoảng cách Haversine và hướng di chuyển (bearing) từ vị trí GPS hiện tại đến phân khu đích
+    /// Tính khoảng cách Haversine và hướng di chuyển (bearing) từ vị trí GPS hiện tại đến phân khu đích (Yêu cầu phiên tham quan hợp lệ)
     /// </summary>
     [HttpGet("{id:int}/navigation")]
+    [RequireTicketSession]
     [ProducesResponseType(typeof(ApiResponse<AreaNavigationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AreaNavigationDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<AreaNavigationDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetNavigation(int id, [FromQuery] decimal lat, [FromQuery] decimal lng)
     {

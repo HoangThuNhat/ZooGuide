@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.DTOs.Ticket;
@@ -103,9 +104,30 @@ public class TicketsController : ControllerBase
         var response = await _ticketService.ValidateAsync(request);
         if (!response.Valid)
         {
+            if (response.ErrorCode == "TICKET_NOT_FOUND")
+            {
+                return NotFound(response);
+            }
             return BadRequest(response);
         }
         return Ok(response);
+    }
+
+    /// <summary>
+    /// Kiểm tra tính hợp lệ của phiên tham quan hiện tại (Yêu cầu Header X-Session-Id hoặc Session-Id)
+    /// </summary>
+    [HttpGet("sessions/verify")]
+    [RequireTicketSession]
+    public IActionResult VerifySession()
+    {
+        var session = HttpContext.Items["TicketSession"] as ZooGuide.Domain.Entities.TicketSession;
+        return Ok(ApiResponse<object>.Ok(new
+        {
+            valid = true,
+            sessionId = session?.SessionId,
+            expiresAt = session?.ExpiredAt,
+            message = "Phiên tham quan hợp lệ và đang hoạt động."
+        }));
     }
 
     /// <summary>

@@ -6,16 +6,20 @@ export default function AdminAnimalsPage() {
     const { showToast } = useApp();
     const [animals, setAnimals] = useState([]);
     const [areas, setAreas] = useState([]);
+    const [speciesList, setSpeciesList] = useState([]);
     const [isEditing, setIsEditing] = useState(null);
 
     const initialForm = {
         nameVi: '',
         nameEn: '',
         scientificName: '',
-        species: 'Họ Mèo lớn (Felidae)',
-        zoneId: 'zone-b',
-        zoneCode: 'B',
-        zoneName: 'Khu Động Vật Ăn Thịt Hoàng Gia',
+        speciesId: 1,
+        species: 'Sư tử Châu Phi',
+        zoneId: 'zone-a',
+        zoneCode: 'A',
+        zoneName: 'Khu Sư Tử',
+        areaId: 1,
+        gender: 'Male',
         origin: '',
         diet: '',
         weight: '',
@@ -32,7 +36,18 @@ export default function AdminAnimalsPage() {
         const resA = await ZooApi.getAnimals();
         if (resA.success) setAnimals(resA.data);
         const resZ = await ZooApi.getAreas();
-        if (resZ.success) setAreas(resZ.data);
+        if (resZ.success) {
+            setAreas(resZ.data);
+            if (resZ.data.length > 0 && !formData.zoneId) {
+                setFormData(prev => ({
+                    ...prev,
+                    zoneId: resZ.data[0].id || `zone-${resZ.data[0].code?.toLowerCase()}`,
+                    areaId: resZ.data[0].areaId || resZ.data[0].id
+                }));
+            }
+        }
+        const resS = await ZooApi.getSpecies();
+        if (resS.success) setSpeciesList(resS.data);
     };
 
     useEffect(() => {
@@ -40,12 +55,13 @@ export default function AdminAnimalsPage() {
     }, []);
 
     const handleZoneChange = (zoneId) => {
-        const area = areas.find(a => a.id === zoneId);
+        const area = areas.find(a => a.id === zoneId || a.areaId === Number(zoneId));
         setFormData({
             ...formData,
             zoneId,
+            areaId: area ? (area.areaId || area.id) : 1,
             zoneCode: area ? area.code : 'A',
-            zoneName: area ? area.nameVi : ''
+            zoneName: area ? (area.nameVi || area.name) : ''
         });
     };
 
@@ -73,7 +89,11 @@ export default function AdminAnimalsPage() {
 
     const handleEdit = (animal) => {
         setIsEditing(animal.id);
-        setFormData({ ...animal });
+        setFormData({
+            ...animal,
+            speciesId: animal.speciesId || 1,
+            areaId: animal.areaId || 1
+        });
     };
 
     const handleDelete = async (id) => {
@@ -164,40 +184,41 @@ export default function AdminAnimalsPage() {
                     </h3>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
-                            <label className="form-label">Tên động vật (Tiếng Việt)</label>
+                            <label className="form-label">Tên cá thể động vật</label>
                             <input 
                                 type="text" 
                                 className="form-input" 
                                 required
-                                placeholder="VD: Hổ Bengal Hoàng Gia"
+                                placeholder="VD: Simba, Bé Na, Cường Đô..."
                                 value={formData.nameVi}
                                 onChange={(e) => setFormData({ ...formData, nameVi: e.target.value })}
                             />
                         </div>
-                        <div className="form-grid-2">
-                            <div className="form-group">
-                                <label className="form-label">Tên quốc tế</label>
-                                <input 
-                                    type="text" 
-                                    className="form-input" 
-                                    placeholder="Royal Bengal Tiger"
-                                    value={formData.nameEn}
-                                    onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label">Tên khoa học (Latin)</label>
-                                <input 
-                                    type="text" 
-                                    className="form-input" 
-                                    placeholder="Panthera tigris tigris"
-                                    value={formData.scientificName}
-                                    onChange={(e) => setFormData({ ...formData, scientificName: e.target.value })}
-                                />
-                            </div>
-                        </div>
 
                         <div className="form-grid-2">
+                            <div className="form-group">
+                                <label className="form-label">Giống loài sinh học (Species)</label>
+                                <select 
+                                    className="form-select"
+                                    value={formData.speciesId || (speciesList[0] ? speciesList[0].id : 1)}
+                                    onChange={(e) => {
+                                        const sId = Number(e.target.value);
+                                        const found = speciesList.find(s => s.id === sId);
+                                        setFormData({
+                                            ...formData,
+                                            speciesId: sId,
+                                            species: found ? found.nameVi : formData.species,
+                                            nameEn: found ? (found.nameEn || found.name) : formData.nameEn,
+                                            scientificName: found ? (found.scientificName || found.nameEn || '') : formData.scientificName,
+                                            iucnStatus: found ? (found.conservationStatus || formData.iucnStatus) : formData.iucnStatus
+                                        });
+                                    }}
+                                >
+                                    {speciesList.map(s => (
+                                        <option key={s.id} value={s.id}>{s.nameVi} ({s.nameEn || s.scientificName || ''})</option>
+                                    ))}
+                                </select>
+                            </div>
                             <div className="form-group">
                                 <label className="form-label">Phân khu nuôi thả</label>
                                 <select 
@@ -206,8 +227,23 @@ export default function AdminAnimalsPage() {
                                     onChange={(e) => handleZoneChange(e.target.value)}
                                 >
                                     {areas.map(z => (
-                                        <option key={z.id} value={z.id}>Khu {z.code} - {z.nameVi}</option>
+                                        <option key={z.id} value={z.id}>Khu {z.code} - {z.nameVi || z.name}</option>
                                     ))}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div className="form-grid-2">
+                            <div className="form-group">
+                                <label className="form-label">Giới tính</label>
+                                <select 
+                                    className="form-select"
+                                    value={formData.gender || "Male"}
+                                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                                >
+                                    <option value="Male">Đực (Male)</option>
+                                    <option value="Female">Cái (Female)</option>
+                                    <option value="Unknown">Chưa rõ (Unknown)</option>
                                 </select>
                             </div>
                             <div className="form-group">
