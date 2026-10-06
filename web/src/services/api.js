@@ -5,8 +5,10 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: 'http://localhost:5142/api',
-    USE_MOCK: false, // Set to false when backend ZooGuide.API is running
+    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
+        ? import.meta.env.VITE_USE_MOCK === 'true'
+        : true,
     TIMEOUT_MS: 8000
 };
 
@@ -463,6 +465,18 @@ export const MOCK_DB = {
 // API CLIENT IMPLEMENTATION
 // ==========================================
 export const ZooApi = {
+    // 0. HEALTH CHECK
+    async checkHealth() {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/health`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            console.error("Health check error:", err);
+            return { status: "Unhealthy", error: err.message };
+        }
+    },
+
     // 1. TICKET & SESSION
     async validateTicket(ticketCode) {
         if (!ticketCode || !ticketCode.trim()) {
