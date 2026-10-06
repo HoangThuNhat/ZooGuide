@@ -14,6 +14,26 @@ export const API_CONFIG = {
 // MOCK DATA STORE (Realistic Zoo Data)
 // ==========================================
 export const MOCK_DB = {
+    species: [
+        { id: 1, nameVi: "Họ Mèo lớn", nameEn: "Big Cats (Felidae)", scientificOrder: "Carnivora", description: "Các loài thú ăn thịt đầu bảng với sức mạnh và móng vuốt sắc nhọn." },
+        { id: 2, nameVi: "Linh trưởng Cựu Thế Giới", nameEn: "Old World Monkeys", scientificOrder: "Primates", description: "Các loài khỉ, vượn và voọc sinh sống tại châu Á và châu Phi." },
+        { id: 3, nameVi: "Động vật móng guốc chẵn", nameEn: "Even-toed Ungulates", scientificOrder: "Artiodactyla", description: "Hươu, nai, hươu cao cổ, ngựa vằn sinh sống trên thảo nguyên." },
+        { id: 4, nameVi: "Bộ Cá sấu", nameEn: "Crocodilians", scientificOrder: "Crocodilia", description: "Bò sát thủy sinh cỡ lớn ăn thịt từ thời tiền sử." },
+        { id: 5, nameVi: "Bộ Hồng hạc", nameEn: "Flamingos", scientificOrder: "Phoenicopteriformes", description: "Các loài chim lội nước chân dài với bộ lông màu hồng rực rỡ." }
+    ],
+
+    ticketTypes: [
+        { id: 1, code: "VIP-FAM", name: "VIP Family Pass", price: 350000, description: "Vé trọn gói gia đình 4 người, gồm quyền Audio Guide và xe điện toàn khu." },
+        { id: 2, code: "STD-ADULT", name: "Standard Adult", price: 120000, description: "Vé tiêu chuẩn người lớn tham quan 5 phân khu." },
+        { id: 3, code: "STD-CHILD", name: "Standard Child", price: 60000, description: "Vé trẻ em dưới 1m3 tham quan và trải nghiệm giáo dục." },
+        { id: 4, code: "AUDIO-ADD", name: "Audio Tour Add-on", price: 40000, description: "Gói nâng cấp thuyết minh song ngữ tự động theo vị trí." }
+    ],
+
+    ticketSessions: [
+        { sessionId: "SES-V810A1", ticketCode: "ZOO-8899-VIP", customerName: "Nguyễn Văn An", ticketType: "VIP Family Pass", activatedAt: "2026-09-30 08:30", status: "Active", device: "Mobile Safari (iOS)" },
+        { sessionId: "SES-V810B2", ticketCode: "ZOO-1234-STD", customerName: "Trần Thị Mai", ticketType: "Standard Adult", activatedAt: "2026-09-30 09:15", status: "Active", device: "Chrome Mobile (Android)" }
+    ],
+
     tickets: [
         {
             ticketCode: "ZOO-8899-VIP",
@@ -627,7 +647,129 @@ export const ZooApi = {
         return { success: true, message: "Đã cập nhật hồ sơ sức khỏe thành công!", data: newRecord };
     },
 
-    // 8. SIMULATE LATENCY FOR UX REALISM
+    // 8. ADMIN: SPECIES CRUD
+    async getSpecies() {
+        await this._simulateLatency(150);
+        return { success: true, data: MOCK_DB.species };
+    },
+    async createSpecies(data) {
+        await this._simulateLatency(200);
+        const newItem = { id: Date.now(), ...data };
+        MOCK_DB.species.push(newItem);
+        return { success: true, data: newItem };
+    },
+    async deleteSpecies(id) {
+        await this._simulateLatency(200);
+        MOCK_DB.species = MOCK_DB.species.filter(s => s.id !== id);
+        return { success: true };
+    },
+
+    // 9. ADMIN: ANIMALS CRUD
+    async createAnimal(data) {
+        await this._simulateLatency(200);
+        const newId = MOCK_DB.animals.length ? Math.max(...MOCK_DB.animals.map(a => a.id)) + 1 : 1;
+        const newItem = {
+            id: newId,
+            code: `ANI-${String(newId).padStart(3, '0')}`,
+            funFactsVi: data.funFactsVi || [],
+            funFactsEn: data.funFactsEn || [],
+            mapX: data.mapX || 300,
+            mapY: data.mapY || 300,
+            ...data
+        };
+        MOCK_DB.animals.push(newItem);
+        return { success: true, data: newItem };
+    },
+    async updateAnimal(id, data) {
+        await this._simulateLatency(200);
+        const idx = MOCK_DB.animals.findIndex(a => a.id === id);
+        if (idx !== -1) {
+            MOCK_DB.animals[idx] = { ...MOCK_DB.animals[idx], ...data };
+            return { success: true, data: MOCK_DB.animals[idx] };
+        }
+        return { success: false, message: "Không tìm thấy động vật" };
+    },
+    async deleteAnimal(id) {
+        await this._simulateLatency(200);
+        MOCK_DB.animals = MOCK_DB.animals.filter(a => a.id !== id);
+        return { success: true };
+    },
+
+    // 10. ADMIN: AREAS CRUD
+    async createArea(data) {
+        await this._simulateLatency(200);
+        const newId = `zone-${data.code.toLowerCase()}`;
+        const newItem = {
+            id: newId,
+            animalCount: 0,
+            mapCoords: { x: 300, y: 300, radius: 90 },
+            ...data
+        };
+        MOCK_DB.areas.push(newItem);
+        return { success: true, data: newItem };
+    },
+    async updateArea(id, data) {
+        await this._simulateLatency(200);
+        const idx = MOCK_DB.areas.findIndex(a => a.id === id);
+        if (idx !== -1) {
+            MOCK_DB.areas[idx] = { ...MOCK_DB.areas[idx], ...data };
+            return { success: true, data: MOCK_DB.areas[idx] };
+        }
+        return { success: false, message: "Không tìm thấy khu vực" };
+    },
+    async deleteArea(id) {
+        await this._simulateLatency(200);
+        MOCK_DB.areas = MOCK_DB.areas.filter(a => a.id !== id);
+        return { success: true };
+    },
+
+    // 11. ADMIN: TICKETS CRUD
+    async getTickets() {
+        await this._simulateLatency(150);
+        return { success: true, data: MOCK_DB.tickets };
+    },
+    async createTicket(data) {
+        await this._simulateLatency(200);
+        const newTicket = {
+            ticketCode: data.ticketCode || `ZOO-${Math.floor(1000 + Math.random() * 9000)}-STD`,
+            status: "Active",
+            validDate: data.validDate || new Date().toISOString().split('T')[0],
+            hasAudioGuide: data.hasAudioGuide !== false,
+            zonesAllowed: data.zonesAllowed || ["ALL"],
+            ...data
+        };
+        MOCK_DB.tickets.unshift(newTicket);
+        return { success: true, data: newTicket };
+    },
+    async updateTicketStatus(code, status) {
+        await this._simulateLatency(200);
+        const ticket = MOCK_DB.tickets.find(t => t.ticketCode === code);
+        if (ticket) {
+            ticket.status = status;
+            return { success: true, data: ticket };
+        }
+        return { success: false, message: "Không tìm thấy vé" };
+    },
+
+    // 12. ADMIN: TICKET TYPES CRUD
+    async getTicketTypes() {
+        await this._simulateLatency(150);
+        return { success: true, data: MOCK_DB.ticketTypes };
+    },
+    async createTicketType(data) {
+        await this._simulateLatency(200);
+        const newType = { id: Date.now(), ...data };
+        MOCK_DB.ticketTypes.push(newType);
+        return { success: true, data: newType };
+    },
+
+    // 13. ADMIN: TICKET SESSIONS
+    async getTicketSessions() {
+        await this._simulateLatency(150);
+        return { success: true, data: MOCK_DB.ticketSessions };
+    },
+
+    // 14. SIMULATE LATENCY FOR UX REALISM
     _simulateLatency(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

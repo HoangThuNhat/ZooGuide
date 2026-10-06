@@ -1,223 +1,48 @@
-import React, { useRef, useEffect } from 'react';
-import { useApp } from './context/AppContext';
-import { ZooApi, MOCK_DB } from './services/api';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 
-// Layout & Global Components
-import Header from './components/layout/Header';
-import HeroBanner from './components/layout/HeroBanner';
-import MobileBottomNav from './components/layout/MobileBottomNav';
+// Visitor Portal
+import VisitorPortal from './pages/visitor/VisitorPortal';
+
+// Admin Portal & Pages
+import AdminLayout from './components/admin/layout/AdminLayout';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
+import AdminSpeciesPage from './pages/admin/AdminSpeciesPage';
+import AdminAnimalsPage from './pages/admin/AdminAnimalsPage';
+import AdminAreasPage from './pages/admin/AdminAreasPage';
+import AdminTicketsPage from './pages/admin/AdminTicketsPage';
+import AdminTicketTypesPage from './pages/admin/AdminTicketTypesPage';
+import AdminTicketSessionsPage from './pages/admin/AdminTicketSessionsPage';
+import AdminNarrationPage from './pages/admin/AdminNarrationPage';
+
+// Common Global Feedback
 import ToastContainer from './components/common/ToastContainer';
 
-// Tab Views
-import MapTab from './components/map/MapTab';
-import AnimalsTab from './components/animals/AnimalsTab';
-import TicketsTab from './components/tickets/TicketsTab';
-import AdminTab from './components/admin/AdminTab';
-
-// Modals & Floating Features
-import TicketModal from './components/tickets/TicketModal';
-import AnimalDetailModal from './components/animals/AnimalDetailModal';
-import TranscriptModal from './components/audio/TranscriptModal';
-import AudioPlayerBar from './components/audio/AudioPlayerBar';
-import Chatbot from './components/chat/Chatbot';
-
 export default function App() {
-    const { 
-        currentTab, 
-        switchTab,
-        currentLang, 
-        hasActiveSession, 
-        setIsTicketModalOpen, 
-        setSelectedAnimalForDetail, 
-        showToast,
-        audioState, 
-        setAudioState,
-        setFilterZone
-    } = useApp();
-
-    const audioTimerRef = useRef(null);
-    const synthRef = useRef(window.speechSynthesis);
-    const speechUtteranceRef = useRef(null);
-
-    // Audio Engine Functions
-    const playAnimalAudio = async (animalId, startAutoplay = true) => {
-        if (!hasActiveSession) {
-            setIsTicketModalOpen(true);
-            showToast("Vui lòng quét hoặc nhập mã vé để nghe thuyết minh!", "warning");
-            return;
-        }
-
-        const res = await ZooApi.getNarration(animalId, currentLang);
-        if (!res.success) {
-            showToast("Không tìm thấy dữ liệu thuyết minh", "error");
-            return;
-        }
-
-        const animal = MOCK_DB.animals.find(a => a.id === parseInt(animalId));
-        const duration = res.data.durationSec || 120;
-
-        setAudioState({
-            animal,
-            narration: res.data,
-            isPlaying: startAutoplay,
-            currentTime: 0,
-            duration,
-            playbackRate: 1.0,
-            isVisible: true
-        });
-
-        if (startAutoplay) {
-            startAudioPlayback(res.data, duration, 1.0);
-        }
-    };
-
-    const startAudioPlayback = (narration, duration, rate) => {
-        // Speech Synthesis fallback
-        if (synthRef.current && narration && narration.transcript) {
-            synthRef.current.cancel();
-            const fullText = narration.transcript.map(t => t.text).join(' ');
-            const utterance = new SpeechSynthesisUtterance(fullText);
-            utterance.rate = rate;
-            utterance.lang = currentLang === 'en' ? 'en-US' : 'vi-VN';
-            utterance.onend = () => {
-                pauseAudioPlayback();
-            };
-            speechUtteranceRef.current = utterance;
-            synthRef.current.speak(utterance);
-        }
-
-        clearInterval(audioTimerRef.current);
-        audioTimerRef.current = setInterval(() => {
-            setAudioState(prev => {
-                if (prev.currentTime >= prev.duration) {
-                    clearInterval(audioTimerRef.current);
-                    return { ...prev, isPlaying: false, currentTime: prev.duration };
-                }
-                return { ...prev, currentTime: prev.currentTime + 1 };
-            });
-        }, 1000 / rate);
-    };
-
-    const pauseAudioPlayback = () => {
-        clearInterval(audioTimerRef.current);
-        if (synthRef.current) {
-            synthRef.current.pause();
-        }
-        setAudioState(prev => ({ ...prev, isPlaying: false }));
-    };
-
-    const resumeAudioPlayback = () => {
-        if (synthRef.current) {
-            synthRef.current.resume();
-        }
-        startAudioPlayback(audioState.narration, audioState.duration, audioState.playbackRate);
-        setAudioState(prev => ({ ...prev, isPlaying: true }));
-    };
-
-    const handleTogglePlay = () => {
-        if (audioState.isPlaying) {
-            pauseAudioPlayback();
-        } else {
-            resumeAudioPlayback();
-        }
-    };
-
-    const handleSkip = (seconds) => {
-        setAudioState(prev => {
-            const nextTime = Math.max(0, Math.min(prev.duration, prev.currentTime + seconds));
-            return { ...prev, currentTime: nextTime };
-        });
-    };
-
-    const handleSeek = (time) => {
-        setAudioState(prev => ({ ...prev, currentTime: time }));
-    };
-
-    const handleChangeSpeed = (speed) => {
-        setAudioState(prev => ({ ...prev, playbackRate: speed }));
-        if (audioState.isPlaying) {
-            startAudioPlayback(audioState.narration, audioState.duration, speed);
-        }
-    };
-
-    // Clean up timer on unmount
-    useEffect(() => {
-        return () => {
-            clearInterval(audioTimerRef.current);
-            if (synthRef.current) synthRef.current.cancel();
-        };
-    }, []);
-
-    // Handlers for Navigation to Map
-    const handleLocateMap = (animal) => {
-        switchTab('map');
-    };
-
     return (
-        <div className="zooguide-app">
-            {/* Header */}
-            <Header />
+        <>
+            <Routes>
+                {/* Visitor Routes */}
+                <Route path="/" element={<VisitorPortal />} />
 
-            {/* Main Container */}
-            <main className="app-main" role="main">
-                {/* Hero Banner */}
-                <HeroBanner />
+                {/* Admin Management Routes */}
+                <Route path="/admin" element={<AdminLayout />}>
+                    <Route index element={<AdminDashboardPage />} />
+                    <Route path="species" element={<AdminSpeciesPage />} />
+                    <Route path="animals" element={<AdminAnimalsPage />} />
+                    <Route path="areas" element={<AdminAreasPage />} />
+                    <Route path="tickets" element={<AdminTicketsPage />} />
+                    <Route path="ticket-types" element={<AdminTicketTypesPage />} />
+                    <Route path="ticket-sessions" element={<AdminTicketSessionsPage />} />
+                    <Route path="narration" element={<AdminNarrationPage />} />
+                </Route>
 
-                <div className="container">
-                    {/* Map Tab */}
-                    {currentTab === 'map' && (
-                        <MapTab 
-                            onPlayAudio={playAnimalAudio}
-                            onOpenDetail={(animal) => setSelectedAnimalForDetail(animal)}
-                        />
-                    )}
+                {/* Catch-all redirect to Visitor */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
 
-                    {/* Animals Tab */}
-                    {currentTab === 'animals' && (
-                        <AnimalsTab 
-                            onPlayAudio={playAnimalAudio}
-                            onLocateMap={handleLocateMap}
-                        />
-                    )}
-
-                    {/* Tickets Tab */}
-                    {currentTab === 'tickets' && (
-                        <TicketsTab />
-                    )}
-
-                    {/* Admin Tab */}
-                    {currentTab === 'admin' && (
-                        <AdminTab onPlaySample={playAnimalAudio} />
-                    )}
-                </div>
-            </main>
-
-            {/* Floating Persistent Audio Player Bar */}
-            <AudioPlayerBar 
-                onTogglePlay={handleTogglePlay}
-                onSkip={handleSkip}
-                onSeek={handleSeek}
-                onChangeSpeed={handleChangeSpeed}
-            />
-
-            {/* Mobile Bottom Navigation */}
-            <MobileBottomNav />
-
-            {/* AI Chatbot */}
-            <Chatbot />
-
-            {/* Modals */}
-            <TicketModal />
-            <AnimalDetailModal 
-                onPlayAudio={playAnimalAudio}
-                onNavigate={(animal) => {
-                    switchTab('map');
-                }}
-            />
-            <TranscriptModal onSeek={handleSeek} />
-
-            {/* Toast Notifications */}
+            {/* Global Toast Container */}
             <ToastContainer />
-        </div>
+        </>
     );
 }

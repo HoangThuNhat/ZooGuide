@@ -37,10 +37,10 @@ export const translations = {
 };
 
 export function AppProvider({ children }) {
-    // Current Active Tab: 'map' | 'animals' | 'tickets' | 'admin'
+    // Current Active Visitor Tab: 'map' | 'animals' | 'tickets'
     const [currentTab, setCurrentTab] = useState(() => {
         const hash = window.location.hash.replace('#', '');
-        return ['map', 'animals', 'tickets', 'admin'].includes(hash) ? hash : 'map';
+        return ['map', 'animals', 'tickets'].includes(hash) ? hash : 'map';
     });
 
     // Language state
@@ -112,7 +112,7 @@ export function AppProvider({ children }) {
     useEffect(() => {
         const handleHashChange = () => {
             const hash = window.location.hash.replace('#', '') || 'map';
-            if (['map', 'animals', 'tickets', 'admin'].includes(hash)) {
+            if (['map', 'animals', 'tickets'].includes(hash)) {
                 setCurrentTab(hash);
             }
         };
