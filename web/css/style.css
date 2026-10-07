@@ -1877,3 +1877,23 @@ a:focus-visible {
         transition-duration: 0.01ms !important;
     }
 }
+
+.ticket-table-scroll {
+    height: 500px;
+    
+    overflow-y: auto;
+    overflow-x: auto;
+}
+
+.ticket-table-scroll .admin-table {
+    
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.ticket-table-scroll .admin-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: #F1F5F9;
+}
