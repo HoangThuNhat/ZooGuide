@@ -101,8 +101,7 @@ export default function AdminTicketsPage() {
             <div className="ticket-page-layout">
                 {/* Tickets Table */}
                 <div>
-                    <div className="admin-table-wrapper">
-                        <table className="admin-table">
+<div className="admin-table-wrapper ticket-table-scroll">                        <table className="admin-table">
                             <thead>
                                 <tr>
                                     <th>Mã vé</th>
