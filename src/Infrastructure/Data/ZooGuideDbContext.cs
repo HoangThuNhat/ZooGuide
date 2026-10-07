@@ -21,6 +21,7 @@ public class ZooGuideDbContext : DbContext
     public virtual DbSet<TicketSession> TicketSessions => Set<TicketSession>();
     public virtual DbSet<Species> Species => Set<Species>();
     public virtual DbSet<Area> Areas => Set<Area>();
+    public virtual DbSet<Enclosure> Enclosures => Set<Enclosure>();
     public virtual DbSet<Animal> Animals => Set<Animal>();
     public virtual DbSet<Language> Languages => Set<Language>();
     public virtual DbSet<Narration> Narrations => Set<Narration>();

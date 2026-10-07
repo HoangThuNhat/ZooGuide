@@ -29,14 +29,16 @@ builder.Services.AddDbContext<ZooGuideDbContext>(options =>
     });
 });
 
-// Register Repositories for Areas, Animals, Tickets
+// Register Repositories for Areas, Animals, Tickets, Enclosures
 builder.Services.AddScoped<IAreaRepository, AreaRepository>();
+builder.Services.AddScoped<IEnclosureRepository, EnclosureRepository>();
 builder.Services.AddScoped<IAnimalRepository, AnimalRepository>();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketSessionRepository, TicketSessionRepository>();
 
-// Register Application Services for Areas, Animals, Tickets
+// Register Application Services for Areas, Animals, Tickets, Enclosures
 builder.Services.AddScoped<IAreaService, AreaService>();
+builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
 
@@ -75,6 +77,7 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
     var userCount = canConnect ? await dbContext.Users.CountAsync() : 0;
     var animalCount = canConnect ? await dbContext.Animals.CountAsync() : 0;
     var areaCount = canConnect ? await dbContext.Areas.CountAsync() : 0;
+    var enclosureCount = canConnect ? await dbContext.Enclosures.CountAsync() : 0;
 
     return Results.Ok(new
     {
@@ -85,7 +88,8 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
         {
             users = userCount,
             animals = animalCount,
-            areas = areaCount
+            areas = areaCount,
+            enclosures = enclosureCount
         }
     });
 })
