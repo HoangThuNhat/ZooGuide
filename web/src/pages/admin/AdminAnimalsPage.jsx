@@ -150,7 +150,7 @@ if (resS.success) setSpeciesOptions(resS.data);
             <div className="ticket-page-layout">
                 {/* Animal Grid List */}
                 <div>
-                    <div className="admin-table-wrapper">
+                    <div className="admin-table-wrapper ticket-table-scroll">
                         <table className="admin-table">
                             <thead>
                                 <tr>
