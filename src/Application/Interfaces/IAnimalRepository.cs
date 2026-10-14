@@ -7,7 +7,7 @@ namespace ZooGuide.Application.Interfaces;
 /// </summary>
 public interface IAnimalRepository
 {
-    Task<List<Animal>> GetAllWithDetailsAsync(string? search, int? areaId, string? zoneId, int? speciesId, string? iucnStatus);
+    Task<List<Animal>> GetAllWithDetailsAsync(string? search, int? areaId, string? zoneId, int? speciesId, string? iucnStatus, int? enclosureId = null);
     Task<Animal?> GetByIdWithDetailsAsync(int animalId);
     Task<Animal?> GetByIdAsync(int animalId);
     Task<Animal> AddAsync(Animal animal);
@@ -16,4 +16,5 @@ public interface IAnimalRepository
     Task<bool> HasNarrationsAsync(int animalId);
     Task<bool> SpeciesExistsAsync(int speciesId);
     Task<bool> AreaExistsAsync(int areaId);
+    Task<bool> EnclosureExistsAsync(int enclosureId);
 }

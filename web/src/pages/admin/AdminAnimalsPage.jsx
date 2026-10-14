@@ -6,6 +6,7 @@ export default function AdminAnimalsPage() {
     const { showToast } = useApp();
     const [animals, setAnimals] = useState([]);
     const [areas, setAreas] = useState([]);
+    const [enclosures, setEnclosures] = useState([]);
     const [speciesOptions, setSpeciesOptions] = useState([]);
     const [isEditing, setIsEditing] = useState(null);
 
@@ -19,6 +20,7 @@ export default function AdminAnimalsPage() {
         zoneCode: 'B',
         zoneName: 'Khu Động Vật Ăn Thịt Hoàng Gia',
         areaId: 1,
+        enclosureId: '',
         gender: 'Male',
         origin: '',
         diet: '',
@@ -35,20 +37,24 @@ export default function AdminAnimalsPage() {
     const loadData = async () => {
         const resA = await ZooApi.getAnimals();
         if (resA.success) setAnimals(resA.data);
-        const resZ = await ZooApi.getAreas();
-if (resZ.success) {
-    setAreas(resZ.data);
-    if (resZ.data.length > 0 && !formData.zoneId) {
-        setFormData(prev => ({
-            ...prev,
-            zoneId: resZ.data[0].id || `zone-${resZ.data[0].code?.toLowerCase()}`,
-            areaId: resZ.data[0].areaId || resZ.data[0].id
-        }));
-    }
-}
 
-const resS = await ZooApi.getSpecies();
-if (resS.success) setSpeciesOptions(resS.data);
+        const resZ = await ZooApi.getAreas();
+        if (resZ.success) {
+            setAreas(resZ.data);
+            if (resZ.data.length > 0 && !formData.zoneId) {
+                setFormData(prev => ({
+                    ...prev,
+                    zoneId: resZ.data[0].id || `zone-${resZ.data[0].code?.toLowerCase()}`,
+                    areaId: resZ.data[0].areaId || resZ.data[0].id
+                }));
+            }
+        }
+
+        const resE = await ZooApi.getEnclosures();
+        if (resE.success) setEnclosures(resE.data);
+
+        const resS = await ZooApi.getSpecies();
+        if (resS.success) setSpeciesOptions(resS.data);
     };
 
     useEffect(() => {
@@ -57,13 +63,15 @@ if (resS.success) setSpeciesOptions(resS.data);
 
     const handleZoneChange = (zoneId) => {
         const area = areas.find(a => a.id === zoneId || a.areaId === Number(zoneId));
-        setFormData({
-            ...formData,
+        const newAreaId = area ? (area.areaId || area.id) : 1;
+        setFormData(prev => ({
+            ...prev,
             zoneId,
-            areaId: area ? (area.areaId || area.id) : 1,
+            areaId: newAreaId,
             zoneCode: area ? area.code : 'A',
-            zoneName: area ? (area.nameVi || area.name) : ''
-        });
+            zoneName: area ? (area.nameVi || area.name) : '',
+            enclosureId: '' // Reset chuồng khi đổi khu vực
+        }));
     };
 
     const handleSpeciesChange = (speciesId) => {
@@ -90,20 +98,29 @@ if (resS.success) setSpeciesOptions(resS.data);
         e.preventDefault();
         if (!formData.nameVi.trim()) return;
 
+        const payload = {
+            ...formData,
+            enclosureId: formData.enclosureId ? Number(formData.enclosureId) : null
+        };
+
         if (isEditing) {
-            const res = await ZooApi.updateAnimal(isEditing, formData);
+            const res = await ZooApi.updateAnimal(isEditing, payload);
             if (res.success) {
                 showToast("Cập nhật thông tin động vật thành công!", "success");
                 setIsEditing(null);
                 setFormData(initialForm);
                 loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi cập nhật động vật", "error");
             }
         } else {
-            const res = await ZooApi.createAnimal(formData);
+            const res = await ZooApi.createAnimal(payload);
             if (res.success) {
                 showToast("Thêm mới cá thể động vật thành công!", "success");
                 setFormData(initialForm);
                 loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi thêm động vật", "error");
             }
         }
     };
@@ -113,7 +130,8 @@ if (resS.success) setSpeciesOptions(resS.data);
         setFormData({
             ...animal,
             speciesId: animal.speciesId || 1,
-            areaId: animal.areaId || 1
+            areaId: animal.areaId || 1,
+            enclosureId: animal.enclosureId || ''
         });
     };
 
@@ -157,6 +175,7 @@ if (resS.success) setSpeciesOptions(resS.data);
                                     <th>Mã / Hình</th>
                                     <th>Tên cá thể & Loài sinh học</th>
                                     <th>Phân khu</th>
+                                    <th>Chuồng trại</th>
                                     <th>Bảo tồn (IUCN)</th>
                                     <th>Hồ sơ sức khỏe</th>
                                     <th>Thao tác</th>
@@ -180,6 +199,15 @@ if (resS.success) setSpeciesOptions(resS.data);
                                         </td>
                                         <td>
                                             <span className="chip chip-sm">Khu {a.zoneCode}</span>
+                                        </td>
+                                        <td>
+                                            {a.enclosureName ? (
+                                                <span className="chip chip-sm font-semibold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
+                                                    {a.enclosureName}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-muted italic">Chưa xếp chuồng</span>
+                                            )}
                                         </td>
                                         <td>
                                             <span className={`badge ${getIucnBadgeClass(a.iucnStatus)}`}>{a.iucnStatus}</span>
@@ -216,22 +244,16 @@ if (resS.success) setSpeciesOptions(resS.data);
                     </h3>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
-
-
                             <label className="form-label">Tên cá thể động vật (Tiếng Việt)</label>
-
                             <input 
                                 type="text" 
                                 className="form-input" 
                                 required
-
                                 placeholder="VD: Sư tử Simba"
-
                                 value={formData.nameVi}
                                 onChange={(e) => setFormData({ ...formData, nameVi: e.target.value })}
                             />
                         </div>
-
 
                         <div className="form-group">
                             <label className="form-label">Thuộc Loài sinh học (Species)</label>
@@ -269,8 +291,10 @@ if (resS.success) setSpeciesOptions(resS.data);
                                     value={formData.scientificName}
                                     onChange={(e) => setFormData({ ...formData, scientificName: e.target.value })}
                                 />
-
                             </div>
+                        </div>
+
+                        <div className="form-grid-2">
                             <div className="form-group">
                                 <label className="form-label">Phân khu nuôi thả</label>
                                 <select 
@@ -281,6 +305,24 @@ if (resS.success) setSpeciesOptions(resS.data);
                                     {areas.map(z => (
                                         <option key={z.id} value={z.id}>Khu {z.code} - {z.nameVi || z.name}</option>
                                     ))}
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-label">Chuồng trại (Enclosure)</label>
+                                <select 
+                                    className="form-select"
+                                    value={formData.enclosureId || ''}
+                                    onChange={(e) => setFormData({ ...formData, enclosureId: e.target.value ? Number(e.target.value) : '' })}
+                                >
+                                    <option value="">-- Chưa xếp chuồng (Trống) --</option>
+                                    {enclosures
+                                        .filter(e => e.areaId === Number(formData.areaId))
+                                        .map(e => (
+                                            <option key={e.enclosureId || e.id} value={e.enclosureId || e.id}>
+                                                {e.name} ({e.code || `ENC-${e.enclosureId}`})
+                                            </option>
+                                        ))
+                                    }
                                 </select>
                             </div>
                         </div>

@@ -19,10 +19,14 @@ public class AreaResponseDto
     public decimal Longitude { get; set; }
     public decimal RadiusMeters { get; set; }
     public string? MapImageUrl { get; set; }
+    public decimal? MapX { get; set; }
+    public decimal? MapY { get; set; }
     public string Status { get; set; } = "Active";
+    public int EnclosureCount { get; set; }
     public int AnimalCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
+    public List<EnclosureResponseDto> Enclosures { get; set; } = new();
 }
 
 /// <summary>
@@ -30,6 +34,9 @@ public class AreaResponseDto
 /// </summary>
 public class CreateAreaDto
 {
+    [MaxLength(20, ErrorMessage = "Mã phân khu tối đa 20 ký tự")]
+    public string? Code { get; set; }
+
     [Required(ErrorMessage = "Tên khu vực không được để trống")]
     [MaxLength(100, ErrorMessage = "Tên khu vực tối đa 100 ký tự")]
     public string Name { get; set; } = string.Empty;
@@ -46,6 +53,8 @@ public class CreateAreaDto
     public decimal RadiusMeters { get; set; }
 
     public string? MapImageUrl { get; set; }
+    public decimal? MapX { get; set; }
+    public decimal? MapY { get; set; }
     public AreaStatus Status { get; set; } = AreaStatus.Active;
 }
 
@@ -54,6 +63,9 @@ public class CreateAreaDto
 /// </summary>
 public class UpdateAreaDto
 {
+    [MaxLength(20, ErrorMessage = "Mã phân khu tối đa 20 ký tự")]
+    public string? Code { get; set; }
+
     [Required(ErrorMessage = "Tên khu vực không được để trống")]
     [MaxLength(100, ErrorMessage = "Tên khu vực tối đa 100 ký tự")]
     public string Name { get; set; } = string.Empty;
@@ -70,6 +82,8 @@ public class UpdateAreaDto
     public decimal RadiusMeters { get; set; }
 
     public string? MapImageUrl { get; set; }
+    public decimal? MapX { get; set; }
+    public decimal? MapY { get; set; }
     public AreaStatus Status { get; set; } = AreaStatus.Active;
 }
 

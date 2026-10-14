@@ -18,10 +18,14 @@ public class Area
     public decimal Longitude { get; set; }
     public decimal RadiusMeters { get; set; }
     public string? MapImageUrl { get; set; }
+    public string? Code { get; set; }
+    public decimal? MapX { get; set; }
+    public decimal? MapY { get; set; }
     public AreaStatus Status { get; set; } = AreaStatus.Active;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation properties
+    public virtual ICollection<Enclosure> Enclosures { get; set; } = new List<Enclosure>();
     public virtual ICollection<Animal> Animals { get; set; } = new List<Animal>();
 }

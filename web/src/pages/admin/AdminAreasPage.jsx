@@ -4,172 +4,724 @@ import { useApp } from '../../context/AppContext';
 
 export default function AdminAreasPage() {
     const { showToast } = useApp();
+    const [activeTab, setActiveTab] = useState('areas'); // 'areas' | 'enclosures'
     const [areas, setAreas] = useState([]);
-    const [formData, setFormData] = useState({
+    const [enclosures, setEnclosures] = useState([]);
+    const [animals, setAnimals] = useState([]);
+    const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+
+    // Area Form State
+    const [isEditingArea, setIsEditingArea] = useState(null);
+    const initialAreaForm = {
         code: '',
         nameVi: '',
         nameEn: '',
         color: '#15803D',
         descriptionVi: '',
-        descriptionEn: ''
-    });
+        descriptionEn: '',
+        mapX: 400,
+        mapY: 300,
+        radiusMeters: 60
+    };
+    const [areaForm, setAreaForm] = useState(initialAreaForm);
+
+    // Enclosure Form State
+    const [isEditingEnclosure, setIsEditingEnclosure] = useState(null);
+    const initialEnclosureForm = {
+        areaId: '',
+        code: '',
+        name: '',
+        description: '',
+        imageUrl: '',
+        status: 'Active',
+        mapX: 450,
+        mapY: 320
+    };
+    const [enclosureForm, setEnclosureForm] = useState(initialEnclosureForm);
+
+    // Move Animal State
+    const [movingAnimal, setMovingAnimal] = useState(null); // animal obj
+    const [targetEnclosureId, setTargetEnclosureId] = useState('');
 
     const loadData = async () => {
-        const res = await ZooApi.getAreas();
-        if (res.success) setAreas(res.data);
+        const resA = await ZooApi.getAreas();
+        if (resA.success) {
+            setAreas(resA.data);
+            if (resA.data.length > 0 && !enclosureForm.areaId) {
+                setEnclosureForm(prev => ({ ...prev, areaId: resA.data[0].areaId || resA.data[0].id }));
+            }
+        }
+
+        const resE = await ZooApi.getEnclosures();
+        if (resE.success) setEnclosures(resE.data);
+
+        const resAni = await ZooApi.getAnimals();
+        if (resAni.success) setAnimals(resAni.data);
     };
 
     useEffect(() => {
         loadData();
     }, []);
 
-    const handleSubmit = async (e) => {
+    // AREA HANDLERS
+    const handleAreaSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.code.trim() || !formData.nameVi.trim()) return;
+        if (!areaForm.nameVi.trim()) return;
 
-        const res = await ZooApi.createArea(formData);
-        if (res.success) {
-            showToast("Thêm phân khu mới thành công!", "success");
-            setFormData({ code: '', nameVi: '', nameEn: '', color: '#15803D', descriptionVi: '', descriptionEn: '' });
-            loadData();
+        const payload = {
+            code: areaForm.code.trim().toUpperCase(),
+            name: areaForm.nameVi.trim(),
+            nameVi: areaForm.nameVi.trim(),
+            description: areaForm.descriptionVi.trim(),
+            descriptionVi: areaForm.descriptionVi.trim(),
+            color: areaForm.color,
+            mapX: areaForm.mapX !== '' ? parseFloat(areaForm.mapX) : null,
+            mapY: areaForm.mapY !== '' ? parseFloat(areaForm.mapY) : null,
+            radiusMeters: parseFloat(areaForm.radiusMeters) || 60
+        };
+
+        if (isEditingArea) {
+            const res = await ZooApi.updateArea(isEditingArea, payload);
+            if (res.success) {
+                showToast("Cập nhật phân khu thành công!", "success");
+                setIsEditingArea(null);
+                setAreaForm(initialAreaForm);
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi cập nhật phân khu", "error");
+            }
+        } else {
+            const res = await ZooApi.createArea(payload);
+            if (res.success) {
+                showToast("Thêm mới phân khu thành công!", "success");
+                setAreaForm(initialAreaForm);
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi tạo phân khu", "error");
+            }
         }
     };
 
-    const handleDelete = async (id) => {
+    const handleEditArea = (area) => {
+        setIsEditingArea(area.areaId || area.id);
+        setAreaForm({
+            code: area.code || '',
+            nameVi: area.nameVi || area.name || '',
+            nameEn: area.nameEn || '',
+            color: area.color || '#15803D',
+            descriptionVi: area.descriptionVi || area.description || '',
+            descriptionEn: area.descriptionEn || '',
+            mapX: area.mapX != null ? area.mapX : 400,
+            mapY: area.mapY != null ? area.mapY : 300,
+            radiusMeters: area.radiusMeters || 60
+        });
+        setActiveTab('areas');
+    };
+
+    const handleDeleteArea = async (id) => {
         if (window.confirm("Bạn có chắc chắn muốn xóa phân khu này?")) {
-            await ZooApi.deleteArea(id);
-            showToast("Đã xóa phân khu", "info");
-            loadData();
+            const res = await ZooApi.deleteArea(id);
+            if (res.success) {
+                showToast("Đã xóa phân khu", "info");
+                loadData();
+            } else {
+                showToast(res.error || "Không thể xóa phân khu này.", "error");
+            }
         }
     };
+
+    // ENCLOSURE HANDLERS
+    const handleEnclosureSubmit = async (e) => {
+        e.preventDefault();
+        if (!enclosureForm.name.trim() || !enclosureForm.areaId) {
+            showToast("Vui lòng nhập tên chuồng và chọn phân khu.", "warning");
+            return;
+        }
+
+        const payload = {
+            areaId: parseInt(enclosureForm.areaId),
+            code: enclosureForm.code.trim() || null,
+            name: enclosureForm.name.trim(),
+            description: enclosureForm.description.trim(),
+            imageUrl: enclosureForm.imageUrl.trim(),
+            status: enclosureForm.status,
+            mapX: enclosureForm.mapX !== '' ? parseFloat(enclosureForm.mapX) : null,
+            mapY: enclosureForm.mapY !== '' ? parseFloat(enclosureForm.mapY) : null
+        };
+
+        if (isEditingEnclosure) {
+            const res = await ZooApi.updateEnclosure(isEditingEnclosure, payload);
+            if (res.success) {
+                showToast("Cập nhật thông tin chuồng trại thành công!", "success");
+                setIsEditingEnclosure(null);
+                setEnclosureForm({ ...initialEnclosureForm, areaId: areas[0]?.areaId || '' });
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi cập nhật chuồng", "error");
+            }
+        } else {
+            const res = await ZooApi.createEnclosure(payload);
+            if (res.success) {
+                showToast("Thêm mới chuồng trại thành công!", "success");
+                setEnclosureForm({ ...initialEnclosureForm, areaId: areas[0]?.areaId || '' });
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Lỗi tạo chuồng", "error");
+            }
+        }
+    };
+
+    const handleEditEnclosure = (enc) => {
+        setIsEditingEnclosure(enc.enclosureId || enc.id);
+        setEnclosureForm({
+            areaId: enc.areaId,
+            code: enc.code || '',
+            name: enc.name || '',
+            description: enc.description || '',
+            imageUrl: enc.imageUrl || '',
+            status: enc.status || 'Active',
+            mapX: enc.mapX != null ? enc.mapX : 450,
+            mapY: enc.mapY != null ? enc.mapY : 320
+        });
+        setActiveTab('enclosures');
+    };
+
+    const handleDeleteEnclosure = async (id) => {
+        if (window.confirm("Bạn có chắc chắn muốn xóa chuồng này? Nếu chuồng đang có động vật, bạn cần chuyển chúng trước.")) {
+            const res = await ZooApi.deleteEnclosure(id);
+            if (res.success) {
+                showToast("Đã xóa chuồng thành công", "info");
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Không thể xóa chuồng.", "error");
+            }
+        }
+    };
+
+    // MOVE ANIMAL HANDLER
+    const handleConfirmMoveAnimal = async () => {
+        if (!movingAnimal) return;
+        const targetId = targetEnclosureId ? parseInt(targetEnclosureId) : null;
+        const res = await ZooApi.moveAnimalEnclosure(movingAnimal.animalId || movingAnimal.id, targetId);
+        if (res.success) {
+            showToast(res.message || "Chuyển chuồng cho động vật thành công!", "success");
+            setMovingAnimal(null);
+            setTargetEnclosureId('');
+            loadData();
+        } else {
+            showToast(res.error || res.message || "Không thể chuyển chuồng.", "error");
+        }
+    };
+
+    const filteredEnclosures = enclosures.filter(e => {
+        if (selectedAreaFilter === 'all') return true;
+        return e.areaId === Number(selectedAreaFilter);
+    });
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            {/* Page Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Phân Khu & Chuồng Trại (Areas & Enclosures)
                     </h2>
                     <p style={{ color: '#64748B', margin: 0, fontSize: '0.9rem' }}>
-                        Thông tin kiểm định các phân khu A, B, C, D, E, môi trường sống và số lượng loài động vật.
+                        Cấu trúc phân cấp chuẩn: <strong>Sở thú → Phân khu (Area) → Chuồng trại (Enclosure) → Cá thể động vật</strong>.
                     </p>
                 </div>
-                <span className="chip font-bold">{areas.length} phân khu hoạt động</span>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                    <span className="chip font-bold" style={{ background: '#DCFCE7', color: '#166534' }}>
+                        {areas.length} Phân Khu
+                    </span>
+                    <span className="chip font-bold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
+                        {enclosures.length} Chuồng Trại
+                    </span>
+                </div>
             </div>
 
-            <div className="ticket-page-layout">
-                {/* Areas Grid */}
-                <div>
-                    <div className="animals-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-                        {areas.map(area => (
-                            <div key={area.id} className="admin-card">
-                                <div className="admin-card-header" style={{ borderLeft: `4px solid ${area.color}` }}>
-                                    <div>
-                                        <span className="text-xs uppercase tracking-wider text-muted">Khu vực {area.code}</span>
-                                        <h4 className="font-bold text-base">{area.nameVi}</h4>
+            {/* Sub-Tabs Selector */}
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E2E8F0', marginBottom: '24px' }}>
+                <button
+                    className="btn btn-sm"
+                    style={{
+                        padding: '10px 20px',
+                        fontWeight: 700,
+                        borderBottom: activeTab === 'areas' ? '3px solid #15803D' : '3px solid transparent',
+                        borderRadius: '0',
+                        background: 'transparent',
+                        color: activeTab === 'areas' ? '#15803D' : '#64748B'
+                    }}
+                    onClick={() => setActiveTab('areas')}
+                >
+                    🗺️ Danh Sách Phân Khu ({areas.length})
+                </button>
+                <button
+                    className="btn btn-sm"
+                    style={{
+                        padding: '10px 20px',
+                        fontWeight: 700,
+                        borderBottom: activeTab === 'enclosures' ? '3px solid #15803D' : '3px solid transparent',
+                        borderRadius: '0',
+                        background: 'transparent',
+                        color: activeTab === 'enclosures' ? '#15803D' : '#64748B'
+                    }}
+                    onClick={() => setActiveTab('enclosures')}
+                >
+                    🏠 Quản Lý Chuồng Trại ({enclosures.length})
+                </button>
+            </div>
+
+            {/* TAB 1: AREAS MANAGEMENT */}
+            {activeTab === 'areas' && (
+                <div className="ticket-page-layout">
+                    {/* Areas Grid */}
+                    <div>
+                        <div className="animals-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+                            {areas.map(area => (
+                                <div key={area.id || area.areaId} className="admin-card">
+                                    <div className="admin-card-header" style={{ borderLeft: `4px solid ${area.color || '#15803D'}` }}>
+                                        <div>
+                                            <span className="text-xs uppercase tracking-wider text-muted font-bold">Khu vực {area.code}</span>
+                                            <h4 className="font-bold text-base">{area.nameVi || area.name}</h4>
+                                        </div>
+                                        <span className="badge badge-success">Đạt chuẩn</span>
                                     </div>
-                                    <span className="badge badge-success">Đạt chuẩn</span>
+                                    <div className="admin-card-body">
+                                        <p className="text-sm text-muted mb-3" style={{ minHeight: '38px' }}>
+                                            {area.descriptionVi || area.description || "Khu vực sinh thái sở thú."}
+                                        </p>
+                                        <div className="admin-stat-row">
+                                            <span>Số chuồng hiện tại:</span>
+                                            <strong className="text-primary">{area.enclosures ? area.enclosures.length : (area.enclosureCount || 0)} chuồng</strong>
+                                        </div>
+                                        <div className="admin-stat-row">
+                                            <span>Số lượng cá thể thú:</span>
+                                            <strong>{area.animalCount || 0} cá thể</strong>
+                                        </div>
+                                        <div className="admin-stat-row">
+                                            <span>Tọa độ bản đồ (MapX, MapY):</span>
+                                            <code>{area.mapX != null ? Math.round(area.mapX) : 'Chưa gán'}, {area.mapY != null ? Math.round(area.mapY) : 'Chưa gán'}</code>
+                                        </div>
+                                        <div className="admin-stat-row">
+                                            <span>Màu nhận diện:</span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: area.color || '#15803D' }}></span>
+                                                <code>{area.color || '#15803D'}</code>
+                                            </span>
+                                        </div>
+                                        <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                            <button 
+                                                className="btn btn-sm btn-outline" 
+                                                onClick={() => handleEditArea(area)}
+                                            >
+                                                Sửa khu
+                                            </button>
+                                            <button 
+                                                className="btn btn-sm btn-outline text-danger" 
+                                                style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
+                                                onClick={() => handleDeleteArea(area.areaId || area.id)}
+                                            >
+                                                Xóa
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="admin-card-body">
-                                    <p className="text-sm text-muted mb-3">{area.descriptionVi}</p>
-                                    <div className="admin-stat-row">
-                                        <span>Số lượng loài hiện tại:</span>
-                                        <strong>{area.animalCount} loài</strong>
-                                    </div>
-                                    <div className="admin-stat-row">
-                                        <span>Màu chỉ dẫn bản đồ:</span>
-                                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                            <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: area.color }}></span>
-                                            <code>{area.color}</code>
-                                        </span>
-                                    </div>
-                                    <div className="admin-stat-row">
-                                        <span>Kiểm định an toàn:</span>
-                                        <span className="text-success font-semibold">✓ Đạt chuẩn an toàn</span>
-                                    </div>
-                                    <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end' }}>
-                                        <button 
-                                            className="btn btn-sm btn-outline text-danger" 
-                                            style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
-                                            onClick={() => handleDelete(area.id)}
-                                        >
-                                            Xóa khu
-                                        </button>
-                                    </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Area Form */}
+                    <div className="admin-card">
+                        <h3 className="font-bold text-base mb-3">
+                            {isEditingArea ? 'Cập Nhật Phân Khu Sở Thú' : 'Tạo Mới Phân Khu Sở Thú'}
+                        </h3>
+                        <form onSubmit={handleAreaSubmit}>
+                            <div className="form-grid-2">
+                                <div className="form-group">
+                                    <label className="form-label">Mã phân khu (Code)</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-input" 
+                                        placeholder="VD: A, B, C, F..." 
+                                        required
+                                        value={areaForm.code}
+                                        onChange={(e) => setAreaForm({ ...areaForm, code: e.target.value.toUpperCase() })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Màu nhận diện bản đồ</label>
+                                    <input 
+                                        type="color" 
+                                        className="form-input" 
+                                        style={{ height: '42px', padding: '2px' }}
+                                        value={areaForm.color}
+                                        onChange={(e) => setAreaForm({ ...areaForm, color: e.target.value })}
+                                    />
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
 
-                {/* Add Form */}
-                <div className="admin-card">
-                    <h3 className="font-bold text-base mb-3">Tạo Mới Phân Khu Sở Thú</h3>
-                    <form onSubmit={handleSubmit}>
-                        <div className="form-grid-2">
                             <div className="form-group">
-                                <label className="form-label">Mã phân khu</label>
+                                <label className="form-label">Tên phân khu (Tiếng Việt)</label>
                                 <input 
                                     type="text" 
                                     className="form-input" 
-                                    placeholder="VD: F" 
+                                    placeholder="VD: Khu Động Vật Ăn Thịt" 
                                     required
-                                    value={formData.code}
-                                    onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
+                                    value={areaForm.nameVi}
+                                    onChange={(e) => setAreaForm({ ...areaForm, nameVi: e.target.value })}
                                 />
                             </div>
+
+                            <div className="form-grid-2">
+                                <div className="form-group">
+                                    <label className="form-label">Tọa độ Map X (0 - 1000)</label>
+                                    <input 
+                                        type="number" 
+                                        className="form-input" 
+                                        placeholder="VD: 520"
+                                        value={areaForm.mapX}
+                                        onChange={(e) => setAreaForm({ ...areaForm, mapX: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tọa độ Map Y (0 - 700)</label>
+                                    <input 
+                                        type="number" 
+                                        className="form-input" 
+                                        placeholder="VD: 160"
+                                        value={areaForm.mapY}
+                                        onChange={(e) => setAreaForm({ ...areaForm, mapY: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+
                             <div className="form-group">
-                                <label className="form-label">Màu nhận diện bản đồ</label>
-                                <input 
-                                    type="color" 
-                                    className="form-input" 
-                                    style={{ height: '42px', padding: '2px' }}
-                                    value={formData.color}
-                                    onChange={(e) => setFormData({ ...formData, color: e.target.value })}
-                                />
+                                <label className="form-label">Mô tả sinh thái phân khu</label>
+                                <textarea 
+                                    className="form-textarea" 
+                                    rows="3" 
+                                    placeholder="Không gian cảnh quan, hào bảo vệ, thảm thực vật..."
+                                    value={areaForm.descriptionVi}
+                                    onChange={(e) => setAreaForm({ ...areaForm, descriptionVi: e.target.value })}
+                                ></textarea>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                    {isEditingArea ? 'Lưu Cập Nhật Phân Khu' : 'Lưu Phân Khu Mới'}
+                                </button>
+                                {isEditingArea && (
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-secondary"
+                                        onClick={() => { setIsEditingArea(null); setAreaForm(initialAreaForm); }}
+                                    >
+                                        Hủy
+                                    </button>
+                                )}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* TAB 2: ENCLOSURES MANAGEMENT */}
+            {activeTab === 'enclosures' && (
+                <div>
+                    {/* Filter bar */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <span className="text-sm font-bold text-muted">Lọc theo phân khu:</span>
+                            <select
+                                className="form-select"
+                                style={{ width: 'auto', padding: '6px 12px', fontSize: '0.9rem' }}
+                                value={selectedAreaFilter}
+                                onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                            >
+                                <option value="all">Tất cả phân khu ({enclosures.length} chuồng)</option>
+                                {areas.map(a => (
+                                    <option key={a.areaId || a.id} value={a.areaId || a.id}>
+                                        Khu {a.code} - {a.nameVi || a.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <span className="text-xs text-muted">
+                            Hiển thị {filteredEnclosures.length} / {enclosures.length} chuồng
+                        </span>
+                    </div>
+
+                    <div className="ticket-page-layout">
+                        {/* Enclosures List Table */}
+                        <div>
+                            <div className="admin-table-wrapper ticket-table-scroll">
+                                <table className="admin-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Mã / Tên Chuồng Trại</th>
+                                            <th>Phân khu</th>
+                                            <th>Tọa độ (X, Y)</th>
+                                            <th>Trạng thái</th>
+                                            <th>Động vật sinh sống</th>
+                                            <th>Thao tác</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredEnclosures.map(enc => {
+                                            const residentAnimals = animals.filter(a => a.enclosureId === (enc.enclosureId || enc.id));
+                                            return (
+                                                <tr key={enc.enclosureId || enc.id}>
+                                                    <td>
+                                                        <div>
+                                                            <strong className="text-base font-bold">{enc.name}</strong>
+                                                            <div className="text-xs text-muted font-mono">{enc.code}</div>
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <span className="chip chip-sm font-semibold">
+                                                            Khu {enc.areaCode || enc.areaName}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <code className="text-xs">
+                                                            {enc.mapX != null ? Math.round(enc.mapX) : 'Chưa gán'}, {enc.mapY != null ? Math.round(enc.mapY) : 'Chưa gán'}
+                                                        </code>
+                                                    </td>
+                                                    <td>
+                                                        <span className={`badge ${enc.status === 'Active' ? 'badge-success' : 'badge-warning'}`}>
+                                                            {enc.status === 'Active' ? 'Hoạt động' : 'Bảo trì'}
+                                                        </span>
+                                                    </td>
+                                                    <td>
+                                                        <div>
+                                                            <span className="font-bold text-primary">{residentAnimals.length} cá thể</span>
+                                                            {residentAnimals.length > 0 && (
+                                                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginTop: '4px' }}>
+                                                                    {residentAnimals.map(a => (
+                                                                        <span 
+                                                                            key={a.id || a.animalId} 
+                                                                            className="chip chip-sm"
+                                                                            style={{ background: '#F1F5F9', cursor: 'pointer', fontSize: '0.75rem' }}
+                                                                            title="Bấm để chuyển chuồng cho cá thể này"
+                                                                            onClick={() => {
+                                                                                setMovingAnimal(a);
+                                                                                setTargetEnclosureId('');
+                                                                            }}
+                                                                        >
+                                                                            {a.nameVi || a.name} ⇄
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button 
+                                                                className="btn btn-sm btn-outline"
+                                                                onClick={() => handleEditEnclosure(enc)}
+                                                            >
+                                                                Sửa
+                                                            </button>
+                                                            <button 
+                                                                className="btn btn-sm btn-outline text-danger"
+                                                                style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
+                                                                onClick={() => handleDeleteEnclosure(enc.enclosureId || enc.id)}
+                                                            >
+                                                                Xóa
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {filteredEnclosures.length === 0 && (
+                                            <tr>
+                                                <td colSpan="6" style={{ textAlign: 'center', padding: '32px', color: '#94A3B8' }}>
+                                                    Chưa có chuồng trại nào trong phân khu này. Hãy tạo chuồng mới ở biểu mẫu bên cạnh!
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Tên phân khu (Tiếng Việt)</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="VD: Khu Rừng Cận Nhiệt Đới" 
-                                required
-                                value={formData.nameVi}
-                                onChange={(e) => setFormData({ ...formData, nameVi: e.target.value })}
-                            />
-                        </div>
+                        {/* Enclosure Create/Edit Form */}
+                        <div className="admin-card">
+                            <h3 className="font-bold text-base mb-3">
+                                {isEditingEnclosure ? 'Cập Nhật Chuồng Trại' : 'Tạo Mới Chuồng Trại (Enclosure)'}
+                            </h3>
+                            <form onSubmit={handleEnclosureSubmit}>
+                                <div className="form-group">
+                                    <label className="form-label">Phân khu trực thuộc</label>
+                                    <select
+                                        className="form-select"
+                                        required
+                                        value={enclosureForm.areaId}
+                                        onChange={(e) => setEnclosureForm({ ...enclosureForm, areaId: e.target.value })}
+                                    >
+                                        <option value="">-- Chọn phân khu --</option>
+                                        {areas.map(a => (
+                                            <option key={a.areaId || a.id} value={a.areaId || a.id}>
+                                                Khu {a.code} - {a.nameVi || a.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Tên phân khu (English)</label>
-                            <input 
-                                type="text" 
-                                className="form-input" 
-                                placeholder="VD: Subtropical Forest Biome"
-                                value={formData.nameEn}
-                                onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
-                            />
-                        </div>
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label className="form-label">Mã chuồng</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            placeholder="VD: ENC-TIG-01" 
+                                            value={enclosureForm.code}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, code: e.target.value.toUpperCase() })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Trạng thái chuồng</label>
+                                        <select
+                                            className="form-select"
+                                            value={enclosureForm.status}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, status: e.target.value })}
+                                        >
+                                            <option value="Active">Hoạt động (Active)</option>
+                                            <option value="Maintenance">Bảo trì (Maintenance)</option>
+                                        </select>
+                                    </div>
+                                </div>
 
-                        <div className="form-group">
-                            <label className="form-label">Mô tả sinh thái phân khu</label>
-                            <textarea 
-                                className="form-textarea" 
-                                rows="3" 
-                                placeholder="Không gian cảnh quan, hào bảo vệ, độ ẩm..."
-                                value={formData.descriptionVi}
-                                onChange={(e) => setFormData({ ...formData, descriptionVi: e.target.value })}
-                            ></textarea>
-                        </div>
+                                <div className="form-group">
+                                    <label className="form-label">Tên chuồng trại</label>
+                                    <input 
+                                        type="text" 
+                                        className="form-input" 
+                                        placeholder="VD: Chuồng Hổ Bengal Hoàng Gia" 
+                                        required
+                                        value={enclosureForm.name}
+                                        onChange={(e) => setEnclosureForm({ ...enclosureForm, name: e.target.value })}
+                                    />
+                                </div>
 
-                        <button type="submit" className="btn btn-primary w-full" style={{ width: '100%' }}>
-                            Lưu Phân Khu
-                        </button>
-                    </form>
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label className="form-label">Tọa độ Map X (0 - 1000)</label>
+                                        <input 
+                                            type="number" 
+                                            className="form-input" 
+                                            placeholder="VD: 495"
+                                            value={enclosureForm.mapX}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, mapX: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Tọa độ Map Y (0 - 700)</label>
+                                        <input 
+                                            type="number" 
+                                            className="form-input" 
+                                            placeholder="VD: 115"
+                                            value={enclosureForm.mapY}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, mapY: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">URL Hình ảnh chuồng trại</label>
+                                    <input 
+                                        type="url" 
+                                        className="form-input" 
+                                        placeholder="https://..."
+                                        value={enclosureForm.imageUrl}
+                                        onChange={(e) => setEnclosureForm({ ...enclosureForm, imageUrl: e.target.value })}
+                                    />
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label">Mô tả quy mô chuồng</label>
+                                    <textarea 
+                                        className="form-textarea" 
+                                        rows="3" 
+                                        placeholder="Diện tích khuôn viên, hào nước bảo vệ, mỏm đá tự nhiên..."
+                                        value={enclosureForm.description}
+                                        onChange={(e) => setEnclosureForm({ ...enclosureForm, description: e.target.value })}
+                                    ></textarea>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                                        {isEditingEnclosure ? 'Lưu Cập Nhật Chuồng' : 'Lưu Chuồng Trại Mới'}
+                                    </button>
+                                    {isEditingEnclosure && (
+                                        <button 
+                                            type="button" 
+                                            className="btn btn-secondary"
+                                            onClick={() => { setIsEditingEnclosure(null); setEnclosureForm({ ...initialEnclosureForm, areaId: areas[0]?.areaId || '' }); }}
+                                        >
+                                            Hủy
+                                        </button>
+                                    )}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
+
+            {/* MODAL: MOVE ANIMAL TO ANOTHER ENCLOSURE */}
+            {movingAnimal && (
+                <div className="modal-overlay" role="dialog" aria-modal="true">
+                    <div className="modal-backdrop" onClick={() => setMovingAnimal(null)}></div>
+                    <div className="modal-dialog" style={{ maxWidth: '480px' }}>
+                        <div className="modal-header" style={{ padding: '16px 20px', borderBottom: '1px solid #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h3 className="font-bold text-base" style={{ margin: 0 }}>
+                                ⇄ Chuyển Chuồng Cho Động Vật
+                            </h3>
+                            <button className="btn btn-icon btn-sm" onClick={() => setMovingAnimal(null)}>✕</button>
+                        </div>
+                        <div className="modal-body" style={{ padding: '20px' }}>
+                            <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '8px', marginBottom: '16px', border: '1px solid #E2E8F0' }}>
+                                <div className="font-bold text-base text-primary">{movingAnimal.nameVi || movingAnimal.name}</div>
+                                <div className="text-xs text-muted">Mã: {movingAnimal.code} • Loài: {movingAnimal.species}</div>
+                                <div className="text-xs mt-1">
+                                    Chuồng hiện tại: <strong>{movingAnimal.enclosureName || 'Chưa xếp chuồng'}</strong>
+                                </div>
+                            </div>
+
+                            <div className="form-group">
+                                <label className="form-label font-bold">Chọn chuồng đích muốn chuyển tới:</label>
+                                <select 
+                                    className="form-select"
+                                    value={targetEnclosureId}
+                                    onChange={(e) => setTargetEnclosureId(e.target.value)}
+                                >
+                                    <option value="">-- Gỡ khỏi chuồng (Chưa xếp chuồng) --</option>
+                                    {enclosures.map(e => (
+                                        <option key={e.enclosureId || e.id} value={e.enclosureId || e.id}>
+                                            Khu {e.areaCode}: {e.name} ({e.code})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <p className="text-xs text-muted mt-2">
+                                ℹ️ Khi chuyển chuồng, hệ thống sẽ tự động cập nhật phân khu (Area) của động vật theo phân khu của chuồng mới.
+                            </p>
+                        </div>
+                        <div className="modal-footer" style={{ padding: '14px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                            <button className="btn btn-secondary btn-sm" onClick={() => setMovingAnimal(null)}>
+                                Hủy Bỏ
+                            </button>
+                            <button className="btn btn-primary btn-sm" onClick={handleConfirmMoveAnimal}>
+                                Xác Nhận Chuyển Chuồng
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

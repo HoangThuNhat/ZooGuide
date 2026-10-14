@@ -5,10 +5,8 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5142/api',
-    USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
-        ? import.meta.env.VITE_USE_MOCK === 'true'
-        : true,
+    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    USE_MOCK: false,
     TIMEOUT_MS: 8000
 };
 
@@ -1431,93 +1429,354 @@ export const ZooApi = {
         }
         try {
             const res = await fetch(`${API_CONFIG.BASE_URL}/areas`);
-            return await res.json();
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const rawList = Array.isArray(json) ? json : (json.data || []);
+            
+            const areaColors = {
+                'A': '#15803D',
+                'B': '#B45309',
+                'C': '#059669',
+                'D': '#0284C7',
+                'E': '#7C3AED'
+            };
+
+            const mapped = rawList.map(a => {
+                const code = a.code || (a.areaId ? String.fromCharCode(64 + a.areaId) : 'A');
+                return {
+                    id: a.id || `zone-${code.toLowerCase()}`,
+                    areaId: a.areaId,
+                    code: code,
+                    name: a.name,
+                    nameVi: a.nameVi || a.name,
+                    nameEn: a.name,
+                    description: a.description || '',
+                    descriptionVi: a.descriptionVi || a.description || '',
+                    latitude: a.latitude,
+                    longitude: a.longitude,
+                    radiusMeters: a.radiusMeters,
+                    mapX: a.mapX != null ? Number(a.mapX) : null,
+                    mapY: a.mapY != null ? Number(a.mapY) : null,
+                    mapCoords: {
+                        x: a.mapX != null ? Number(a.mapX) : 400,
+                        y: a.mapY != null ? Number(a.mapY) : 300,
+                        radius: a.radiusMeters || 90
+                    },
+                    color: areaColors[code] || '#475569',
+                    status: a.status || 'Active',
+                    enclosureCount: a.enclosureCount != null ? a.enclosureCount : (a.enclosures ? a.enclosures.length : 0),
+                    animalCount: a.animalCount || 0,
+                    enclosures: (a.enclosures || []).map(e => ({
+                        id: e.enclosureId || e.id,
+                        enclosureId: e.enclosureId || e.id,
+                        areaId: e.areaId,
+                        code: e.code,
+                        name: e.name,
+                        description: e.description,
+                        imageUrl: e.imageUrl,
+                        status: e.status,
+                        mapX: e.mapX != null ? Number(e.mapX) : null,
+                        mapY: e.mapY != null ? Number(e.mapY) : null,
+                        animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
+                        animals: e.animals || []
+                    }))
+                };
+            });
+
+            return { success: true, count: mapped.length, data: mapped };
         } catch (err) {
-            return { success: true, data: MOCK_DB.areas };
+            console.error("ZooApi.getAreas error:", err);
+            return { success: false, message: "Không thể kết nối đến máy chủ danh sách khu vực." };
         }
     },
 
-    // 3. GET ANIMALS (with filters) - Always uses frontend MOCK_DB.animals as /api/animals is not connected yet
-    async getAnimals(filters = {}) {
-        await this._simulateLatency(150);
-        let results = [...MOCK_DB.animals];
+    // 2.1 GET ENCLOSURES (Chuồng Trại)
+    async getEnclosures(filters = {}) {
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(150);
+            let list = [...(MOCK_DB.enclosures || [])];
+            if (filters.areaId) list = list.filter(e => e.areaId === Number(filters.areaId));
+            return { success: true, data: list };
+        }
+        try {
+            const params = new URLSearchParams();
+            if (filters.areaId) params.append('areaId', filters.areaId);
+            if (filters.search) params.append('search', filters.search);
+            if (filters.status) params.append('status', filters.status);
+            const qs = params.toString() ? `?${params.toString()}` : '';
 
-        if (filters.search) {
-            const q = filters.search.toLowerCase().trim();
-            results = results.filter(a => 
-                (a.nameVi && a.nameVi.toLowerCase().includes(q)) || 
-                (a.nameEn && a.nameEn.toLowerCase().includes(q)) || 
-                (a.scientificName && a.scientificName.toLowerCase().includes(q)) ||
-                (a.species && a.species.toLowerCase().includes(q)) ||
-                (a.origin && a.origin.toLowerCase().includes(q))
-            );
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures${qs}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const rawList = Array.isArray(json) ? json : (json.data || []);
+
+            const mapped = rawList.map(e => ({
+                id: e.enclosureId || e.id,
+                enclosureId: e.enclosureId || e.id,
+                areaId: e.areaId,
+                areaName: e.areaName,
+                areaCode: e.areaCode,
+                code: e.code,
+                name: e.name,
+                description: e.description,
+                imageUrl: e.imageUrl,
+                status: e.status,
+                mapX: e.mapX != null ? Number(e.mapX) : null,
+                mapY: e.mapY != null ? Number(e.mapY) : null,
+                animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
+                animals: (e.animals || []).map(a => ({
+                    id: a.animalId || a.id,
+                    code: a.code || `ANI-${String(a.animalId || a.id).padStart(3, '0')}`,
+                    nameVi: a.nameVi || a.name,
+                    nameEn: a.name || a.nameVi,
+                    scientificName: a.scientificName || a.speciesName || "Chưa có tên khoa học",
+                    species: a.speciesName || a.species || "Chưa phân loại",
+                    speciesId: a.speciesId,
+                    areaId: a.areaId,
+                    enclosureId: a.enclosureId,
+                    imageUrl: a.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
+                    healthStatus: a.healthStatus || "Tốt",
+                    gender: a.gender || "Unknown",
+                    status: a.status || "Active"
+                }))
+            }));
+
+            return { success: true, count: mapped.length, data: mapped };
+        } catch (err) {
+            console.error("ZooApi.getEnclosures error:", err);
+            return { success: false, message: "Không thể kết nối đến máy chủ chuồng trại." };
+        }
+    },
+
+    async getEnclosureById(id) {
+        if (API_CONFIG.USE_MOCK) {
+            const enc = (MOCK_DB.enclosures || []).find(e => e.id === Number(id));
+            return enc ? { success: true, data: enc } : { success: false, message: "Không tìm thấy chuồng." };
+        }
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            return { success: true, data: json.data || json };
+        } catch (err) {
+            console.error("ZooApi.getEnclosureById error:", err);
+            return { success: false, message: "Không thể tải chi tiết chuồng trại." };
+        }
+    },
+
+    async createEnclosure(data) {
+        try {
+            const reqData = {
+                areaId: parseInt(data.areaId),
+                code: data.code?.trim() || null,
+                name: data.name?.trim(),
+                description: data.description?.trim() || "",
+                imageUrl: data.imageUrl?.trim() || "",
+                status: data.status || "Active",
+                mapX: data.mapX ? parseFloat(data.mapX) : null,
+                mapY: data.mapY ? parseFloat(data.mapY) : null
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi tạo chuồng trại");
+            }
+            const created = await res.json();
+            return { success: true, data: created.data || created };
+        } catch (err) {
+            console.error("createEnclosure error:", err);
+            return { success: false, error: err.message, message: err.message };
+        }
+    },
+
+    async updateEnclosure(id, data) {
+        try {
+            const reqData = {
+                areaId: parseInt(data.areaId),
+                code: data.code?.trim() || null,
+                name: data.name?.trim(),
+                description: data.description?.trim() || "",
+                imageUrl: data.imageUrl?.trim() || "",
+                status: data.status || "Active",
+                mapX: data.mapX ? parseFloat(data.mapX) : null,
+                mapY: data.mapY ? parseFloat(data.mapY) : null
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(reqData)
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi cập nhật chuồng");
+            }
+            const updated = await res.json();
+            return { success: true, data: updated.data || updated };
+        } catch (err) {
+            console.error("updateEnclosure error:", err);
+            return { success: false, error: err.message, message: err.message };
+        }
+    },
+
+    async deleteEnclosure(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi xóa chuồng");
+            }
+            return { success: true };
+        } catch (err) {
+            console.error("deleteEnclosure error:", err);
+            return { success: false, error: err.message, message: err.message };
+        }
+    },
+
+    async moveAnimalEnclosure(animalId, targetEnclosureId) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/move-animal`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    animalId: parseInt(animalId),
+                    targetEnclosureId: targetEnclosureId ? parseInt(targetEnclosureId) : null
+                })
+            });
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || "Lỗi chuyển chuồng cho động vật");
+            }
+            const result = await res.json();
+            return { success: true, message: result.message };
+        } catch (err) {
+            console.error("moveAnimalEnclosure error:", err);
+            return { success: false, error: err.message, message: err.message };
+        }
+    },
+
+    // 3. GET ANIMALS (with filters)
+    async getAnimals(filters = {}) {
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(150);
+            let results = [...MOCK_DB.animals];
+            if (filters.search) {
+                const q = filters.search.toLowerCase().trim();
+                results = results.filter(a =>
+                    (a.nameVi && a.nameVi.toLowerCase().includes(q)) ||
+                    (a.scientificName && a.scientificName.toLowerCase().includes(q))
+                );
+            }
+            return { success: true, count: results.length, data: results };
         }
 
-
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals`);
-            if (!res.ok) throw new Error("Lỗi kết nối /animals");
+            const params = new URLSearchParams();
+            if (filters.search) params.append('search', filters.search);
+            if (filters.areaId) params.append('areaId', filters.areaId);
+            if (filters.enclosureId) params.append('enclosureId', filters.enclosureId);
+            if (filters.zoneId && filters.zoneId !== 'all') params.append('zoneId', filters.zoneId);
+            if (filters.speciesId) params.append('speciesId', filters.speciesId);
+            if (filters.iucnStatus && filters.iucnStatus !== 'all') params.append('iucnStatus', filters.iucnStatus);
+            const qs = params.toString() ? `?${params.toString()}` : '';
+
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals${qs}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const animalsData = await res.json();
             const rawList = Array.isArray(animalsData) ? animalsData : (animalsData.data || []);
 
-            let results = rawList.map((a) => ({
+            const results = rawList.map((a) => ({
                 id: a.animalId || a.id,
+                animalId: a.animalId || a.id,
                 code: a.code || `ANI-${String(a.animalId || a.id).padStart(3, '0')}`,
                 nameVi: a.nameVi || a.name,
                 nameEn: a.name || a.nameVi,
                 scientificName: a.scientificName || a.speciesName || "Chưa có tên khoa học",
                 speciesId: a.speciesId || 1,
-                species: a.speciesName || "Chưa phân loại",
+                species: a.speciesName || a.species || "Chưa phân loại",
+                areaId: a.areaId,
                 zoneId: a.zoneId || (a.areaId ? `zone-${String.fromCharCode(96 + a.areaId)}` : "zone-a"),
                 zoneCode: a.zoneCode || (a.areaId ? String.fromCharCode(64 + a.areaId) : "A"),
                 zoneName: a.areaName || "Khu vực chung",
-                areaId: a.areaId || 1,
-                mapX: 300,
-                mapY: 300,
+                enclosureId: a.enclosureId,
+                enclosureName: a.enclosureName,
+                enclosureCode: a.enclosureCode,
                 imageUrl: a.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
                 origin: a.origin || "Tự nhiên",
-                diet: "Tự nhiên",
-                lifespan: "Không rõ",
-                weight: "Không rõ",
+                diet: a.diet || "Chế độ dinh dưỡng sở thú",
+                lifespan: a.lifespan || "10 - 20 năm",
+                weight: a.weight || "Theo dõi định kỳ",
                 iucnStatus: a.conservationStatus || "Ít quan tâm",
                 healthStatus: a.healthStatus || "Tốt",
-                breedingStatus: "Bình thường",
-                funFactsVi: [a.description || "Chưa có thông tin mô tả chi tiết."],
+                breedingStatus: a.breedingStatus || "Bình thường",
+                gender: a.gender || "Unknown",
+                status: a.status || "Active",
+                funFactsVi: [a.description || a.conservationNote || "Cá thể đang được chăm sóc tại vườn thú."],
                 funFactsEn: [a.description || "No information yet."]
             }));
 
-            if (filters.search) {
-                const q = filters.search.toLowerCase().trim();
-                results = results.filter(a => 
-                    (a.nameVi && a.nameVi.toLowerCase().includes(q)) || 
-                    (a.scientificName && a.scientificName.toLowerCase().includes(q))
-                );
-            }
-
-            if (filters.zoneId && filters.zoneId !== 'all') {
-                results = results.filter(a => a.zoneId === filters.zoneId);
-            }
-
-            if (filters.iucnStatus && filters.iucnStatus !== 'all') {
-                results = results.filter(a => a.iucnStatus && a.iucnStatus.includes(filters.iucnStatus));
-            }
-
             return { success: true, count: results.length, data: results };
         } catch (err) {
-            console.warn("Live API /animals failed, fallback to mock:", err);
-            return { success: true, count: MOCK_DB.animals.length, data: MOCK_DB.animals };
-
+            console.error("Live API /animals error:", err);
+            return { success: false, message: "Không thể kết nối đến máy chủ danh sách động vật." };
         }
-
-        return { success: true, count: results.length, data: results };
     },
 
-    // 4. GET ANIMAL BY ID - Always uses frontend MOCK_DB.animals
+    // 4. GET ANIMAL BY ID
     async getAnimalById(id) {
-        await this._simulateLatency(100);
-        const animal = MOCK_DB.animals.find(a => a.id === parseInt(id));
-        if (!animal) return { success: false, message: "Không tìm thấy động vật." };
-        return { success: true, data: animal };
+        if (API_CONFIG.USE_MOCK) {
+            await this._simulateLatency(100);
+            const animal = MOCK_DB.animals.find(a => a.id === parseInt(id));
+            if (!animal) return { success: false, message: "Không tìm thấy động vật." };
+            return { success: true, data: animal };
+        }
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${id}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            const a = json.data || json;
+            const mapped = {
+                id: a.animalId || a.id,
+                animalId: a.animalId || a.id,
+                code: a.code || `ANI-${String(a.animalId || a.id).padStart(3, '0')}`,
+                nameVi: a.nameVi || a.name,
+                nameEn: a.name || a.nameVi,
+                scientificName: a.scientificName || a.species?.scientificName || a.speciesName || "Chưa có tên khoa học",
+                speciesId: a.speciesId || a.species?.speciesId || 1,
+                species: a.speciesName || a.species?.name || "Chưa phân loại",
+                areaId: a.areaId,
+                zoneId: a.zoneId || (a.areaId ? `zone-${String.fromCharCode(96 + a.areaId)}` : "zone-a"),
+                zoneCode: a.zoneCode || (a.areaId ? String.fromCharCode(64 + a.areaId) : "A"),
+                zoneName: a.areaName || a.area?.name || "Khu vực chung",
+                enclosureId: a.enclosureId,
+                enclosureName: a.enclosureName || a.enclosure?.name,
+                enclosureCode: a.enclosureCode || a.enclosure?.code,
+                imageUrl: a.imageUrl || a.species?.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=800&q=80",
+                origin: a.origin || "Tự nhiên",
+                diet: a.diet || "Chế độ dinh dưỡng sở thú",
+                lifespan: a.lifespan || "10 - 20 năm",
+                weight: a.weight || "Theo dõi định kỳ",
+                iucnStatus: a.conservationStatus || a.species?.conservationStatus || "Ít quan tâm",
+                healthStatus: a.healthStatus || "Tốt",
+                breedingStatus: a.breedingStatus || "Bình thường",
+                gender: a.gender || "Unknown",
+                status: a.status || "Active",
+                funFactsVi: [a.description || a.species?.description || a.conservationNote || "Cá thể đang được chăm sóc tại vườn thú."],
+                funFactsEn: [a.description || "No information yet."],
+                area: a.area,
+                enclosure: a.enclosure,
+                speciesObj: a.species
+            };
+            return { success: true, data: mapped };
+        } catch (err) {
+            console.error("ZooApi.getAnimalById error:", err);
+            return { success: false, message: "Không tìm thấy hồ sơ động vật." };
+        }
     },
 
     // 5. GET SPECIES NARRATION BY SPECIES ID & LANG (Thuyết minh gắn với Loài / Species)
@@ -1733,6 +1992,7 @@ export const ZooApi = {
                 nameVi: data.nameVi || data.name,
                 speciesId: parseInt(data.speciesId) || 1,
                 areaId: parseInt(data.areaId) || (data.zoneId ? (parseInt(data.zoneId.replace('zone-', '')) || 1) : 1),
+                enclosureId: data.enclosureId ? parseInt(data.enclosureId) : null,
                 zoneId: data.zoneId,
                 zoneCode: data.zoneCode,
                 gender: data.gender || "Unknown",
@@ -1775,6 +2035,7 @@ export const ZooApi = {
                 nameVi: data.nameVi || data.name,
                 speciesId: parseInt(data.speciesId) || 1,
                 areaId: parseInt(data.areaId) || (data.zoneId ? (parseInt(data.zoneId.replace('zone-', '')) || 1) : 1),
+                enclosureId: data.enclosureId ? parseInt(data.enclosureId) : null,
                 zoneId: data.zoneId,
                 zoneCode: data.zoneCode,
                 gender: data.gender || "Unknown",
@@ -1836,12 +2097,15 @@ export const ZooApi = {
 
         try {
             const reqData = {
+                code: data.code?.trim() || null,
                 name: data.nameVi || data.name,
-                description: data.description || "",
+                description: data.descriptionVi || data.description || "",
                 latitude: parseFloat(data.latitude) || 10.7875,
                 longitude: parseFloat(data.longitude) || 106.7052,
                 radiusMeters: parseFloat(data.radiusMeters) || 50,
-                mapImageUrl: data.mapImageUrl || ""
+                mapImageUrl: data.mapImageUrl || "",
+                mapX: data.mapX != null && data.mapX !== '' ? parseFloat(data.mapX) : null,
+                mapY: data.mapY != null && data.mapY !== '' ? parseFloat(data.mapY) : null
             };
             const res = await fetch(`${API_CONFIG.BASE_URL}/areas`, {
                 method: 'POST',
@@ -1873,12 +2137,15 @@ export const ZooApi = {
         try {
             const numId = typeof id === 'number' ? id : (parseInt(String(id).replace('zone-', '')) || 1);
             const reqData = {
+                code: data.code?.trim() || null,
                 name: data.nameVi || data.name,
-                description: data.description || "",
+                description: data.descriptionVi || data.description || "",
                 latitude: parseFloat(data.latitude) || 10.7875,
                 longitude: parseFloat(data.longitude) || 106.7052,
                 radiusMeters: parseFloat(data.radiusMeters) || 50,
-                mapImageUrl: data.mapImageUrl || ""
+                mapImageUrl: data.mapImageUrl || "",
+                mapX: data.mapX != null && data.mapX !== '' ? parseFloat(data.mapX) : null,
+                mapY: data.mapY != null && data.mapY !== '' ? parseFloat(data.mapY) : null
             };
             const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
                 method: 'PUT',

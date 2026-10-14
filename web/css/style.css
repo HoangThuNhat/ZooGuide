@@ -1868,6 +1868,18 @@ a:focus-visible {
     .map-canvas-container {
         min-height: 380px;
     }
+
+    .map-view-layout {
+        grid-template-columns: 1fr !important;
+    }
+
+    .mobile-only-flex {
+        display: flex !important;
+    }
+
+    .mobile-hidden {
+        display: none !important;
+    }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -18,6 +18,9 @@ public class AnimalResponseDto
     public string? ConservationStatus { get; set; }
     public int AreaId { get; set; }
     public string AreaName { get; set; } = string.Empty;
+    public int? EnclosureId { get; set; }
+    public string? EnclosureName { get; set; }
+    public string? EnclosureCode { get; set; }
     public string ZoneId => $"zone-{(AreaId > 0 ? ((char)('a' + (AreaId - 1) % 26)).ToString() : "a")}";
     public string ZoneCode => (AreaId > 0 ? ((char)('A' + (AreaId - 1) % 26)).ToString() : "A");
     public string Name { get; set; } = string.Empty;
@@ -41,6 +44,7 @@ public class AnimalDetailDto : AnimalResponseDto
 {
     public SpeciesDetailDto? Species { get; set; }
     public AreaResponseDto? Area { get; set; }
+    public EnclosureResponseDto? Enclosure { get; set; }
 }
 
 /// <summary>
@@ -108,6 +112,7 @@ public class CreateAnimalDto
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    public int? EnclosureId { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalStatus Status { get; set; } = AnimalStatus.Active;
 }
@@ -164,6 +169,7 @@ public class UpdateAnimalDto
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    public int? EnclosureId { get; set; }
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public AnimalStatus Status { get; set; } = AnimalStatus.Active;
 }
@@ -176,6 +182,7 @@ public class AnimalFilterDto
     public string? Search { get; set; }
     public int? AreaId { get; set; }
     public string? ZoneId { get; set; }
+    public int? EnclosureId { get; set; }
     public int? SpeciesId { get; set; }
     public string? IucnStatus { get; set; }
 }

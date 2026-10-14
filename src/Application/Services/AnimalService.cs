@@ -24,7 +24,8 @@ public class AnimalService : IAnimalService
             filter?.AreaId,
             filter?.ZoneId,
             filter?.SpeciesId,
-            filter?.IucnStatus);
+            filter?.IucnStatus,
+            filter?.EnclosureId);
 
         return animals.Select(MapToResponseDto);
     }
@@ -44,6 +45,9 @@ public class AnimalService : IAnimalService
             ConservationStatus = dto.ConservationStatus,
             AreaId = dto.AreaId,
             AreaName = dto.AreaName,
+            EnclosureId = dto.EnclosureId,
+            EnclosureName = dto.EnclosureName,
+            EnclosureCode = dto.EnclosureCode,
             Name = dto.Name,
             Description = dto.Description,
             Gender = dto.Gender,
@@ -67,13 +71,31 @@ public class AnimalService : IAnimalService
             Area = animal.Area == null ? null : new AreaResponseDto
             {
                 AreaId = animal.Area.AreaId,
+                Code = animal.Area.Code ?? "A",
                 Name = animal.Area.Name,
                 Description = animal.Area.Description,
                 Latitude = animal.Area.Latitude,
                 Longitude = animal.Area.Longitude,
                 RadiusMeters = animal.Area.RadiusMeters,
                 MapImageUrl = animal.Area.MapImageUrl,
+                MapX = animal.Area.MapX,
+                MapY = animal.Area.MapY,
                 Status = animal.Area.Status.ToString()
+            },
+            Enclosure = animal.Enclosure == null ? null : new EnclosureResponseDto
+            {
+                EnclosureId = animal.Enclosure.EnclosureId,
+                AreaId = animal.Enclosure.AreaId,
+                AreaName = animal.Area?.Name ?? string.Empty,
+                Code = animal.Enclosure.Code ?? $"ENC-{animal.Enclosure.EnclosureId:D3}",
+                Name = animal.Enclosure.Name,
+                Description = animal.Enclosure.Description,
+                ImageUrl = animal.Enclosure.ImageUrl,
+                Status = animal.Enclosure.Status,
+                MapX = animal.Enclosure.MapX,
+                MapY = animal.Enclosure.MapY,
+                CreatedAt = animal.Enclosure.CreatedAt,
+                UpdatedAt = animal.Enclosure.UpdatedAt
             }
         };
     }
@@ -94,11 +116,22 @@ public class AnimalService : IAnimalService
             return (null, $"Khu vực phân chuồng với AreaId = {dto.AreaId} không tồn tại trong hệ thống.");
         }
 
-        // 3. Khởi tạo cá thể động vật
+        // 3. Kiểm tra chuồng nếu được chỉ định
+        if (dto.EnclosureId.HasValue && dto.EnclosureId.Value > 0)
+        {
+            bool enclosureExists = await _animalRepository.EnclosureExistsAsync(dto.EnclosureId.Value);
+            if (!enclosureExists)
+            {
+                return (null, $"Chuồng với EnclosureId = {dto.EnclosureId.Value} không tồn tại trong hệ thống.");
+            }
+        }
+
+        // 4. Khởi tạo cá thể động vật
         var animal = new Animal
         {
             SpeciesId = dto.SpeciesId,
             AreaId = dto.AreaId,
+            EnclosureId = dto.EnclosureId > 0 ? dto.EnclosureId : null,
             Name = dto.Name.Trim(),
             Description = dto.Description?.Trim(),
             Gender = dto.Gender,
@@ -145,9 +178,20 @@ public class AnimalService : IAnimalService
             }
         }
 
+        // Kiểm tra chuồng mới nếu có thay đổi
+        if (dto.EnclosureId.HasValue && dto.EnclosureId.Value > 0 && animal.EnclosureId != dto.EnclosureId)
+        {
+            bool enclosureExists = await _animalRepository.EnclosureExistsAsync(dto.EnclosureId.Value);
+            if (!enclosureExists)
+            {
+                return (null, $"Chuồng mới EnclosureId = {dto.EnclosureId.Value} không tồn tại trong hệ thống.", false);
+            }
+        }
+
         // Cập nhật thông tin
         animal.SpeciesId = dto.SpeciesId;
         animal.AreaId = dto.AreaId;
+        animal.EnclosureId = dto.EnclosureId > 0 ? dto.EnclosureId : null;
         animal.Name = dto.Name.Trim();
         animal.Description = dto.Description?.Trim();
         animal.Gender = dto.Gender;
@@ -200,6 +244,9 @@ public class AnimalService : IAnimalService
             ConservationStatus = a.Species?.ConservationStatus,
             AreaId = a.AreaId,
             AreaName = a.Area?.Name ?? string.Empty,
+            EnclosureId = a.EnclosureId,
+            EnclosureName = a.Enclosure?.Name,
+            EnclosureCode = a.Enclosure?.Code,
             Name = a.Name,
             Description = a.Description,
             Gender = a.Gender.ToString(),

@@ -14,6 +14,7 @@ public class Animal
     public int AnimalId { get; set; }
     public int SpeciesId { get; set; }
     public int AreaId { get; set; }
+    public int? EnclosureId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public AnimalGender Gender { get; set; } = AnimalGender.Unknown;
@@ -29,5 +30,6 @@ public class Animal
     // Navigation properties
     public virtual Species Species { get; set; } = null!;
     public virtual Area Area { get; set; } = null!;
+    public virtual Enclosure? Enclosure { get; set; }
     public virtual ICollection<Narration> Narrations { get; set; } = new List<Narration>();
 }

@@ -40,12 +40,15 @@ public class AreaService : IAreaService
         // Khởi tạo entity khu vực mới
         var area = new Area
         {
+            Code = string.IsNullOrWhiteSpace(dto.Code) ? null : dto.Code.Trim().ToUpper(),
             Name = dto.Name.Trim(),
             Description = dto.Description?.Trim(),
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
             RadiusMeters = dto.RadiusMeters,
             MapImageUrl = dto.MapImageUrl?.Trim(),
+            MapX = dto.MapX,
+            MapY = dto.MapY,
             Status = dto.Status,
             CreatedAt = DateTime.UtcNow
         };
@@ -66,12 +69,18 @@ public class AreaService : IAreaService
         }
 
         // Cập nhật thông tin và tọa độ kiểm định
+        if (!string.IsNullOrWhiteSpace(dto.Code))
+        {
+            area.Code = dto.Code.Trim().ToUpper();
+        }
         area.Name = dto.Name.Trim();
         area.Description = dto.Description?.Trim();
         area.Latitude = dto.Latitude;
         area.Longitude = dto.Longitude;
         area.RadiusMeters = dto.RadiusMeters;
         area.MapImageUrl = dto.MapImageUrl?.Trim();
+        area.MapX = dto.MapX;
+        area.MapY = dto.MapY;
         area.Status = dto.Status;
         area.UpdatedAt = DateTime.UtcNow;
 
@@ -143,10 +152,52 @@ public class AreaService : IAreaService
 
     private static AreaResponseDto MapToResponseDto(Area a)
     {
-        // Tạo mã phân khu: A, B, C... dựa vào AreaId
-        string code = a.AreaId > 0 && a.AreaId <= 26 
-            ? ((char)('A' + a.AreaId - 1)).ToString() 
-            : $"Z{a.AreaId}";
+        // Tạo mã phân khu: Ưu tiên a.Code hoặc A, B, C... dựa vào AreaId
+        string code = !string.IsNullOrWhiteSpace(a.Code) 
+            ? a.Code 
+            : (a.AreaId > 0 && a.AreaId <= 26 
+                ? ((char)('A' + a.AreaId - 1)).ToString() 
+                : $"Z{a.AreaId}");
+
+        var enclosures = a.Enclosures?.Select(e => new EnclosureResponseDto
+        {
+            EnclosureId = e.EnclosureId,
+            AreaId = e.AreaId,
+            AreaName = a.Name,
+            AreaCode = code,
+            Code = e.Code ?? $"ENC-{e.EnclosureId:D3}",
+            Name = e.Name,
+            Description = e.Description,
+            ImageUrl = e.ImageUrl,
+            Status = e.Status,
+            MapX = e.MapX,
+            MapY = e.MapY,
+            AnimalCount = e.Animals?.Count ?? 0,
+            CreatedAt = e.CreatedAt,
+            UpdatedAt = e.UpdatedAt,
+            Animals = e.Animals?.Select(an => new AnimalResponseDto
+            {
+                AnimalId = an.AnimalId,
+                SpeciesId = an.SpeciesId,
+                SpeciesName = an.Species?.Name ?? string.Empty,
+                AreaId = an.AreaId,
+                AreaName = a.Name,
+                EnclosureId = an.EnclosureId,
+                EnclosureName = e.Name,
+                EnclosureCode = e.Code,
+                Name = an.Name,
+                Description = an.Description,
+                Gender = an.Gender.ToString(),
+                DateOfBirth = an.DateOfBirth,
+                Origin = an.Origin,
+                HealthStatus = an.HealthStatus,
+                ConservationNote = an.ConservationNote,
+                ImageUrl = an.ImageUrl,
+                Status = an.Status.ToString(),
+                CreatedAt = an.CreatedAt,
+                UpdatedAt = an.UpdatedAt
+            }).ToList() ?? new List<AnimalResponseDto>()
+        }).ToList() ?? new List<EnclosureResponseDto>();
 
         return new AreaResponseDto
         {
@@ -158,10 +209,14 @@ public class AreaService : IAreaService
             Longitude = a.Longitude,
             RadiusMeters = a.RadiusMeters,
             MapImageUrl = a.MapImageUrl,
+            MapX = a.MapX,
+            MapY = a.MapY,
             Status = a.Status.ToString(),
+            EnclosureCount = enclosures.Count,
             AnimalCount = a.Animals?.Count ?? 0,
             CreatedAt = a.CreatedAt,
-            UpdatedAt = a.UpdatedAt
+            UpdatedAt = a.UpdatedAt,
+            Enclosures = enclosures
         };
     }
 

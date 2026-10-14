@@ -76,6 +76,14 @@ public class AnimalConfiguration : IEntityTypeConfiguration<Animal>
             .HasForeignKey(a => a.AreaId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.Property(a => a.EnclosureId)
+            .IsRequired(false);
+
+        builder.HasOne(a => a.Enclosure)
+            .WithMany(e => e.Animals)
+            .HasForeignKey(a => a.EnclosureId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasMany(a => a.Narrations)
             .WithOne(n => n.Animal)
             .HasForeignKey(n => n.AnimalId)
@@ -84,6 +92,7 @@ public class AnimalConfiguration : IEntityTypeConfiguration<Animal>
         // Indexes on Foreign Keys for quick lookups
         builder.HasIndex(a => a.SpeciesId).HasDatabaseName("IX_Animals_SpeciesId");
         builder.HasIndex(a => a.AreaId).HasDatabaseName("IX_Animals_AreaId");
+        builder.HasIndex(a => a.EnclosureId).HasDatabaseName("IX_Animals_EnclosureId");
         builder.HasIndex(a => a.Status).HasDatabaseName("IX_Animals_Status");
     }
 }

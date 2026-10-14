@@ -17,6 +17,8 @@ public class AreaRepository : IAreaRepository
     public async Task<List<Area>> GetAllWithAnimalsAsync()
     {
         return await _context.Areas
+            .Include(a => a.Enclosures)
+                .ThenInclude(e => e.Animals)
             .Include(a => a.Animals)
             .AsNoTracking()
             .ToListAsync();
@@ -25,6 +27,8 @@ public class AreaRepository : IAreaRepository
     public async Task<Area?> GetByIdWithAnimalsAsync(int areaId)
     {
         return await _context.Areas
+            .Include(a => a.Enclosures)
+                .ThenInclude(e => e.Animals)
             .Include(a => a.Animals)
             .FirstOrDefaultAsync(a => a.AreaId == areaId);
     }

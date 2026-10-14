@@ -29,14 +29,16 @@ builder.Services.AddDbContext<ZooGuideDbContext>(options =>
     });
 });
 
-// Register Repositories for Areas, Animals, Tickets
+// Register Repositories for Areas, Animals, Tickets, Enclosures
 builder.Services.AddScoped<IAreaRepository, AreaRepository>();
+builder.Services.AddScoped<IEnclosureRepository, EnclosureRepository>();
 builder.Services.AddScoped<IAnimalRepository, AnimalRepository>();
 builder.Services.AddScoped<ITicketRepository, TicketRepository>();
 builder.Services.AddScoped<ITicketSessionRepository, TicketSessionRepository>();
 
-// Register Application Services for Areas, Animals, Tickets
+// Register Application Services for Areas, Animals, Tickets, Enclosures
 builder.Services.AddScoped<IAreaService, AreaService>();
+builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
 

@@ -19,11 +19,13 @@ public class AnimalRepository : IAnimalRepository
         int? areaId, 
         string? zoneId, 
         int? speciesId, 
-        string? iucnStatus)
+        string? iucnStatus,
+        int? enclosureId = null)
     {
         var query = _context.Animals
             .Include(a => a.Species)
             .Include(a => a.Area)
+            .Include(a => a.Enclosure)
             .AsNoTracking()
             .AsQueryable();
 
@@ -34,7 +36,8 @@ public class AnimalRepository : IAnimalRepository
                 a.Name.ToLower().Contains(s) ||
                 (a.Description != null && a.Description.ToLower().Contains(s)) ||
                 a.Species.Name.ToLower().Contains(s) ||
-                (a.Species.ScientificName != null && a.Species.ScientificName.ToLower().Contains(s)));
+                (a.Species.ScientificName != null && a.Species.ScientificName.ToLower().Contains(s)) ||
+                (a.Enclosure != null && a.Enclosure.Name.ToLower().Contains(s)));
         }
 
         if (areaId.HasValue && areaId.Value > 0)
@@ -49,6 +52,18 @@ public class AnimalRepository : IAnimalRepository
             {
                 int calculatedAreaId = cleanZone[0] - 'A' + 1;
                 query = query.Where(a => a.AreaId == calculatedAreaId);
+            }
+        }
+
+        if (enclosureId.HasValue)
+        {
+            if (enclosureId.Value > 0)
+            {
+                query = query.Where(a => a.EnclosureId == enclosureId.Value);
+            }
+            else if (enclosureId.Value == 0) // Special case: unassigned animals
+            {
+                query = query.Where(a => a.EnclosureId == null);
             }
         }
 
@@ -72,6 +87,7 @@ public class AnimalRepository : IAnimalRepository
         return await _context.Animals
             .Include(a => a.Species)
             .Include(a => a.Area)
+            .Include(a => a.Enclosure)
             .FirstOrDefaultAsync(a => a.AnimalId == animalId);
     }
 
@@ -112,5 +128,10 @@ public class AnimalRepository : IAnimalRepository
     public async Task<bool> AreaExistsAsync(int areaId)
     {
         return await _context.Areas.AnyAsync(a => a.AreaId == areaId);
+    }
+
+    public async Task<bool> EnclosureExistsAsync(int enclosureId)
+    {
+        return await _context.Enclosures.AnyAsync(e => e.EnclosureId == enclosureId);
     }
 }

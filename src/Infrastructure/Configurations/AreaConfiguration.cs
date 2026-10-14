@@ -48,12 +48,29 @@ public class AreaConfiguration : IEntityTypeConfiguration<Area>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        builder.Property(a => a.Code)
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(a => a.MapX)
+            .HasPrecision(8, 2)
+            .IsRequired(false);
+
+        builder.Property(a => a.MapY)
+            .HasPrecision(8, 2)
+            .IsRequired(false);
+
         builder.Property(a => a.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("now()");
 
         builder.Property(a => a.UpdatedAt)
             .IsRequired(false);
+
+        builder.HasMany(a => a.Enclosures)
+            .WithOne(e => e.Area)
+            .HasForeignKey(e => e.AreaId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(a => a.Animals)
             .WithOne(an => an.Area)
