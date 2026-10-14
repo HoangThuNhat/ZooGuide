@@ -17,121 +17,134 @@ public class EnclosuresController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy danh sách chuồng trại (Hỗ trợ lọc theo phân khu AreaId, tìm kiếm và trạng thái)
+    /// Lấy danh sách chuồng trại trong sở thú (hỗ trợ lọc theo phân khu AreaId, từ khóa tìm kiếm và trạng thái)
     /// </summary>
     [HttpGet]
-    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponseDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetEnclosures([FromQuery] EnclosureFilterDto filter)
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll([FromQuery] EnclosureFilterRequest filter)
     {
-        var enclosures = await _enclosureService.GetEnclosuresAsync(filter);
-        return Ok(ApiResponse<IEnumerable<EnclosureResponseDto>>.Ok(enclosures));
+        var enclosures = await _enclosureService.GetAllAsync(filter);
+        return Ok(ApiResponse<IEnumerable<EnclosureResponse>>.Ok(enclosures));
     }
 
     /// <summary>
-    /// Lấy chi tiết chuồng theo EnclosureId kèm danh sách động vật
+    /// Lấy chi tiết chuồng trại theo EnclosureId (kèm thông tin phân khu và danh sách động vật)
     /// </summary>
     [HttpGet("{id:int}")]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureDetailDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureDetailDto>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetEnclosureById(int id)
+    [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetById(int id)
     {
-        var enclosure = await _enclosureService.GetEnclosureByIdAsync(id);
+        var enclosure = await _enclosureService.GetByIdAsync(id);
         if (enclosure == null)
         {
-            return NotFound(ApiResponse<EnclosureDetailDto>.Fail($"Không tìm thấy chuồng với mã ID = {id}."));
+            return NotFound(ApiResponse<EnclosureDetailResponse>.Fail($"Không tìm thấy chuồng với mã ID = {id}."));
         }
 
-        return Ok(ApiResponse<EnclosureDetailDto>.Ok(enclosure));
+        return Ok(ApiResponse<EnclosureDetailResponse>.Ok(enclosure));
     }
 
     /// <summary>
-    /// Thêm mới chuồng trại
+    /// Thêm mới chuồng trại (Kiểm tra AreaId có tồn tại trong hệ thống)
     /// </summary>
     [HttpPost]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureResponseDto>), StatusCodes.Status201Created)]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureResponseDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> CreateEnclosure([FromBody] CreateEnclosureDto dto)
+    [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Create([FromBody] CreateEnclosureRequest request)
     {
         if (!ModelState.IsValid)
         {
             var errors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
-            return BadRequest(ApiResponse<EnclosureResponseDto>.Fail(errors));
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail(errors));
         }
 
-        if (string.IsNullOrWhiteSpace(dto.Name))
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return BadRequest(ApiResponse<EnclosureResponseDto>.Fail("Tên chuồng không được để trống."));
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail("Tên chuồng không được để trống."));
         }
 
-        var result = await _enclosureService.CreateEnclosureAsync(dto);
-        if (result.ErrorMessage != null)
+        try
         {
-            return BadRequest(ApiResponse<EnclosureResponseDto>.Fail(result.ErrorMessage));
+            var created = await _enclosureService.CreateAsync(request);
+            return CreatedAtAction(
+                nameof(GetById),
+                new { id = created.EnclosureId },
+                ApiResponse<EnclosureResponse>.Ok(created, "Thêm mới chuồng thành công!"));
         }
-
-        return CreatedAtAction(nameof(GetEnclosureById), new { id = result.Data!.EnclosureId }, 
-            ApiResponse<EnclosureResponseDto>.Ok(result.Data, "Thêm mới chuồng thành công!"));
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail(ex.Message));
+        }
     }
 
     /// <summary>
-    /// Cập nhật thông tin chuồng trại
+    /// Cập nhật thông tin chuồng trại theo EnclosureId (Kiểm tra EnclosureId và AreaId tồn tại)
     /// </summary>
     [HttpPut("{id:int}")]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureResponseDto>), StatusCodes.Status200OK)]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureResponseDto>), StatusCodes.Status400BadRequest)]
-    [ProducesResponseType(typeof(ApiResponse<EnclosureResponseDto>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> UpdateEnclosure(int id, [FromBody] UpdateEnclosureDto dto)
+    [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateEnclosureRequest request)
     {
         if (!ModelState.IsValid)
         {
             var errors = string.Join("; ", ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage));
-            return BadRequest(ApiResponse<EnclosureResponseDto>.Fail(errors));
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail(errors));
         }
 
-        var result = await _enclosureService.UpdateEnclosureAsync(id, dto);
-        if (result.NotFound)
+        if (string.IsNullOrWhiteSpace(request.Name))
         {
-            return NotFound(ApiResponse<EnclosureResponseDto>.Fail($"Không tìm thấy chuồng với mã ID = {id}."));
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail("Tên chuồng không được để trống."));
         }
 
-        if (result.ErrorMessage != null)
+        try
         {
-            return BadRequest(ApiResponse<EnclosureResponseDto>.Fail(result.ErrorMessage));
-        }
+            var updated = await _enclosureService.UpdateAsync(id, request);
+            if (updated == null)
+            {
+                return NotFound(ApiResponse<EnclosureResponse>.Fail($"Không tìm thấy chuồng với mã ID = {id} để cập nhật."));
+            }
 
-        return Ok(ApiResponse<EnclosureResponseDto>.Ok(result.Data!, "Cập nhật thông tin chuồng thành công!"));
+            return Ok(ApiResponse<EnclosureResponse>.Ok(updated, "Cập nhật chuồng thành công!"));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<EnclosureResponse>.Fail(ex.Message));
+        }
     }
 
     /// <summary>
-    /// Xóa chuồng (Kiểm tra ràng buộc cá thể động vật bên trong)
+    /// Xóa chuồng trại theo EnclosureId (chặn xóa khi chuồng vẫn còn động vật bên trong)
     /// </summary>
     [HttpDelete("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
-    public async Task<IActionResult> DeleteEnclosure(int id)
+    public async Task<IActionResult> Delete(int id)
     {
-        var result = await _enclosureService.DeleteEnclosureAsync(id);
-        if (result.NotFound)
+        try
         {
-            return NotFound(ApiResponse<object>.Fail(result.Message ?? "Không tìm thấy chuồng."));
-        }
+            var success = await _enclosureService.DeleteAsync(id);
+            if (!success)
+            {
+                return NotFound(ApiResponse<object>.Fail($"Không tìm thấy chuồng với mã ID = {id}."));
+            }
 
-        if (result.HasConflict)
+            return Ok(ApiResponse<object>.Ok(new { id }, "Đã xóa chuồng thành công."));
+        }
+        catch (InvalidOperationException ex)
         {
-            return Conflict(ApiResponse<object>.Fail(result.Message ?? "Chuồng đang có động vật sinh sống, không thể xóa."));
+            return Conflict(ApiResponse<object>.Fail(ex.Message));
         }
-
-        return Ok(ApiResponse<object>.Ok(new { id }, result.Message ?? "Đã xóa chuồng thành công."));
     }
 
     /// <summary>
-    /// Chuyển cá thể động vật sang chuồng khác hoặc gỡ khỏi chuồng
+    /// Chuyển cá thể động vật sang chuồng khác hoặc gỡ khỏi chuồng (TargetEnclosureId rỗng)
     /// </summary>
     [HttpPost("move-animal")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> MoveAnimal([FromBody] MoveAnimalDto dto)
+    public async Task<IActionResult> MoveAnimal([FromBody] MoveAnimalRequest request)
     {
         if (!ModelState.IsValid)
         {
@@ -139,12 +152,31 @@ public class EnclosuresController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail(errors));
         }
 
-        var result = await _enclosureService.MoveAnimalAsync(dto);
-        if (!result.Success)
+        try
         {
-            return BadRequest(ApiResponse<object>.Fail(result.Message ?? "Không thể chuyển động vật."));
+            var message = await _enclosureService.MoveAnimalAsync(request);
+            return Ok(ApiResponse<object>.Ok(new { request.AnimalId, request.TargetEnclosureId }, message));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Lấy danh sách toàn bộ chuồng trại thuộc một phân khu (AreaId)
+    /// </summary>
+    [HttpGet("/api/areas/{areaId:int}/enclosures")]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByAreaId(int areaId)
+    {
+        var enclosures = await _enclosureService.GetByAreaIdAsync(areaId);
+        if (enclosures == null)
+        {
+            return NotFound(ApiResponse<IEnumerable<EnclosureResponse>>.Fail($"Không tìm thấy khu vực với mã ID = {areaId}."));
         }
 
-        return Ok(ApiResponse<object>.Ok(new { dto.AnimalId, dto.TargetEnclosureId }, result.Message ?? "Chuyển chuồng thành công!"));
+        return Ok(ApiResponse<IEnumerable<EnclosureResponse>>.Ok(enclosures));
     }
 }

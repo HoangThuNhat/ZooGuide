@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803D"/>
+      <stop offset="100%" stop-color="#059669"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- 100% full bleed background for maskable icons (safe zone is center 80%) -->
+  <rect x="0" y="0" width="512" height="512" fill="url(#bgGrad)"/>
+  
+  <!-- Brand Pin centered within safe zone (center 400x400) -->
+  <g transform="translate(256, 245) scale(12)" stroke="#FFFFFF" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0 -11 A 8 8 0 0 0 -8 -3 C -8 1.5 -5 4.5 -1.5 8.2 L 0 10 L 1.5 8.2 C 5 4.5 8 1.5 8 -3 A 8 8 0 0 0 0 -11 Z" fill="rgba(255,255,255,0.12)"/>
+    <circle cx="0" cy="-3" r="2.8" fill="#FFFFFF"/>
+  </g>
+  
+  <!-- Sound waves in safe zone -->
+  <g stroke="#FDE047" stroke-width="12" fill="none" stroke-linecap="round" opacity="0.95">
+    <path d="M 140 195 A 145 145 0 0 1 140 125" />
+    <path d="M 372 195 A 145 145 0 0 0 372 125" />
+  </g>
+  
+  <!-- Nature leaf motif -->
+  <path d="M 256 405 C 242 385 244 368 256 355 C 268 368 270 385 256 405 Z" fill="#86EFAC"/>
+</svg>

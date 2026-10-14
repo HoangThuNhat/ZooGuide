@@ -4,221 +4,224 @@ using ZooGuide.Domain.Entities;
 
 namespace ZooGuide.Application.Services;
 
+/// <summary>
+/// Xử lý nghiệp vụ quản lý chuồng trại (Enclosures)
+/// </summary>
 public class EnclosureService : IEnclosureService
 {
     private readonly IEnclosureRepository _enclosureRepository;
-    private readonly IAnimalRepository _animalRepository;
     private readonly IAreaRepository _areaRepository;
+    private readonly IAnimalRepository _animalRepository;
 
     public EnclosureService(
         IEnclosureRepository enclosureRepository,
-        IAnimalRepository animalRepository,
-        IAreaRepository areaRepository)
+        IAreaRepository areaRepository,
+        IAnimalRepository animalRepository)
     {
         _enclosureRepository = enclosureRepository;
-        _animalRepository = animalRepository;
         _areaRepository = areaRepository;
+        _animalRepository = animalRepository;
     }
 
-    public async Task<IEnumerable<EnclosureResponseDto>> GetEnclosuresAsync(EnclosureFilterDto filter)
+    public async Task<IEnumerable<EnclosureResponse>> GetAllAsync(EnclosureFilterRequest? filter = null)
     {
-        var enclosures = await _enclosureRepository.GetAllWithDetailsAsync(
-            filter.AreaId, 
-            filter.Search, 
-            filter.Status);
-
-        return enclosures.Select(MapToResponseDto);
+        var enclosures = await _enclosureRepository.GetAllAsync(filter?.AreaId, filter?.Search, filter?.Status);
+        return enclosures.Select(e => MapToResponse(e));
     }
 
-    public async Task<EnclosureDetailDto?> GetEnclosureByIdAsync(int id)
+    public async Task<EnclosureDetailResponse?> GetByIdAsync(int id)
     {
         var enclosure = await _enclosureRepository.GetByIdWithDetailsAsync(id);
-        if (enclosure == null) return null;
-
-        var dto = new EnclosureDetailDto
-        {
-            EnclosureId = enclosure.EnclosureId,
-            AreaId = enclosure.AreaId,
-            AreaName = enclosure.Area.Name,
-            AreaCode = enclosure.Area.Code,
-            Code = enclosure.Code ?? $"ENC-{enclosure.EnclosureId:D3}",
-            Name = enclosure.Name,
-            Description = enclosure.Description,
-            ImageUrl = enclosure.ImageUrl,
-            Status = enclosure.Status,
-            MapX = enclosure.MapX,
-            MapY = enclosure.MapY,
-            AnimalCount = enclosure.Animals.Count,
-            CreatedAt = enclosure.CreatedAt,
-            UpdatedAt = enclosure.UpdatedAt,
-            Animals = enclosure.Animals.Select(MapAnimalToDto).ToList(),
-            Area = new AreaResponseDto
-            {
-                AreaId = enclosure.Area.AreaId,
-                Code = enclosure.Area.Code ?? "A",
-                Name = enclosure.Area.Name,
-                Description = enclosure.Area.Description,
-                Latitude = enclosure.Area.Latitude,
-                Longitude = enclosure.Area.Longitude,
-                RadiusMeters = enclosure.Area.RadiusMeters,
-                MapImageUrl = enclosure.Area.MapImageUrl,
-                MapX = enclosure.Area.MapX,
-                MapY = enclosure.Area.MapY,
-                Status = enclosure.Area.Status.ToString(),
-                CreatedAt = enclosure.Area.CreatedAt,
-                UpdatedAt = enclosure.Area.UpdatedAt
-            }
-        };
-
-        return dto;
+        return enclosure == null ? null : MapToDetailResponse(enclosure);
     }
 
-    public async Task<(EnclosureResponseDto? Data, string? ErrorMessage)> CreateEnclosureAsync(CreateEnclosureDto dto)
+    public async Task<IEnumerable<EnclosureResponse>?> GetByAreaIdAsync(int areaId)
     {
-        var areaExists = await _enclosureRepository.AreaExistsAsync(dto.AreaId);
-        if (!areaExists)
+        // Kiểm tra khu vực có tồn tại trong hệ thống không
+        var area = await _areaRepository.GetByIdAsync(areaId);
+        if (area == null)
         {
-            return (null, $"Phân khu với mã ID = {dto.AreaId} không tồn tại.");
+            return null;
         }
 
-        var area = await _areaRepository.GetByIdAsync(dto.AreaId);
-        var areaCode = area?.Code ?? "Z";
+        var enclosures = await _enclosureRepository.GetByAreaIdAsync(areaId);
+        return enclosures.Select(e => MapToResponse(e, area.Name, area.Code));
+    }
 
-        string code = dto.Code?.Trim() ?? string.Empty;
+    public async Task<EnclosureResponse> CreateAsync(CreateEnclosureRequest request)
+    {
+        // Kiểm tra AreaId có tồn tại trong bảng AREAS không
+        var area = await _areaRepository.GetByIdAsync(request.AreaId);
+        if (area == null)
+        {
+            throw new ArgumentException($"Khu vực với AreaId = {request.AreaId} không tồn tại trong hệ thống.");
+        }
+
+        var code = request.Code?.Trim();
         if (string.IsNullOrWhiteSpace(code))
         {
-            code = $"ENC-{areaCode}-{DateTime.UtcNow.Ticks % 10000:D4}";
+            code = $"ENC-{area.Code ?? "Z"}-{DateTime.UtcNow.Ticks % 10000:D4}";
         }
 
         var enclosure = new Enclosure
         {
-            AreaId = dto.AreaId,
+            AreaId = request.AreaId,
             Code = code,
-            Name = dto.Name.Trim(),
-            Description = dto.Description?.Trim(),
-            ImageUrl = dto.ImageUrl?.Trim(),
-            Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status,
-            MapX = dto.MapX,
-            MapY = dto.MapY,
+            Name = request.Name.Trim(),
+            Description = request.Description?.Trim(),
+            ImageUrl = request.ImageUrl?.Trim(),
+            Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
+            MapX = request.MapX,
+            MapY = request.MapY,
             CreatedAt = DateTime.UtcNow
         };
 
-        var created = await _enclosureRepository.AddAsync(enclosure);
-        var full = await _enclosureRepository.GetByIdWithDetailsAsync(created.EnclosureId);
-        return (MapToResponseDto(full ?? created), null);
+        var created = await _enclosureRepository.CreateAsync(enclosure);
+        var full = await _enclosureRepository.GetByIdWithDetailsAsync(created.EnclosureId) ?? created;
+        return MapToResponse(full, area.Name, area.Code);
     }
 
-    public async Task<(EnclosureResponseDto? Data, bool NotFound, string? ErrorMessage)> UpdateEnclosureAsync(int id, UpdateEnclosureDto dto)
+    public async Task<EnclosureResponse?> UpdateAsync(int id, UpdateEnclosureRequest request)
     {
         var enclosure = await _enclosureRepository.GetByIdAsync(id);
         if (enclosure == null)
         {
-            return (null, true, $"Không tìm thấy chuồng với mã ID = {id}.");
+            return null;
         }
 
-        if (enclosure.AreaId != dto.AreaId)
+        // Kiểm tra AreaId có tồn tại trong bảng AREAS không
+        var area = await _areaRepository.GetByIdAsync(request.AreaId);
+        if (area == null)
         {
-            var areaExists = await _enclosureRepository.AreaExistsAsync(dto.AreaId);
-            if (!areaExists)
-            {
-                return (null, false, $"Phân khu với mã ID = {dto.AreaId} không tồn tại.");
-            }
-            enclosure.AreaId = dto.AreaId;
+            throw new ArgumentException($"Khu vực với AreaId = {request.AreaId} không tồn tại trong hệ thống.");
         }
 
-        if (!string.IsNullOrWhiteSpace(dto.Code))
+        enclosure.AreaId = request.AreaId;
+        if (!string.IsNullOrWhiteSpace(request.Code))
         {
-            enclosure.Code = dto.Code.Trim();
+            enclosure.Code = request.Code.Trim();
         }
-
-        enclosure.Name = dto.Name.Trim();
-        enclosure.Description = dto.Description?.Trim();
-        enclosure.ImageUrl = dto.ImageUrl?.Trim();
-        enclosure.Status = string.IsNullOrWhiteSpace(dto.Status) ? "Active" : dto.Status;
-        enclosure.MapX = dto.MapX;
-        enclosure.MapY = dto.MapY;
+        enclosure.Name = request.Name.Trim();
+        enclosure.Description = request.Description?.Trim();
+        enclosure.ImageUrl = request.ImageUrl?.Trim();
+        enclosure.Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim();
+        enclosure.MapX = request.MapX;
+        enclosure.MapY = request.MapY;
         enclosure.UpdatedAt = DateTime.UtcNow;
+        // CreatedAt được giữ nguyên
 
         await _enclosureRepository.UpdateAsync(enclosure);
 
-        var full = await _enclosureRepository.GetByIdWithDetailsAsync(id);
-        return (MapToResponseDto(full ?? enclosure), false, null);
+        var full = await _enclosureRepository.GetByIdWithDetailsAsync(id) ?? enclosure;
+        return MapToResponse(full, area.Name, area.Code);
     }
 
-    public async Task<(bool Success, bool NotFound, bool HasConflict, string? Message)> DeleteEnclosureAsync(int id)
+    public async Task<bool> DeleteAsync(int id)
     {
         var enclosure = await _enclosureRepository.GetByIdAsync(id);
         if (enclosure == null)
         {
-            return (false, true, false, $"Không tìm thấy chuồng với mã ID = {id}.");
+            return false;
         }
 
-        var hasAnimals = await _enclosureRepository.HasAnimalsAsync(id);
-        if (hasAnimals)
+        // Ràng buộc: không xóa chuồng khi vẫn còn cá thể động vật bên trong
+        if (await _enclosureRepository.HasAnimalsAsync(id))
         {
-            return (false, false, true, "Chuồng đang có động vật sinh sống. Vui lòng chuyển các cá thể sang chuồng khác trước khi xóa chuồng này.");
+            throw new InvalidOperationException(
+                "Chuồng đang có động vật sinh sống. Vui lòng chuyển các cá thể sang chuồng khác trước khi xóa chuồng này.");
         }
 
         await _enclosureRepository.DeleteAsync(enclosure);
-        return (true, false, false, "Đã xóa chuồng thành công.");
+        return true;
     }
 
-    public async Task<(bool Success, string? Message)> MoveAnimalAsync(MoveAnimalDto dto)
+    public async Task<string> MoveAnimalAsync(MoveAnimalRequest request)
     {
-        var animal = await _animalRepository.GetByIdAsync(dto.AnimalId);
+        var animal = await _animalRepository.GetByIdAsync(request.AnimalId);
         if (animal == null)
         {
-            return (false, $"Không tìm thấy cá thể động vật với mã ID = {dto.AnimalId}.");
+            throw new ArgumentException($"Không tìm thấy cá thể động vật với mã ID = {request.AnimalId}.");
         }
 
-        if (dto.TargetEnclosureId.HasValue && dto.TargetEnclosureId.Value > 0)
+        if (request.TargetEnclosureId.HasValue && request.TargetEnclosureId.Value > 0)
         {
-            var targetEnclosure = await _enclosureRepository.GetByIdAsync(dto.TargetEnclosureId.Value);
-            if (targetEnclosure == null)
+            var target = await _enclosureRepository.GetByIdAsync(request.TargetEnclosureId.Value);
+            if (target == null)
             {
-                return (false, $"Chuồng đích với mã ID = {dto.TargetEnclosureId.Value} không tồn tại.");
+                throw new ArgumentException($"Chuồng đích với mã ID = {request.TargetEnclosureId.Value} không tồn tại.");
             }
 
-            animal.EnclosureId = targetEnclosure.EnclosureId;
-            animal.AreaId = targetEnclosure.AreaId; // Tự động đồng bộ AreaId theo chuồng đích
+            animal.EnclosureId = target.EnclosureId;
+            animal.AreaId = target.AreaId; // Tự động đồng bộ AreaId theo chuồng đích
             animal.UpdatedAt = DateTime.UtcNow;
 
             await _animalRepository.UpdateAsync(animal);
-            return (true, $"Đã chuyển động vật '{animal.Name}' sang '{targetEnclosure.Name}'.");
+            return $"Đã chuyển động vật '{animal.Name}' sang '{target.Name}'.";
         }
-        else
-        {
-            animal.EnclosureId = null;
-            animal.UpdatedAt = DateTime.UtcNow;
 
-            await _animalRepository.UpdateAsync(animal);
-            return (true, $"Đã gỡ động vật '{animal.Name}' ra khỏi chuồng (trạng thái Chưa xếp chuồng).");
-        }
+        animal.EnclosureId = null;
+        animal.UpdatedAt = DateTime.UtcNow;
+
+        await _animalRepository.UpdateAsync(animal);
+        return $"Đã gỡ động vật '{animal.Name}' ra khỏi chuồng (trạng thái Chưa xếp chuồng).";
     }
 
-    private static EnclosureResponseDto MapToResponseDto(Enclosure e)
+    private static EnclosureResponse MapToResponse(Enclosure e, string? areaName = null, string? areaCode = null)
     {
-        return new EnclosureResponseDto
-        {
-            EnclosureId = e.EnclosureId,
-            AreaId = e.AreaId,
-            AreaName = e.Area?.Name ?? string.Empty,
-            AreaCode = e.Area?.Code,
-            Code = e.Code ?? $"ENC-{e.EnclosureId:D3}",
-            Name = e.Name,
-            Description = e.Description,
-            ImageUrl = e.ImageUrl,
-            Status = e.Status,
-            MapX = e.MapX,
-            MapY = e.MapY,
-            AnimalCount = e.Animals?.Count ?? 0,
-            CreatedAt = e.CreatedAt,
-            UpdatedAt = e.UpdatedAt,
-            Animals = e.Animals?.Select(MapAnimalToDto).ToList() ?? new List<AnimalResponseDto>()
-        };
+        var response = new EnclosureResponse();
+        FillResponse(response, e, areaName, areaCode);
+        return response;
     }
 
-    private static AnimalResponseDto MapAnimalToDto(Animal a)
+    private static EnclosureDetailResponse MapToDetailResponse(Enclosure e)
+    {
+        var response = new EnclosureDetailResponse();
+        FillResponse(response, e, null, null);
+
+        if (e.Area != null)
+        {
+            response.Area = new AreaResponseDto
+            {
+                AreaId = e.Area.AreaId,
+                Code = e.Area.Code ?? "A",
+                Name = e.Area.Name,
+                Description = e.Area.Description,
+                Latitude = e.Area.Latitude,
+                Longitude = e.Area.Longitude,
+                RadiusMeters = e.Area.RadiusMeters,
+                MapImageUrl = e.Area.MapImageUrl,
+                MapX = e.Area.MapX,
+                MapY = e.Area.MapY,
+                Status = e.Area.Status.ToString(),
+                CreatedAt = e.Area.CreatedAt,
+                UpdatedAt = e.Area.UpdatedAt
+            };
+        }
+
+        return response;
+    }
+
+    private static void FillResponse(EnclosureResponse target, Enclosure e, string? areaName, string? areaCode)
+    {
+        target.EnclosureId = e.EnclosureId;
+        target.AreaId = e.AreaId;
+        target.AreaName = areaName ?? e.Area?.Name ?? string.Empty;
+        target.AreaCode = areaCode ?? e.Area?.Code;
+        target.Code = e.Code ?? $"ENC-{e.EnclosureId:D3}";
+        target.Name = e.Name;
+        target.Description = e.Description;
+        target.ImageUrl = e.ImageUrl;
+        target.Status = e.Status;
+        target.MapX = e.MapX;
+        target.MapY = e.MapY;
+        target.AnimalCount = e.Animals?.Count ?? 0;
+        target.CreatedAt = e.CreatedAt;
+        target.UpdatedAt = e.UpdatedAt;
+        target.Animals = e.Animals?.Select(a => MapAnimalToDto(a, e, target.AreaName)).ToList()
+                         ?? new List<AnimalResponseDto>();
+    }
+
+    private static AnimalResponseDto MapAnimalToDto(Animal a, Enclosure e, string areaName)
     {
         return new AnimalResponseDto
         {
@@ -228,10 +231,10 @@ public class EnclosureService : IEnclosureService
             ScientificName = a.Species?.ScientificName,
             ConservationStatus = a.Species?.ConservationStatus,
             AreaId = a.AreaId,
-            AreaName = a.Area?.Name ?? string.Empty,
+            AreaName = a.Area?.Name ?? areaName,
             EnclosureId = a.EnclosureId,
-            EnclosureName = a.Enclosure?.Name,
-            EnclosureCode = a.Enclosure?.Code,
+            EnclosureName = e.Name,
+            EnclosureCode = e.Code,
             Name = a.Name,
             Description = a.Description,
             Gender = a.Gender.ToString(),

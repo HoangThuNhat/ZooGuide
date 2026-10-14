@@ -1,0 +1,73 @@
+{
+  "name": "ZooGuide",
+  "short_name": "ZooGuide",
+  "description": "Hệ thống thuyết minh tự động và bản đồ tương tác sở thú thông minh",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#15803D",
+  "background_color": "#F0FDF4",
+  "lang": "vi",
+  "dir": "ltr",
+  "categories": [
+    "travel",
+    "navigation",
+    "education"
+  ],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-192-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bản Đồ Sở Thú",
+      "short_name": "Bản Đồ",
+      "description": "Mở bản đồ tương tác vườn thú",
+      "url": "/#map",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Thuyết Minh Loài",
+      "short_name": "Thuyết Minh",
+      "description": "Nghe thuyết minh các loài động vật",
+      "url": "/#species-audio",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Vé Tham Quan",
+      "short_name": "Vé Của Tôi",
+      "description": "Quét và kiểm tra vé tham quan",
+      "url": "/#tickets",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

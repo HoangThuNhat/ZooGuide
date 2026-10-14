@@ -159,7 +159,7 @@ public class AreaService : IAreaService
                 ? ((char)('A' + a.AreaId - 1)).ToString() 
                 : $"Z{a.AreaId}");
 
-        var enclosures = a.Enclosures?.Select(e => new EnclosureResponseDto
+        var enclosures = a.Enclosures?.Select(e => new EnclosureResponse
         {
             EnclosureId = e.EnclosureId,
             AreaId = e.AreaId,
@@ -197,7 +197,7 @@ public class AreaService : IAreaService
                 CreatedAt = an.CreatedAt,
                 UpdatedAt = an.UpdatedAt
             }).ToList() ?? new List<AnimalResponseDto>()
-        }).ToList() ?? new List<EnclosureResponseDto>();
+        }).ToList() ?? new List<EnclosureResponse>();
 
         return new AreaResponseDto
         {

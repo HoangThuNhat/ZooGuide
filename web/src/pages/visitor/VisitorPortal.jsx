@@ -27,6 +27,8 @@ export default function VisitorPortal() {
         switchTab,
         currentLang, 
         hasActiveSession, 
+        currentSession,
+        clearSession,
         setIsTicketModalOpen, 
         setSelectedAnimalForDetail, 
         showToast,
@@ -44,16 +46,25 @@ export default function VisitorPortal() {
 
     // Audio Engine Functions - strictly Species-bound narration
     const playSpeciesAudio = async (speciesId, startAutoplay = true, lang = currentLang) => {
-        if (!hasActiveSession) {
-            if (typeof validateTicketCode === 'function') {
-                await validateTicketCode('ZOO-8899-VIP');
-            }
-            showToast("Đã kích hoạt vé tham quan trải nghiệm âm thanh!", "info");
+        // 1. Kiểm tra phiên vé hợp lệ bắt buộc
+        if (!hasActiveSession || !currentSession?.sessionId) {
+            showToast("Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.", "error");
+            pauseAudioPlayback();
+            setIsTicketModalOpen(true);
+            return;
         }
 
-        const res = await ZooApi.getSpeciesNarration(speciesId, lang);
+        // 2. Gọi API lấy thuyết minh có kèm sessionId để backend xác thực
+        const res = await ZooApi.getSpeciesNarration(speciesId, lang, currentSession.sessionId);
         if (!res.success) {
-            showToast("Không tìm thấy dữ liệu thuyết minh", "error");
+            if (res.unauthorized) {
+                showToast(res.message || "Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé.", "error");
+                clearSession();
+                pauseAudioPlayback();
+                setIsTicketModalOpen(true);
+            } else {
+                showToast(res.message || "Không tìm thấy dữ liệu thuyết minh", "error");
+            }
             return;
         }
 
@@ -103,6 +114,11 @@ export default function VisitorPortal() {
                 if (!audioElementRef.current) {
                     audioElementRef.current = new Audio();
                 }
+                audioElementRef.current.onerror = (e) => {
+                    console.warn("Audio element playback error:", e);
+                    showToast("Luồng âm thanh bị từ chối hoặc phiên vé đã hết hạn. Đã dừng phát.", "error");
+                    pauseAudioPlayback();
+                };
                 audioElementRef.current.src = narration.audioSrc;
                 audioElementRef.current.playbackRate = rate;
                 audioElementRef.current.currentTime = 0;

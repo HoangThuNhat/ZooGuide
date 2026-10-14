@@ -18,10 +18,31 @@ public class TicketService : ITicketService
         _ticketSessionService = ticketSessionService;
     }
 
-    public async Task<IEnumerable<TicketDto>> GetAllAsync()
+    public async Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null)
     {
-        return await _context.Tickets
+        var query = _context.Tickets
             .Include(t => t.TicketType)
+            .AsNoTracking()
+            .AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var term = search.Trim().ToLower();
+            query = query.Where(t => t.TicketCode.ToLower().Contains(term) || (t.TicketType != null && t.TicketType.Name.ToLower().Contains(term)));
+        }
+
+        if (ticketTypeId.HasValue && ticketTypeId.Value > 0)
+        {
+            query = query.Where(t => t.TicketTypeId == ticketTypeId.Value);
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(t => t.Status == status.Value);
+        }
+
+        return await query
+            .OrderByDescending(t => t.CreatedAt)
             .Select(t => new TicketDto
             {
                 TicketId = t.TicketId,

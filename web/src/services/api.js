@@ -6,7 +6,9 @@
 
 export const API_CONFIG = {
     BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
-    USE_MOCK: false,
+    USE_MOCK: import.meta.env.VITE_USE_MOCK !== undefined
+        ? import.meta.env.VITE_USE_MOCK === 'true'
+        : false,
     TIMEOUT_MS: 8000
 };
 
@@ -1780,30 +1782,82 @@ export const ZooApi = {
     },
 
     // 5. GET SPECIES NARRATION BY SPECIES ID & LANG (Thuyết minh gắn với Loài / Species)
-    async getSpeciesNarration(speciesId, lang = 'vi') {
+    // BẮT BUỘC CÓ VÉ HỢP LỆ VÀ PHIÊN CÒN HIỆU LỰC MỚI ĐƯỢC PHÉP TRUY XUẤT
+    async getSpeciesNarration(speciesId, lang = 'vi', sessionId = null) {
         const sId = parseInt(speciesId);
-        await this._simulateLatency(40);
         const isEn = (lang === 'en');
 
-        // Check if there is tailored narration in MOCK_DB.narrations[sId]
-        const tailored = MOCK_DB.narrations[sId];
-        if (tailored) {
-            const entry = isEn && tailored.en ? tailored.en : (tailored.vi || tailored.en);
-            if (entry) {
-                // Attach constituent animals if available
-                const constituentAnimals = MOCK_DB.animals.filter(a => a.speciesId === sId);
-                return { 
-                    success: true, 
-                    data: {
-                        ...entry,
-                        speciesId: sId,
-                        constituentAnimals
-                    }
+        // 1. Kiểm tra nếu chưa có sessionId -> Từ chối ngay lập tức
+        if (!sessionId) {
+            return {
+                success: false,
+                unauthorized: true,
+                message: "Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh."
+            };
+        }
+
+        // 2. Gọi backend API có xác thực TicketSession
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'X-Session-Id': sessionId
                 };
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/species/${sId}?lang=${lang}&sessionId=${encodeURIComponent(sessionId)}`, {
+                    headers
+                });
+
+                if (res.status === 401) {
+                    return {
+                        success: false,
+                        unauthorized: true,
+                        message: "Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé tham quan."
+                    };
+                }
+
+                if (res.ok) {
+                    const json = await res.json();
+                    const n = json.data || json;
+                    if (n) {
+                        const streamUrl = `${API_CONFIG.BASE_URL}/narrations/${n.narrationId}/stream?sessionId=${encodeURIComponent(sessionId)}`;
+                        return {
+                            success: true,
+                            data: {
+                                narrationId: n.narrationId,
+                                speciesId: sId,
+                                title: n.title,
+                                scientificName: "",
+                                conservationStatus: "Sách đỏ IUCN",
+                                summary: n.content,
+                                durationSec: n.durationSeconds || 90,
+                                durationFormatted: `${Math.floor((n.durationSeconds || 90) / 60).toString().padStart(2, '0')}:${((n.durationSeconds || 90) % 60).toString().padStart(2, '0')}`,
+                                audioSrc: streamUrl,
+                                imageUrl: n.animalImageUrl,
+                                transcript: [
+                                    { time: 0, text: n.title },
+                                    { time: 5, text: n.content }
+                                ]
+                            }
+                        };
+                    }
+                }
+            } catch (err) {
+                console.warn("Backend narration fetch failed:", err);
             }
         }
 
-        // Fetch or find species metadata
+        // 3. Xác minh tính hợp lệ của TicketSession với backend nếu cần
+        const verify = await this.verifyTicketSession(sessionId);
+        if (!verify.valid) {
+            return {
+                success: false,
+                unauthorized: true,
+                message: "Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé."
+            };
+        }
+
+        // 4. Nếu phiên hợp lệ, chuẩn bị gói thuyết minh có đường dẫn audio stream được bảo vệ
+        await this._simulateLatency(40);
         let sp = MOCK_DB.species.find(s => s.id === sId);
         try {
             const allSpecies = await this.getSpecies();
@@ -1815,13 +1869,15 @@ export const ZooApi = {
 
         const constituentAnimals = MOCK_DB.animals.filter(a => a.speciesId === sId);
         const animalNames = constituentAnimals.map(a => a.nameVi).join(', ');
-
         const speciesNameVi = sp ? sp.nameVi : `Loài mã số ${sId}`;
         const speciesNameEn = sp ? sp.nameEn : (sp ? sp.nameVi : `Species #${sId}`);
         const scientificName = sp ? (sp.scientificName || sp.nameEn) : "Đang cập nhật";
         const status = sp ? sp.conservationStatus : "Ít quan tâm";
         const desc = sp ? sp.description : "Loài động vật quý hiếm đang được chăm sóc và bảo tồn tại ZooGuide.";
         const imageUrl = (sp && sp.imageUrl) || (constituentAnimals[0] && constituentAnimals[0].imageUrl) || "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=800";
+
+        // Tìm narrationId thích hợp để stream qua backend
+        const streamUrl = `${API_CONFIG.BASE_URL}/narrations/1/stream?sessionId=${encodeURIComponent(sessionId)}`;
 
         const narrationData = {
             speciesId: sId,
@@ -1833,7 +1889,7 @@ export const ZooApi = {
             narrator: isEn ? "ZooGuide Wildlife Conservation Specialist" : "Chuyên gia Sinh học ZooGuide",
             durationSec: 90,
             durationFormatted: "01:30",
-            audioSrc: isEn ? "/assets/audio/generic_en.mp3" : "/assets/audio/generic_vi.mp3",
+            audioSrc: streamUrl,
             summary: isEn 
                 ? `Explore the behavioral ecology, natural habitat, and global conservation status of ${speciesNameEn} (${scientificName}).`
                 : `Giới thiệu chi tiết về đời sống, tập tính tự nhiên và hiện trạng bảo tồn của ${speciesNameVi} (${scientificName}).`,
@@ -1856,18 +1912,14 @@ export const ZooApi = {
         return { success: true, data: narrationData };
     },
 
-    // 5b. GET NARRATION BY TARGET ID (Hỗ trợ cả Animal ID và Species ID - TẤT CẢ ĐỀU LẤY NARRATION THEO SPECIES)
-    async getNarration(targetId, lang = 'vi') {
+    // 5b. GET NARRATION BY TARGET ID
+    async getNarration(targetId, lang = 'vi', sessionId = null) {
         const id = parseInt(targetId);
-        // Nếu targetId là của một cá thể Animal (ví dụ: Simba id=1, Leo id=2) -> lấy speciesId của cá thể đó
         const animal = MOCK_DB.animals.find(a => a.id === id);
         if (animal && animal.speciesId) {
-            // Simba và Leo đều dùng chung bài thuyết minh của loài Sư tử (speciesId)
-            return this.getSpeciesNarration(animal.speciesId, lang);
+            return this.getSpeciesNarration(animal.speciesId, lang, sessionId);
         }
-
-        // Nếu targetId truyền vào trực tiếp là speciesId hoặc không tìm thấy animal
-        return this.getSpeciesNarration(id, lang);
+        return this.getSpeciesNarration(id, lang, sessionId);
     },
 
     // 6. STAFF: GET HEALTH LOGS
@@ -2175,7 +2227,10 @@ export const ZooApi = {
             const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
                 method: 'DELETE'
             });
-            if (!res.ok) throw new Error("Lỗi xóa khu vực");
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                throw new Error(errData?.message || "Lỗi xóa phân khu");
+            }
             return { success: true };
         } catch (err) {
             console.error("deleteArea API error:", err);
@@ -2194,6 +2249,8 @@ export const ZooApi = {
                 if (t.status === 2) statusStr = 'Used';
                 if (t.status === 3) statusStr = 'Expired';
                 return {
+                    id: t.ticketId,
+                    ticketId: t.ticketId,
                     ticketCode: t.ticketCode,
                     customerName: "Khách hàng",
                     ticketType: t.ticketTypeName || "Standard",
@@ -2228,20 +2285,9 @@ export const ZooApi = {
                 throw new Error(errData.message || "Lỗi tạo vé");
             }
             const created = await res.json();
-            console.log("CREATE TICKET API RESPONSE:", created);
-            console.log("CREATE TICKET RESULT:", {
-    success: true,
-    data: {
-        ticketCode: created.ticketCode,
-        status: 'Active',
-        validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
-        validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
-        customerName: data.customerName || "Khách hàng",
-        ticketType: created.ticketTypeName || "Standard",
-        zonesAllowed: ["ALL"]
-    }
-});
             return { success: true, data: {
+                id: created.ticketId,
+                ticketId: created.ticketId,
                 ticketCode: created.ticketCode,
                 status: 'Active',
                 validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
@@ -2283,6 +2329,21 @@ export const ZooApi = {
             return { success: true, data: { ticketCode: code, status: status } };
         } catch (err) {
             return { success: false, message: err.message || "Lỗi cập nhật trạng thái vé" };
+        }
+    },
+    async deleteTicket(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${id}`, {
+                method: 'DELETE'
+            });
+            if (!res.ok) {
+                const errData = await res.json().catch(() => null);
+                throw new Error(errData?.message || "Không thể xóa vé này vì đã có phiên tham quan hoặc liên kết.");
+            }
+            return { success: true, message: "Đã xóa vé thành công" };
+        } catch (err) {
+            console.error("deleteTicket error:", err);
+            return { success: false, error: err.message };
         }
     },
 
@@ -2373,13 +2434,366 @@ export const ZooApi = {
         }
     },
 
-    // 13. ADMIN: TICKET SESSIONS
+    // 13. ADMIN: TICKET SESSIONS (Live API with mock fallback)
     async getTicketSessions() {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    return { success: true, data: list };
+                }
+            } catch (err) {
+                console.warn("Live API /tickets/sessions failed, fallback to mock:", err);
+            }
+        }
         await this._simulateLatency(150);
         return { success: true, data: MOCK_DB.ticketSessions };
     },
 
-    // 14. SIMULATE LATENCY FOR UX REALISM
+    async revokeTicketSession(sessionId) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions/${sessionId}/revoke`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return { success: true, message: data.message || "Đã đóng phiên thành công" };
+                }
+                const errData = await res.json().catch(() => null);
+                return { success: false, message: errData?.message || "Không thể thu hồi phiên" };
+            } catch (err) {
+                console.warn("Live API revoke session failed:", err);
+            }
+        }
+        MOCK_DB.ticketSessions = MOCK_DB.ticketSessions.filter(s => s.sessionId !== sessionId);
+        return { success: true, message: "Đã đóng phiên tham quan (Mock)" };
+    },
+
+    async verifyTicketSession(sessionId) {
+        if (!sessionId) return { valid: false };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions/verify`, {
+                method: 'GET',
+                headers: {
+                    'X-Session-Id': sessionId
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                return { valid: true, data: data.data || data };
+            }
+            return { valid: false };
+        } catch (err) {
+            console.warn("verifyTicketSession failed:", err);
+            return { valid: true }; // Tránh ngắt quãng nếu offline
+        }
+    },
+
+    // 14. ADMIN: DASHBOARD REAL-TIME STATS
+    async getDashboardStats() {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/stats`);
+                if (res.ok) {
+                    const data = await res.json();
+                    return { success: true, data: data.data || data };
+                }
+            } catch (err) {
+                console.warn("Live API /dashboard/stats failed, fallback to calculated:", err);
+            }
+        }
+        await this._simulateLatency(100);
+        const now = new Date();
+        const activeT = MOCK_DB.tickets.filter(t => t.status === 'Active').length;
+        return {
+            success: true,
+            data: {
+                totalTickets: MOCK_DB.tickets.length,
+                activeTickets: activeT,
+                expiredTickets: MOCK_DB.tickets.length - activeT,
+                totalAnimals: MOCK_DB.animals.length,
+                totalSpecies: MOCK_DB.species.length,
+                totalAreas: MOCK_DB.areas.length,
+                totalNarrations: Object.keys(MOCK_DB.narrations || {}).length * 2,
+                totalAudios: Object.keys(MOCK_DB.narrations || {}).length * 2,
+                activeSessions: MOCK_DB.ticketSessions.length,
+                recentHealthLogs: [
+                    {
+                        id: 1,
+                        animalCode: "ANI-001",
+                        animalName: "Sư tử Simba",
+                        date: now.toISOString().slice(0, 10),
+                        veterinarian: "BS. Trần Minh Quân",
+                        healthStatus: "Rất tốt",
+                        weightKg: 215.5,
+                        temperatureC: 38.2,
+                        notes: "Thể lực sung mãn, bờm phát triển tốt.",
+                        actionRequired: ""
+                    }
+                ],
+                recentActivities: []
+            }
+        };
+    },
+
+    // 15. ADMIN: AUDIT LOGS
+    async getAdminLogs(limit = 50) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/admin/logs?limit=${limit}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    return { success: true, data: data.data || data };
+                }
+            } catch (err) {
+                console.warn("Live API /admin/logs failed:", err);
+            }
+        }
+        return { success: true, data: [] };
+    },
+
+    // 16. NARRATIONS & AUDIOS
+    async getNarrations(filter = {}) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const params = new URLSearchParams();
+                if (filter.animalId) params.append('animalId', filter.animalId);
+                if (filter.languageCode) params.append('languageCode', filter.languageCode);
+                if (filter.status) params.append('status', filter.status);
+                if (filter.search) params.append('search', filter.search);
+
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations?${params.toString()}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    return { success: true, data: list };
+                }
+            } catch (err) {
+                console.warn("Live API /narrations failed:", err);
+            }
+        }
+        // Fallback to MOCK_DB.narrations
+        const items = [];
+        for (const [id, narr] of Object.entries(MOCK_DB.narrations || {})) {
+            const animal = MOCK_DB.animals.find(a => a.id === parseInt(id));
+            if (narr.vi) items.push({ narrationId: parseInt(id) * 2 - 1, animalId: parseInt(id), animalName: animal ? animal.nameVi : '', languageCode: 'vi', languageName: 'Tiếng Việt', title: narr.vi.title, content: narr.vi.summary || narr.vi.title, audioUrl: narr.vi.audioUrl || '/assets/audio/simba_vi_studio.mp3', durationSeconds: narr.vi.durationSec || 120, status: 'Published', creatorName: narr.vi.narrator || 'Cán bộ ZooGuide' });
+            if (narr.en) items.push({ narrationId: parseInt(id) * 2, animalId: parseInt(id), animalName: animal ? animal.nameVi : '', languageCode: 'en', languageName: 'English', title: narr.en.title, content: narr.en.summary || narr.en.title, audioUrl: narr.en.audioUrl || '/assets/audio/simba_en_studio.mp3', durationSeconds: narr.en.durationSec || 115, status: 'Published', creatorName: narr.en.narrator || 'Cán bộ ZooGuide' });
+        }
+        return { success: true, data: items };
+    },
+
+    async createNarration(payload) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || "Lỗi tạo bài thuyết minh");
+                }
+                return { success: true, data: data.data || data };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: true, data: payload };
+    },
+
+    async updateNarration(id, payload) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || "Lỗi cập nhật bài thuyết minh");
+                }
+                return { success: true, data: data.data || data };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: true, data: payload };
+    },
+
+    async updateNarrationStatus(id, status) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/status`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status })
+                });
+                const data = await res.json();
+                if (!res.ok) {
+                    throw new Error(data.message || "Lỗi cập nhật trạng thái thuyết minh");
+                }
+                return { success: true };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: true };
+    },
+
+    async deleteNarration(id) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
+                    method: 'DELETE'
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => null);
+                    throw new Error(data?.message || "Lỗi xóa bài thuyết minh");
+                }
+                return { success: true };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: true };
+    },
+
+    async addNarrationAudio(id, audioData) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/audio`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(audioData)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || "Lỗi thêm file audio");
+                return { success: true, data: data.data || data };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return { success: true, data: audioData };
+    },
+
+    async uploadNarrationAudio(id, file) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/upload-audio`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.message || "Lỗi upload file âm thanh");
+                return { success: true, data: data.data || data };
+            } catch (err) {
+                return { success: false, error: err.message };
+            }
+        }
+        return {
+            success: true,
+            data: {
+                fileUrl: URL.createObjectURL(file),
+                fileName: file.name,
+                fileSize: file.size
+            }
+        };
+    },
+
+    async getLanguages() {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const res = await fetch(`${API_CONFIG.BASE_URL}/languages`);
+                if (res.ok) {
+                    const data = await res.json();
+                    const list = Array.isArray(data) ? data : (data.data || []);
+                    return { success: true, data: list };
+                }
+            } catch (err) {
+                console.warn("Live API /languages failed:", err);
+            }
+        }
+        return {
+            success: true,
+            data: [
+                { languageId: 1, code: 'vi', name: 'Tiếng Việt', isActive: true },
+                { languageId: 2, code: 'en', name: 'English', isActive: true },
+                { languageId: 3, code: 'zh', name: '中文 (Chinese)', isActive: true },
+                { languageId: 4, code: 'ja', name: '日本語 (Japanese)', isActive: true }
+            ]
+        };
+    },
+
+    // 17. CHATBOT LIVE INTERACTION
+    async getChatbotStatus(sessionId = null) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const headers = {};
+                if (sessionId) headers['X-Session-Id'] = sessionId;
+                const res = await fetch(`${API_CONFIG.BASE_URL}/chatbot/status?sessionId=${sessionId || ''}`, {
+                    headers
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return { success: true, data: data.data || data };
+                }
+            } catch (err) {
+                console.warn("Live API /chatbot/status failed:", err);
+            }
+        }
+        return {
+            success: true,
+            data: {
+                hasValidTicket: !!sessionId,
+                remainingQuestions: sessionId ? -1 : 3,
+                maxQuestions: 3,
+                isLimitReached: false
+            }
+        };
+    },
+
+    async sendChatMessage(message, sessionId = null) {
+        if (!API_CONFIG.USE_MOCK) {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (sessionId) headers['X-Session-Id'] = sessionId;
+                const res = await fetch(`${API_CONFIG.BASE_URL}/chatbot/message`, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({ message, sessionId })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return { success: true, data: data.data || data };
+                }
+            } catch (err) {
+                console.warn("Live API /chatbot/message failed:", err);
+            }
+        }
+        // Fallback local query
+        await this._simulateLatency(300);
+        return {
+            success: true,
+            data: {
+                reply: `ZooBot đã nhận câu hỏi: "${message}". Hiện tại hệ thống đang kết nối chế độ ngoại tuyến.`,
+                timestamp: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }),
+                foundData: false,
+                hasValidTicket: !!sessionId,
+                remainingQuestions: sessionId ? -1 : 2,
+                maxQuestions: 3,
+                isLimitReached: false
+            }
+        };
+    },
+
+    // 18. SIMULATE LATENCY FOR UX REALISM
     _simulateLatency(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }

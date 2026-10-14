@@ -26,7 +26,7 @@ public class AreaResponseDto
     public int AnimalCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
-    public List<EnclosureResponseDto> Enclosures { get; set; } = new();
+    public List<EnclosureResponse> Enclosures { get; set; } = new();
 }
 
 /// <summary>

@@ -90,6 +90,16 @@ export function AppProvider({ children }) {
                 const parsed = JSON.parse(raw);
                 if (new Date(parsed.expiresAt) > new Date()) {
                     setCurrentSession(parsed);
+                    if (parsed.sessionId) {
+                        ZooApi.verifyTicketSession(parsed.sessionId).then(res => {
+                            if (res && res.valid === false) {
+                                setCurrentSession(null);
+                                localStorage.removeItem(STORAGE_KEY);
+                                sessionStorage.removeItem(STORAGE_KEY);
+                                showToast("Phiên tham quan đã hết hạn hoặc bị thu hồi bởi quản trị viên.", "error");
+                            }
+                        });
+                    }
                 } else {
                     localStorage.removeItem(STORAGE_KEY);
                     sessionStorage.removeItem(STORAGE_KEY);

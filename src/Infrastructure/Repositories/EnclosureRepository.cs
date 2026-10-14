@@ -14,7 +14,7 @@ public class EnclosureRepository : IEnclosureRepository
         _context = context;
     }
 
-    public async Task<List<Enclosure>> GetAllWithDetailsAsync(int? areaId = null, string? search = null, string? status = null)
+    public async Task<List<Enclosure>> GetAllAsync(int? areaId = null, string? search = null, string? status = null)
     {
         var query = _context.Enclosures
             .Include(e => e.Area)
@@ -31,11 +31,11 @@ public class EnclosureRepository : IEnclosureRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
-            query = query.Where(e => 
-                e.Name.ToLower().Contains(s) || 
+            query = query.Where(e =>
+                e.Name.ToLower().Contains(s) ||
                 (e.Code != null && e.Code.ToLower().Contains(s)) ||
                 (e.Description != null && e.Description.ToLower().Contains(s)) ||
-                e.Area.Name.ToLower().Contains(s));
+                (e.Area != null && e.Area.Name.ToLower().Contains(s)));
         }
 
         if (!string.IsNullOrWhiteSpace(status) && status != "all")
@@ -47,6 +47,13 @@ public class EnclosureRepository : IEnclosureRepository
         return await query.OrderBy(e => e.AreaId).ThenBy(e => e.EnclosureId).ToListAsync();
     }
 
+    public async Task<Enclosure?> GetByIdAsync(int enclosureId)
+    {
+        return await _context.Enclosures
+            .Include(e => e.Area)
+            .FirstOrDefaultAsync(e => e.EnclosureId == enclosureId);
+    }
+
     public async Task<Enclosure?> GetByIdWithDetailsAsync(int enclosureId)
     {
         return await _context.Enclosures
@@ -56,11 +63,6 @@ public class EnclosureRepository : IEnclosureRepository
             .FirstOrDefaultAsync(e => e.EnclosureId == enclosureId);
     }
 
-    public async Task<Enclosure?> GetByIdAsync(int enclosureId)
-    {
-        return await _context.Enclosures.FindAsync(enclosureId);
-    }
-
     public async Task<Enclosure?> GetByCodeAsync(string code)
     {
         if (string.IsNullOrWhiteSpace(code)) return null;
@@ -68,7 +70,19 @@ public class EnclosureRepository : IEnclosureRepository
         return await _context.Enclosures.FirstOrDefaultAsync(e => e.Code != null && e.Code.ToLower() == c);
     }
 
-    public async Task<Enclosure> AddAsync(Enclosure enclosure)
+    public async Task<List<Enclosure>> GetByAreaIdAsync(int areaId)
+    {
+        return await _context.Enclosures
+            .Include(e => e.Area)
+            .Include(e => e.Animals)
+                .ThenInclude(a => a.Species)
+            .Where(e => e.AreaId == areaId)
+            .OrderBy(e => e.EnclosureId)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+    public async Task<Enclosure> CreateAsync(Enclosure enclosure)
     {
         _context.Enclosures.Add(enclosure);
         await _context.SaveChangesAsync();
@@ -90,10 +104,5 @@ public class EnclosureRepository : IEnclosureRepository
     public async Task<bool> HasAnimalsAsync(int enclosureId)
     {
         return await _context.Animals.AnyAsync(a => a.EnclosureId == enclosureId);
-    }
-
-    public async Task<bool> AreaExistsAsync(int areaId)
-    {
-        return await _context.Areas.AnyAsync(a => a.AreaId == areaId);
     }
 }

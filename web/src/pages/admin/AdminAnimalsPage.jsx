@@ -96,7 +96,10 @@ export default function AdminAnimalsPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!formData.nameVi.trim()) return;
+        if (!formData.nameVi.trim()) {
+            showToast("Vui lòng nhập tên cá thể động vật", "error");
+            return;
+        }
 
         const payload = {
             ...formData,
@@ -111,7 +114,7 @@ export default function AdminAnimalsPage() {
                 setFormData(initialForm);
                 loadData();
             } else {
-                showToast(res.error || res.message || "Lỗi cập nhật động vật", "error");
+                showToast(res.error || res.message || "Không thể cập nhật hồ sơ động vật", "error");
             }
         } else {
             const res = await ZooApi.createAnimal(payload);
@@ -120,7 +123,7 @@ export default function AdminAnimalsPage() {
                 setFormData(initialForm);
                 loadData();
             } else {
-                showToast(res.error || res.message || "Lỗi thêm động vật", "error");
+                showToast(res.error || res.message || "Không thể tạo mới cá thể động vật", "error");
             }
         }
     };
@@ -129,17 +132,29 @@ export default function AdminAnimalsPage() {
         setIsEditing(animal.id);
         setFormData({
             ...animal,
+            nameVi: animal.nameVi || animal.name,
             speciesId: animal.speciesId || 1,
             areaId: animal.areaId || 1,
             enclosureId: animal.enclosureId || ''
         });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleCancelEdit = () => {
+        setIsEditing(null);
+        setFormData(initialForm);
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm("Bạn có chắc chắn muốn xóa động vật này khỏi hồ sơ quản lý?")) {
-            await ZooApi.deleteAnimal(id);
-            showToast("Đã xóa động vật khỏi hệ thống", "info");
-            loadData();
+        if (window.confirm("Bạn có chắc chắn muốn xóa cá thể động vật này khỏi hồ sơ quản lý?")) {
+            const res = await ZooApi.deleteAnimal(id);
+            if (res.success) {
+                showToast("Đã xóa động vật khỏi hệ thống", "info");
+                if (isEditing === id) handleCancelEdit();
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Không thể xóa động vật khỏi hệ thống", "error");
+            }
         }
     };
 
@@ -239,9 +254,16 @@ export default function AdminAnimalsPage() {
 
                 {/* Create/Edit Form */}
                 <div className="admin-card">
-                    <h3 className="font-bold text-base mb-3">
-                        {isEditing ? 'Cập Nhật Hồ Sơ Động Vật' : 'Thêm Động Vật Mới'}
-                    </h3>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <h3 className="font-bold text-base m-0">
+                            {isEditing ? 'Cập Nhật Hồ Sơ Động Vật' : 'Thêm Động Vật Mới'}
+                        </h3>
+                        {isEditing && (
+                            <button className="btn btn-sm btn-outline" onClick={handleCancelEdit}>
+                                Hủy sửa
+                            </button>
+                        )}
+                    </div>
                     <form onSubmit={handleSubmit}>
                         <div className="form-group">
                             <label className="form-label">Tên cá thể động vật (Tiếng Việt)</label>

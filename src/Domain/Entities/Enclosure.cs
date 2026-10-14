@@ -1,8 +1,8 @@
 namespace ZooGuide.Domain.Entities;
 
 /// <summary>
-/// Bảng ENCLOSURES: Đại diện cho một chuồng hoặc khu nuôi cụ thể; thuộc về một Area.
-/// Cấu trúc phân cấp: Sở thú -> Area (Khu vực) -> Enclosure (Chuồng) -> Animal (Động vật).
+/// Bảng ENCLOSURES: Lưu trữ thông tin chuồng trại thuộc các phân khu (Areas) trong sở thú.
+/// Hệ thống phân cấp: Areas (Khu) -> Enclosures (Chuồng) -> Animals (Động vật).
 /// </summary>
 public class Enclosure
 {
@@ -13,12 +13,15 @@ public class Enclosure
     public string? Description { get; set; }
     public string? ImageUrl { get; set; }
     public string Status { get; set; } = "Active";
+
+    /// <summary>Tọa độ chuồng trên bản đồ sở thú (hệ tọa độ bản đồ 2D của frontend).</summary>
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 
     // Navigation properties
-    public virtual Area Area { get; set; } = null!;
+    public virtual Area? Area { get; set; }
     public virtual ICollection<Animal> Animals { get; set; } = new List<Animal>();
 }

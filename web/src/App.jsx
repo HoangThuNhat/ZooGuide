@@ -17,10 +17,14 @@ import AdminNarrationPage from './pages/admin/AdminNarrationPage';
 
 // Common Global Feedback
 import ToastContainer from './components/common/ToastContainer';
+import OfflineBanner from './components/common/OfflineBanner';
 
 export default function App() {
     return (
         <>
+            {/* Global Online/Offline Banner */}
+            <OfflineBanner />
+
             <Routes>
                 {/* Visitor Routes */}
                 <Route path="/" element={<VisitorPortal />} />

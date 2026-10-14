@@ -44,7 +44,7 @@ public class AnimalDetailDto : AnimalResponseDto
 {
     public SpeciesDetailDto? Species { get; set; }
     public AreaResponseDto? Area { get; set; }
-    public EnclosureResponseDto? Enclosure { get; set; }
+    public EnclosureResponse? Enclosure { get; set; }
 }
 
 /// <summary>

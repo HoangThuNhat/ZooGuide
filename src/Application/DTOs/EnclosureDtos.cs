@@ -3,9 +3,9 @@ using System.ComponentModel.DataAnnotations;
 namespace ZooGuide.Application.DTOs;
 
 /// <summary>
-/// DTO trả về thông tin chuồng/khu nuôi
+/// DTO trả về thông tin chuồng trại (Enclosure)
 /// </summary>
-public class EnclosureResponseDto
+public class EnclosureResponse
 {
     public int EnclosureId { get; set; }
     public int Id => EnclosureId;
@@ -26,61 +26,75 @@ public class EnclosureResponseDto
 }
 
 /// <summary>
-/// DTO chi tiết chuồng kèm danh sách cá thể động vật bên trong
+/// DTO chi tiết chuồng trại kèm thông tin phân khu và danh sách cá thể động vật bên trong
 /// </summary>
-public class EnclosureDetailDto : EnclosureResponseDto
+public class EnclosureDetailResponse : EnclosureResponse
 {
     public AreaResponseDto? Area { get; set; }
 }
 
 /// <summary>
-/// DTO tạo mới chuồng
+/// DTO yêu cầu tạo mới chuồng trại (Enclosure)
 /// </summary>
-public class CreateEnclosureDto
+public class CreateEnclosureRequest
 {
-    [Required(ErrorMessage = "Phân khu trực thuộc (AreaId) không được để trống")]
+    [Required(ErrorMessage = "AreaId không được để trống")]
+    [Range(1, int.MaxValue, ErrorMessage = "AreaId phải lớn hơn 0")]
     public int AreaId { get; set; }
 
     [MaxLength(50, ErrorMessage = "Mã chuồng tối đa 50 ký tự")]
     public string? Code { get; set; }
 
     [Required(ErrorMessage = "Tên chuồng không được để trống")]
-    [MaxLength(100, ErrorMessage = "Tên chuồng tối đa 100 ký tự")]
+    [MaxLength(200, ErrorMessage = "Tên chuồng tối đa 200 ký tự")]
     public string Name { get; set; } = string.Empty;
 
+    [MaxLength(1000, ErrorMessage = "Mô tả tối đa 1000 ký tự")]
     public string? Description { get; set; }
+
+    [MaxLength(500, ErrorMessage = "Đường dẫn hình ảnh tối đa 500 ký tự")]
     public string? ImageUrl { get; set; }
+
+    [MaxLength(50, ErrorMessage = "Trạng thái tối đa 50 ký tự")]
     public string Status { get; set; } = "Active";
+
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
 }
 
 /// <summary>
-/// DTO cập nhật chuồng
+/// DTO yêu cầu cập nhật chuồng trại (Enclosure)
 /// </summary>
-public class UpdateEnclosureDto
+public class UpdateEnclosureRequest
 {
-    [Required(ErrorMessage = "Phân khu trực thuộc (AreaId) không được để trống")]
+    [Required(ErrorMessage = "AreaId không được để trống")]
+    [Range(1, int.MaxValue, ErrorMessage = "AreaId phải lớn hơn 0")]
     public int AreaId { get; set; }
 
     [MaxLength(50, ErrorMessage = "Mã chuồng tối đa 50 ký tự")]
     public string? Code { get; set; }
 
     [Required(ErrorMessage = "Tên chuồng không được để trống")]
-    [MaxLength(100, ErrorMessage = "Tên chuồng tối đa 100 ký tự")]
+    [MaxLength(200, ErrorMessage = "Tên chuồng tối đa 200 ký tự")]
     public string Name { get; set; } = string.Empty;
 
+    [MaxLength(1000, ErrorMessage = "Mô tả tối đa 1000 ký tự")]
     public string? Description { get; set; }
+
+    [MaxLength(500, ErrorMessage = "Đường dẫn hình ảnh tối đa 500 ký tự")]
     public string? ImageUrl { get; set; }
+
+    [MaxLength(50, ErrorMessage = "Trạng thái tối đa 50 ký tự")]
     public string Status { get; set; } = "Active";
+
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
 }
 
 /// <summary>
-/// DTO bộ lọc tìm kiếm chuồng
+/// DTO bộ lọc tìm kiếm chuồng (query string cho GET /api/enclosures)
 /// </summary>
-public class EnclosureFilterDto
+public class EnclosureFilterRequest
 {
     public int? AreaId { get; set; }
     public string? Search { get; set; }
@@ -88,9 +102,9 @@ public class EnclosureFilterDto
 }
 
 /// <summary>
-/// DTO chuyển cá thể động vật sang chuồng khác
+/// DTO yêu cầu chuyển cá thể động vật sang chuồng khác (hoặc gỡ khỏi chuồng khi TargetEnclosureId rỗng)
 /// </summary>
-public class MoveAnimalDto
+public class MoveAnimalRequest
 {
     [Required(ErrorMessage = "Mã cá thể động vật (AnimalId) không được để trống")]
     public int AnimalId { get; set; }

@@ -82,7 +82,7 @@ public class AnimalService : IAnimalService
                 MapY = animal.Area.MapY,
                 Status = animal.Area.Status.ToString()
             },
-            Enclosure = animal.Enclosure == null ? null : new EnclosureResponseDto
+            Enclosure = animal.Enclosure == null ? null : new EnclosureResponse
             {
                 EnclosureId = animal.Enclosure.EnclosureId,
                 AreaId = animal.Enclosure.AreaId,

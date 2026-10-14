@@ -1,10 +1,11 @@
 using ZooGuide.Application.DTOs.Ticket;
+using ZooGuide.Domain.Enums;
 
 namespace ZooGuide.Application.Interfaces;
 
 public interface ITicketService
 {
-    Task<IEnumerable<TicketDto>> GetAllAsync();
+    Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null);
     Task<TicketDto?> GetByIdAsync(int id);
     Task<TicketDto> CreateAsync(TicketCreateRequest request);
     Task<TicketDto?> UpdateAsync(int id, TicketUpdateRequest request);

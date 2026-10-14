@@ -1053,119 +1053,594 @@ a:focus-visible {
 .ticket-page-layout {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-xl);
+    gap: 28px;
     align-items: start;
+    max-width: 1200px;
+    margin: 0 auto;
 }
 
+/* Scanner & Code Verification Column (Left) */
 .ticket-scan-box {
     background-color: var(--color-surface);
     border-radius: var(--radius-xl);
     border: 1px solid var(--color-border);
-    padding: var(--space-xl);
-    box-shadow: var(--shadow-sm);
-}
-
-.ticket-form-group {
+    padding: 24px 28px;
+    box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
-    margin-bottom: var(--space-md);
 }
 
-.ticket-input-styled {
-    height: 52px;
-    padding: 0 var(--space-md);
-    border-radius: var(--radius-md);
-    border: 2px solid var(--color-border);
-    font-size: 1.125rem;
+.ticket-scan-header {
+    margin-bottom: 12px;
+}
+
+.ticket-scan-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.7rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    color: var(--color-primary);
+    background-color: var(--color-primary-light);
+    letter-spacing: 0.05em;
     text-transform: uppercase;
-}
-
-.ticket-input-styled:focus {
-    border-color: var(--color-primary);
+    margin-bottom: 6px;
 }
 
 .camera-preview-sim {
     position: relative;
     width: 100%;
     height: 220px;
-    background-color: #0F172A;
+    background: radial-gradient(circle at center, #1e293b 0%, #0b1120 100%);
     border-radius: var(--radius-lg);
-    margin-bottom: var(--space-md);
+    margin: 12px 0 16px 0;
     display: flex;
     align-items: center;
     justify-content: center;
     overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: inset 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+
+.camera-inactive-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #94a3b8;
+    text-align: center;
+    padding: 16px;
+    z-index: 1;
+}
+
+.camera-inactive-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cbd5e1;
 }
 
 .qr-target-box {
     width: 140px;
     height: 140px;
-    border: 2px dashed rgba(255, 255, 255, 0.6);
-    border-radius: var(--radius-md);
     position: relative;
+    z-index: 2;
 }
+
+/* 4-corner targeting reticle */
+.qr-corner {
+    position: absolute;
+    width: 18px;
+    height: 18px;
+    border-color: #22C55E;
+    border-style: solid;
+}
+.qr-corner-tl { top: 0; left: 0; border-width: 3px 0 0 3px; border-top-left-radius: 6px; }
+.qr-corner-tr { top: 0; right: 0; border-width: 3px 3px 0 0; border-top-right-radius: 6px; }
+.qr-corner-bl { bottom: 0; left: 0; border-width: 0 0 3px 3px; border-bottom-left-radius: 6px; }
+.qr-corner-br { bottom: 0; right: 0; border-width: 0 3px 3px 0; border-bottom-right-radius: 6px; }
 
 .qr-scanline {
     position: absolute;
     top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, #22C55E, transparent);
-    box-shadow: 0 0 10px #22C55E;
-    animation: scanline-anim 2s infinite ease-in-out;
+    left: 2px;
+    right: 2px;
+    height: 2.5px;
+    background: linear-gradient(90deg, transparent, #22C55E 50%, transparent);
+    box-shadow: 0 0 10px #22C55E, 0 0 3px #22C55E;
+    animation: scanline-anim 2.2s infinite ease-in-out;
 }
 
 @keyframes scanline-anim {
-    0% { top: 0%; }
-    50% { top: 98%; }
-    100% { top: 0%; }
+    0% { top: 2%; }
+    50% { top: 96%; }
+    100% { top: 2%; }
+}
+
+.ticket-scan-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 16px;
+}
+
+.ticket-status-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--color-foreground-muted);
+    font-weight: 500;
+}
+
+.ticket-status-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: var(--color-foreground-muted);
+}
+.ticket-status-dot.active {
+    background-color: #22C55E;
+    box-shadow: 0 0 6px #22C55E;
+}
+
+/* Modal Ticket Input Form (Kept for modal dialog and manual input) */
+.ticket-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.ticket-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.ticket-input-icon {
+    position: absolute;
+    left: 14px;
+    color: var(--color-foreground-muted);
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+}
+
+.ticket-input-styled {
+    width: 100%;
+    height: 48px;
+    padding: 0 14px 0 42px;
+    border-radius: var(--radius-md);
+    border: 1.5px solid var(--color-border);
+    background-color: var(--color-surface);
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--color-foreground);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ticket-input-styled:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.btn-ticket-submit {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 48px;
+    width: 100%;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    border-radius: var(--radius-md);
+    background: var(--color-primary);
+    color: #FFFFFF;
+    border: none;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    box-shadow: 0 4px 12px rgba(21, 128, 61, 0.22);
+}
+
+.btn-ticket-submit:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+    box-shadow: 0 6px 16px rgba(21, 128, 61, 0.32);
+    transform: translateY(-1px);
+}
+
+.btn-ticket-submit:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* =========================================================
+   REALISTIC ELECTRONIC PASS (RIGHT COLUMN)
+   ========================================================= */
+.ticket-pass-wrapper {
+    position: relative;
 }
 
 .ticket-info-card {
-    background: linear-gradient(135deg, #15803D 0%, #047857 100%);
+    position: relative;
+    background: linear-gradient(145deg, #124d28 0%, #15803d 50%, #065f46 100%);
     color: #FFFFFF;
-    border-radius: var(--radius-xl);
-    padding: var(--space-xl);
-    box-shadow: var(--shadow-lg);
+    border-radius: 20px;
+    overflow: hidden;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 16px 36px -6px rgba(18, 77, 40, 0.35), 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
+/* Subtle decorative badge watermark */
+.ticket-info-card::after {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    pointer-events: none;
+    border-radius: 50%;
+}
+
+.ticket-pass-top {
+    padding: 24px 24px 16px 24px;
+    position: relative;
+    z-index: 1;
+}
+
+/* Ticket Header Row */
 .ticket-card-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: var(--space-lg);
-    padding-bottom: var(--space-md);
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.25);
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 0;
+    border-bottom: none;
+}
+
+.ticket-brand-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    padding: 3px 10px;
+    border-radius: 9999px;
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #FFFFFF;
+    backdrop-filter: blur(4px);
+}
+
+.ticket-card-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    margin-top: 4px;
+    color: #FFFFFF;
+}
+
+/* Status Pill */
+.ticket-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.ticket-status-pill.active {
+    background: rgba(34, 197, 94, 0.25);
+    border: 1px solid rgba(74, 222, 128, 0.5);
+    color: #DCFCE7;
+    box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
+}
+
+.ticket-status-pill.pending {
+    background: rgba(254, 243, 199, 0.18);
+    border: 1px solid rgba(253, 224, 71, 0.35);
+    color: #FEF08A;
+}
+
+.pulse-indicator {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #4ADE80;
+    box-shadow: 0 0 8px #4ADE80;
+    animation: status-pulse 1.8s infinite;
+}
+
+.status-indicator-idle {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background-color: #FACC15;
+}
+
+/* Dedicated Voucher / Code Strip */
+.ticket-code-banner {
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.ticket-code-label-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ticket-code-sublabel {
+    font-size: 0.6875rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+}
+
+.ticket-code-hint {
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.85);
 }
 
 .ticket-code-display {
     font-family: var(--font-heading);
-    font-size: 1.5rem;
+    font-size: 1.25rem;
     font-weight: 800;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.06em;
+    color: #FFFFFF;
+    white-space: nowrap;
 }
 
+.ticket-code-display.empty-state {
+    font-size: 0.875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+/* 2x2 Ticket Info Grid */
 .ticket-detail-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-md);
-    margin-bottom: var(--space-lg);
+    gap: 10px;
+    margin-bottom: 16px;
+}
+
+.ticket-info-item {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 10px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    transition: background var(--transition-fast);
+}
+
+.ticket-info-item:hover {
+    background: rgba(255, 255, 255, 0.12);
 }
 
 .ticket-meta-label {
-    font-size: 0.75rem;
-    opacity: 0.8;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.72);
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 5px;
 }
 
 .ticket-meta-val {
-    font-size: 1rem;
+    font-size: 0.9375rem;
     font-weight: 700;
+    color: #FFFFFF;
+    word-break: break-word;
+    line-height: 1.35;
+}
+
+.ticket-meta-val.text-success {
+    color: #86EFAC;
+}
+
+.ticket-meta-val.text-pending {
+    color: #FDE047;
+}
+
+/* Quyền Lợi Tham Quan Section */
+.ticket-perks-box {
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 12px 14px;
+}
+
+.ticket-perks-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 8px;
+}
+
+.ticket-perks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ticket-perks-list li {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 0.8125rem;
+    color: rgba(255, 255, 255, 0.92);
+}
+
+.ticket-perks-list svg {
+    flex-shrink: 0;
+    margin-top: 2px;
+    color: #86EFAC;
+}
+
+.ticket-perks-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.perk-badge {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* Perforation Divider with Circular Notches */
+.ticket-perforation-divider {
+    position: relative;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    margin: 4px 0;
+}
+
+.ticket-perforation-line {
+    width: 100%;
+    border-top: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.ticket-notch {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: var(--color-background);
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
+}
+
+.ticket-notch-left {
+    left: -11px;
+}
+
+.ticket-notch-right {
+    right: -11px;
+}
+
+/* Bottom Ticket Stub (Barcode & Actions) */
+.ticket-pass-bottom {
+    padding: 14px 24px 20px 24px;
+    background: rgba(0, 0, 0, 0.16);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.ticket-barcode-container {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.ticket-barcode-graphic {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    height: 34px;
+    width: 100%;
+    max-width: 260px;
+    opacity: 0.85;
+}
+
+.barcode-bar {
+    height: 100%;
+    background-color: #FFFFFF;
+    border-radius: 1px;
+}
+
+.ticket-serial-text {
+    font-family: monospace;
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    text-align: center;
+}
+
+.btn-ticket-end {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 9px 16px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    color: #FEE2E2;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-ticket-end:hover {
+    background: rgba(239, 68, 68, 0.32);
+    border-color: #F87171;
+    color: #FFFFFF;
 }
 
 /* --- TAB 4: STAFF & ADMIN PORTAL --- */
@@ -1908,4 +2383,199 @@ a:focus-visible {
     top: 0;
     z-index: 10;
     background: #F1F5F9;
+}
+
+/* ==========================================================================
+   PWA & Offline UI Components
+   ========================================================================== */
+
+/* Network Status Banner */
+.network-status-banner {
+    position: sticky;
+    top: 70px;
+    z-index: 990;
+    width: 100%;
+    animation: fadeInSlideDown 0.25s ease-out;
+}
+
+@keyframes fadeInSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.banner-offline {
+    background-color: #FFFBEB;
+    border-bottom: 1px solid #FCD34D;
+    color: #92400E;
+}
+
+.banner-reconnected {
+    background-color: #F0FDF4;
+    border-bottom: 1px solid #86EFAC;
+    color: #166534;
+}
+
+.banner-inner {
+    padding-top: var(--space-xs);
+    padding-bottom: var(--space-xs);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.banner-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.banner-icon.icon-warning {
+    color: #D97706;
+}
+
+.banner-icon.icon-success {
+    color: #15803D;
+}
+
+.banner-text {
+    flex: 1;
+}
+
+.banner-dismiss-btn {
+    background: transparent;
+    border: 1px solid #D97706;
+    color: #92400E;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+}
+
+.banner-dismiss-btn:hover {
+    background-color: rgba(217, 119, 6, 0.15);
+}
+
+/* PWA Install Button */
+.pwa-install-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 0.825rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.pwa-install-header-btn {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.25);
+}
+
+.pwa-install-header-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(21, 128, 61, 0.35);
+}
+
+/* PWA Guidance Modal */
+.pwa-guide-modal {
+    max-width: 480px;
+}
+
+.pwa-guide-header-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.pwa-guide-desc {
+    color: var(--color-muted-foreground);
+    font-size: 0.9rem;
+    margin-bottom: var(--space-md);
+    line-height: 1.5;
+}
+
+.pwa-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.pwa-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background-color: var(--color-muted);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+}
+
+.pwa-step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    color: #FFFFFF;
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.pwa-step-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: var(--color-foreground);
+}
+
+.pwa-share-icon-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 3px 8px;
+    background-color: #FFFFFF;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    color: var(--color-foreground);
+    width: fit-content;
+}
+
+@media (max-width: 768px) {
+    .network-status-banner {
+        top: 60px;
+    }
+    .pwa-install-header-btn span {
+        display: none;
+    }
+    .pwa-install-header-btn {
+        padding: 8px;
+        border-radius: 50%;
+    }
 }
