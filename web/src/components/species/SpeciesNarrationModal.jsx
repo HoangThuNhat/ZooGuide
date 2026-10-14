@@ -13,7 +13,11 @@ export default function SpeciesNarrationModal({
         currentLang, 
         setLanguage, 
         audioState, 
-        setAudioState 
+        setAudioState,
+        hasActiveSession,
+        currentSession,
+        setIsTicketModalOpen,
+        showToast
     } = useApp();
 
     const [selectedLang, setSelectedLang] = useState(currentLang || 'vi');
@@ -33,9 +37,18 @@ export default function SpeciesNarrationModal({
         async function fetchNarration() {
             setLoading(true);
             try {
-                const res = await ZooApi.getSpeciesNarration(species.id, selectedLang);
+                if (!hasActiveSession || !currentSession?.sessionId) {
+                    if (isMounted) {
+                        setNarration(null);
+                        setLoading(false);
+                    }
+                    return;
+                }
+                const res = await ZooApi.getSpeciesNarration(species.id, selectedLang, currentSession.sessionId);
                 if (isMounted && res.success) {
                     setNarration(res.data);
+                } else if (isMounted) {
+                    setNarration(null);
                 }
             } catch (err) {
                 console.error("Error fetching species narration:", err);
@@ -46,7 +59,7 @@ export default function SpeciesNarrationModal({
 
         fetchNarration();
         return () => { isMounted = false; };
-    }, [isOpen, species, selectedLang]);
+    }, [isOpen, species, selectedLang, hasActiveSession, currentSession]);
 
     if (!isOpen || !species) return null;
 
@@ -84,6 +97,11 @@ export default function SpeciesNarrationModal({
     };
 
     const handlePlayClick = () => {
+        if (!hasActiveSession) {
+            showToast("Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.", "error");
+            setIsTicketModalOpen(true);
+            return;
+        }
         if (onPlayAudio) {
             onPlayAudio(species.id, true, selectedLang);
         }
@@ -300,6 +318,26 @@ export default function SpeciesNarrationModal({
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    ) : !hasActiveSession ? (
+                        <div style={{ textAlign: 'center', padding: '24px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔒</div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A', margin: '0 0 6px 0' }}>
+                                Tính Năng Thuyết Minh Yêu Cầu Vé Tham Quan
+                            </h4>
+                            <p style={{ fontSize: '0.88rem', color: '#64748B', margin: '0 0 16px 0' }}>
+                                Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.
+                            </p>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    onClose();
+                                    setIsTicketModalOpen(true);
+                                }}
+                            >
+                                🎟️ Kích hoạt vé tham quan
+                            </button>
                         </div>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '16px', color: '#EF4444' }}>

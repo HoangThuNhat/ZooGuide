@@ -23,9 +23,12 @@ public class TicketsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll(
+        [FromQuery] string? search = null,
+        [FromQuery] int? ticketTypeId = null,
+        [FromQuery] ZooGuide.Domain.Enums.TicketStatus? status = null)
     {
-        var tickets = await _ticketService.GetAllAsync();
+        var tickets = await _ticketService.GetAllAsync(search, ticketTypeId, status);
         return Ok(tickets);
     }
 

@@ -2372,3 +2372,198 @@ a:focus-visible {
     z-index: 10;
     background: #F1F5F9;
 }
+
+/* ==========================================================================
+   PWA & Offline UI Components
+   ========================================================================== */
+
+/* Network Status Banner */
+.network-status-banner {
+    position: sticky;
+    top: 70px;
+    z-index: 990;
+    width: 100%;
+    animation: fadeInSlideDown 0.25s ease-out;
+}
+
+@keyframes fadeInSlideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.banner-offline {
+    background-color: #FFFBEB;
+    border-bottom: 1px solid #FCD34D;
+    color: #92400E;
+}
+
+.banner-reconnected {
+    background-color: #F0FDF4;
+    border-bottom: 1px solid #86EFAC;
+    color: #166534;
+}
+
+.banner-inner {
+    padding-top: var(--space-xs);
+    padding-bottom: var(--space-xs);
+}
+
+.banner-content {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    font-size: 0.875rem;
+    line-height: 1.4;
+}
+
+.banner-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.banner-icon.icon-warning {
+    color: #D97706;
+}
+
+.banner-icon.icon-success {
+    color: #15803D;
+}
+
+.banner-text {
+    flex: 1;
+}
+
+.banner-dismiss-btn {
+    background: transparent;
+    border: 1px solid #D97706;
+    color: #92400E;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background-color 0.15s ease;
+}
+
+.banner-dismiss-btn:hover {
+    background-color: rgba(217, 119, 6, 0.15);
+}
+
+/* PWA Install Button */
+.pwa-install-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: 0.825rem;
+    font-weight: 600;
+    border-radius: var(--radius-full);
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.pwa-install-header-btn {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.25);
+}
+
+.pwa-install-header-btn:hover {
+    opacity: 0.95;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(21, 128, 61, 0.35);
+}
+
+/* PWA Guidance Modal */
+.pwa-guide-modal {
+    max-width: 480px;
+}
+
+.pwa-guide-header-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+}
+
+.pwa-guide-desc {
+    color: var(--color-muted-foreground);
+    font-size: 0.9rem;
+    margin-bottom: var(--space-md);
+    line-height: 1.5;
+}
+
+.pwa-steps-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+}
+
+.pwa-step-item {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+    background-color: var(--color-muted);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-border);
+}
+
+.pwa-step-num {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background-color: var(--color-primary);
+    color: #FFFFFF;
+    font-size: 0.85rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.pwa-step-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: var(--color-foreground);
+}
+
+.pwa-share-icon-preview {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    padding: 3px 8px;
+    background-color: #FFFFFF;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    font-size: 0.8rem;
+    color: var(--color-foreground);
+    width: fit-content;
+}
+
+@media (max-width: 768px) {
+    .network-status-banner {
+        top: 60px;
+    }
+    .pwa-install-header-btn span {
+        display: none;
+    }
+    .pwa-install-header-btn {
+        padding: 8px;
+        border-radius: 50%;
+    }
+}

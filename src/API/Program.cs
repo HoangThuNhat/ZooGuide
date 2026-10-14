@@ -44,6 +44,7 @@ builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
 
 // Register Services for Person 3 Responsibilities (Dashboard, Narration, Chatbot, Audit)
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IAuditLogService, ZooGuide.Infrastructure.Services.AuditLogService>();
+builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IGuestChatLimiterService, ZooGuide.Infrastructure.Services.GuestChatLimiterService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDashboardService, ZooGuide.Infrastructure.Services.DashboardService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.INarrationService, ZooGuide.Infrastructure.Services.NarrationService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IChatbotService, ZooGuide.Infrastructure.Services.ChatbotService>();

@@ -90,6 +90,34 @@ public class NarrationService : INarrationService
         return narration == null ? null : MapToDto(narration);
     }
 
+    public async Task<NarrationResponseDto?> GetBySpeciesAndLanguageAsync(int speciesId, string languageCode)
+    {
+        var lang = languageCode.Trim().ToLower();
+        var narration = await _context.Narrations
+            .Include(n => n.Animal)
+            .Include(n => n.Language)
+            .Include(n => n.Creator)
+            .Include(n => n.Audios)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(n => n.Animal.SpeciesId == speciesId && n.Language.Code.ToLower() == lang && n.Status == NarrationStatus.Published);
+
+        if (narration != null)
+        {
+            return MapToDto(narration);
+        }
+
+        // Fallback: any published narration for this species
+        var fallback = await _context.Narrations
+            .Include(n => n.Animal)
+            .Include(n => n.Language)
+            .Include(n => n.Creator)
+            .Include(n => n.Audios)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(n => n.Animal.SpeciesId == speciesId && n.Status == NarrationStatus.Published);
+
+        return fallback == null ? null : MapToDto(fallback);
+    }
+
     public async Task<NarrationResponseDto> CreateAsync(CreateNarrationDto dto)
     {
         var animal = await _context.Animals.FindAsync(dto.AnimalId);

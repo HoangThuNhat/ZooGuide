@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.Interfaces;
@@ -46,10 +47,14 @@ public class NarrationsController : ControllerBase
     }
 
     /// <summary>
+    /// <summary>
     /// Lấy bài thuyết minh chính thức theo AnimalId và ngôn ngữ (vi, en, zh, ja...)
+    /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ
     /// </summary>
     [HttpGet("animal/{animalId:int}")]
+    [RequireTicketSession]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByAnimal(int animalId, [FromQuery] string lang = "vi")
     {
@@ -59,6 +64,78 @@ public class NarrationsController : ControllerBase
             return NotFound(ApiResponse<NarrationResponseDto>.Fail($"Chưa có bài thuyết minh cho động vật ID = {animalId} với ngôn ngữ '{lang}'."));
         }
         return Ok(ApiResponse<NarrationResponseDto>.Ok(narration));
+    }
+
+    /// <summary>
+    /// Lấy bài thuyết minh chính thức theo SpeciesId và ngôn ngữ (vi, en, zh, ja...)
+    /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ
+    /// </summary>
+    [HttpGet("species/{speciesId:int}")]
+    [RequireTicketSession]
+    [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetBySpecies(int speciesId, [FromQuery] string lang = "vi")
+    {
+        var narration = await _narrationService.GetBySpeciesAndLanguageAsync(speciesId, lang);
+        if (narration == null)
+        {
+            return NotFound(ApiResponse<NarrationResponseDto>.Fail($"Chưa có bài thuyết minh cho loài ID = {speciesId} với ngôn ngữ '{lang}'."));
+        }
+        return Ok(ApiResponse<NarrationResponseDto>.Ok(narration));
+    }
+
+    /// <summary>
+    /// Stream file âm thanh thuyết minh có kiểm soát quyền truy cập
+    /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ (?sessionId=... hoặc header)
+    /// </summary>
+    [HttpGet("{id:int}/stream")]
+    [RequireTicketSession]
+    public async Task<IActionResult> StreamAudio(int id)
+    {
+        var narration = await _narrationService.GetByIdAsync(id);
+        if (narration == null)
+        {
+            return NotFound(ApiResponse<object>.Fail($"Không tìm thấy bài thuyết minh ID = {id}."));
+        }
+
+        if (!string.Equals(narration.Status, "Published", StringComparison.OrdinalIgnoreCase))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail("Bài thuyết minh này chưa được phê duyệt xuất bản."));
+        }
+
+        var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        string? resolvedFilePath = null;
+        string mimeType = "audio/mpeg";
+
+        var primaryAudio = narration.Audios?.FirstOrDefault();
+        var audioUrl = primaryAudio?.FileUrl ?? narration.AudioUrl;
+
+        if (!string.IsNullOrWhiteSpace(audioUrl))
+        {
+            var cleanUrl = audioUrl.TrimStart('/');
+            var candidate = Path.Combine(webRoot, cleanUrl);
+            if (System.IO.File.Exists(candidate))
+            {
+                resolvedFilePath = candidate;
+            }
+        }
+
+        if (resolvedFilePath == null)
+        {
+            var fallbackGeneric = Path.Combine(webRoot, "assets", "audio", "generic_vi.mp3");
+            if (System.IO.File.Exists(fallbackGeneric))
+            {
+                resolvedFilePath = fallbackGeneric;
+            }
+        }
+
+        if (resolvedFilePath == null || !System.IO.File.Exists(resolvedFilePath))
+        {
+            return NotFound(ApiResponse<object>.Fail("File âm thanh thuyết minh không tồn tại trên hệ thống lưu trữ."));
+        }
+
+        return PhysicalFile(resolvedFilePath, mimeType, enableRangeProcessing: true);
     }
 
     /// <summary>
