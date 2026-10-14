@@ -81,6 +81,22 @@ export default function AdminTicketsPage() {
         }
     };
 
+    const handleDeleteTicket = async (ticketId, ticketCode) => {
+        if (!ticketId) {
+            showToast("Không tìm thấy ID vé để xóa", "error");
+            return;
+        }
+        if (window.confirm(`Bạn có chắc chắn muốn xóa vé ${ticketCode}? Thao tác này chỉ thành công khi vé chưa liên kết phiên tham quan.`)) {
+            const res = await ZooApi.deleteTicket(ticketId);
+            if (res.success) {
+                showToast("Đã xóa vé thành công khỏi hệ thống!", "info");
+                loadData();
+            } else {
+                showToast(res.error || res.message || "Không thể xóa vé này", "error");
+            }
+        }
+    };
+
     return (
         <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
@@ -125,12 +141,23 @@ export default function AdminTicketsPage() {
                                             </span>
                                         </td>
                                         <td>
-                                            <button 
-                                                className="btn btn-sm btn-outline"
-                                                onClick={() => handleToggleStatus(t)}
-                                            >
-                                                {t.status === 'Active' ? 'Đánh dấu Hết Hạn' : 'Kích hoạt lại'}
-                                            </button>
+                                            <div style={{ display: 'flex', gap: '6px' }}>
+                                                <button 
+                                                    className="btn btn-sm btn-outline"
+                                                    onClick={() => handleToggleStatus(t)}
+                                                >
+                                                    {t.status === 'Active' ? 'Đánh dấu Hết Hạn' : 'Kích hoạt lại'}
+                                                </button>
+                                                {t.id && (
+                                                    <button 
+                                                        className="btn btn-sm btn-outline text-danger"
+                                                        style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
+                                                        onClick={() => handleDeleteTicket(t.id, t.ticketCode)}
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
