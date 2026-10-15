@@ -1675,8 +1675,20 @@ a:focus-visible {
     position: sticky;
     top: 0;
     z-index: 100;
-    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: margin-left 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.22s ease,
+                visibility 0.28s,
+                transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     box-sizing: border-box;
+}
+
+@media (min-width: 1025px) {
+    .admin-portal-sidebar.desktop-collapsed {
+        margin-left: -260px;
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
 }
 
 .admin-sidebar-header {
@@ -1807,39 +1819,87 @@ a:focus-visible {
     display: flex;
     align-items: center;
     gap: 12px;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     min-width: 0;
 }
 
 .admin-menu-toggle {
-    display: none;
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
     width: 38px;
     height: 38px;
     border-radius: 8px;
     border: 1px solid #CBD5E1;
-    background: #F8FAFC;
-    color: #1E293B;
-    align-items: center;
-    justify-content: center;
+    background: #FFFFFF;
+    color: #334155;
     cursor: pointer;
     flex-shrink: 0;
-    transition: all 0.15s ease;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    padding: 0;
 }
 
 .admin-menu-toggle:hover {
     background: #F1F5F9;
     border-color: #94A3B8;
+    color: #0F172A;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.admin-menu-toggle:active {
+    transform: scale(0.95);
+    background: #E2E8F0;
+}
+
+.admin-menu-toggle.active {
+    background: #F0FDF4;
+    border-color: #86EFAC;
+    color: #15803D;
+}
+
+.admin-menu-toggle.active:hover {
+    background: #DCFCE7;
+    border-color: #4ADE80;
+    color: #166534;
+}
+
+.admin-menu-toggle.collapsed {
+    background: #FFFFFF;
+    border-color: #CBD5E1;
+    color: #64748B;
+}
+
+.admin-menu-toggle.collapsed:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+    color: #0F172A;
+}
+
+.admin-menu-toggle svg {
+    display: block;
+    transition: transform 0.2s ease;
 }
 
 .admin-header-title {
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     font-weight: 600;
     color: #475569;
     min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-brand-highlight {
+    font-weight: 800;
+    color: #15803D;
+    letter-spacing: -0.02em;
 }
 
 .admin-portal-badge-text {
     color: #0F172A;
+    font-weight: 700;
 }
 
 .admin-header-right {
@@ -2159,6 +2219,11 @@ a:focus-visible {
         z-index: 1100;
         transform: translateX(-100%);
         box-shadow: none;
+        margin-left: 0 !important;
+        opacity: 1 !important;
+        visibility: visible !important;
+        pointer-events: auto !important;
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .admin-portal-sidebar.open {
@@ -2171,7 +2236,7 @@ a:focus-visible {
     }
 
     .admin-menu-toggle {
-        display: inline-flex;
+        display: inline-flex !important;
     }
 
     .admin-sidebar-backdrop {
