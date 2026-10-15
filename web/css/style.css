@@ -1910,7 +1910,7 @@ a:focus-visible {
 }
 
 .admin-main-content {
-    padding: 24px;
+    padding: 28px 32px;
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
@@ -1957,21 +1957,23 @@ a:focus-visible {
 /* Metric Cards */
 .admin-metrics-row {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: var(--space-md);
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 20px;
     width: 100%;
     box-sizing: border-box;
+    margin-bottom: 28px;
 }
 
 .metric-card {
     background-color: var(--color-surface);
-    padding: var(--space-md);
+    padding: 20px 22px;
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
     box-sizing: border-box;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
 .metric-number {
@@ -2032,12 +2034,13 @@ a:focus-visible {
     background-color: var(--color-surface);
     border-radius: var(--radius-lg);
     border: 1px solid var(--color-border);
-    padding: var(--space-md);
+    padding: 22px 24px;
     box-shadow: var(--shadow-sm);
     box-sizing: border-box;
     container-type: inline-size;
     min-width: 0;
     max-width: 100%;
+    margin-bottom: 24px;
 }
 
 .admin-card-header {
@@ -2045,8 +2048,8 @@ a:focus-visible {
     align-items: center;
     justify-content: space-between;
     padding-left: var(--space-xs);
-    margin-bottom: var(--space-sm);
-    gap: 8px;
+    margin-bottom: 16px;
+    gap: 12px;
     flex-wrap: wrap;
 }
 
@@ -2054,7 +2057,7 @@ a:focus-visible {
     display: flex;
     justify-content: space-between;
     font-size: 0.8125rem;
-    padding: 4px 0;
+    padding: 6px 0;
     border-bottom: 1px dashed var(--color-border-subtle);
 }
 
@@ -2063,9 +2066,9 @@ a:focus-visible {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: 24px;
+    margin-bottom: 28px;
     flex-wrap: wrap;
-    gap: 14px;
+    gap: 16px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -2077,8 +2080,8 @@ a:focus-visible {
 
 .admin-filter-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
     align-items: flex-end;
     width: 100%;
 }
@@ -2088,7 +2091,7 @@ a:focus-visible {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
-    padding: var(--space-md);
+    padding: 18px 22px;
     box-shadow: var(--shadow-sm);
     box-sizing: border-box;
     transition: all 0.2s ease;
@@ -2111,52 +2114,55 @@ a:focus-visible {
     background-color: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: var(--space-md);
-    margin-bottom: var(--space-sm);
+    padding: 16px 20px;
+    margin-bottom: 14px;
     box-sizing: border-box;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .health-log-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    margin-bottom: var(--space-xs);
-    gap: 8px;
+    margin-bottom: 8px;
+    gap: 10px;
     flex-wrap: wrap;
 }
 
 .health-log-details {
     display: flex;
-    gap: var(--space-sm);
-    margin: var(--space-xs) 0;
+    gap: 10px;
+    margin: 8px 0;
     flex-wrap: wrap;
 }
 
 .pill-stat {
     font-size: 0.75rem;
     background-color: var(--color-surface-hover);
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: var(--radius-sm);
+    font-weight: 500;
 }
 
 .health-log-notes {
     font-size: 0.8125rem;
     color: var(--color-foreground);
-    margin-top: 4px;
+    margin-top: 6px;
+    line-height: 1.5;
 }
 
 .health-log-action {
     font-size: 0.8125rem;
     color: var(--color-danger);
     font-weight: 600;
-    margin-top: 2px;
+    margin-top: 4px;
 }
 
 /* Responsive Forms */
 .form-grid-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: var(--space-sm);
+    gap: 16px;
     width: 100%;
     box-sizing: border-box;
 }
@@ -2164,15 +2170,15 @@ a:focus-visible {
 @container (max-width: 380px) {
     .form-grid-2 {
         grid-template-columns: 1fr !important;
-        gap: 10px !important;
+        gap: 12px !important;
     }
 }
 
 .form-group {
     display: flex;
     flex-direction: column;
-    gap: 4px;
-    margin-bottom: var(--space-sm);
+    gap: 6px;
+    margin-bottom: 18px;
     min-width: 0;
     width: 100%;
     box-sizing: border-box;
@@ -2181,10 +2187,11 @@ a:focus-visible {
 .form-label {
     font-size: 0.8125rem;
     font-weight: 600;
+    color: #334155;
 }
 
 .form-input, .form-textarea, .form-select {
-    padding: 8px 12px;
+    padding: 9px 13px;
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border);
     font-size: 0.875rem;

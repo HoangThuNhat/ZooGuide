@@ -238,12 +238,12 @@ export default function AdminTicketsPage() {
             </div>
 
             {/* Search and Filters Bar */}
-            <div className="admin-card" style={{ marginBottom: '20px', padding: '16px' }}>
+            <div className="admin-card" style={{ marginBottom: '24px', padding: '18px 20px' }}>
                 <div className="admin-filter-grid">
                     {/* Search Field */}
                     <div style={{ position: 'relative' }}>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            🔍 Tìm kiếm mã vé / hạng vé
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Tìm kiếm mã vé / hạng vé
                         </label>
                         <div style={{ position: 'relative' }}>
                             <input
@@ -280,8 +280,8 @@ export default function AdminTicketsPage() {
 
                     {/* Status Filter */}
                     <div>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            🏷️ Trạng thái vé
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Trạng thái vé
                         </label>
                         <select
                             className="form-select"
@@ -298,8 +298,8 @@ export default function AdminTicketsPage() {
 
                     {/* Ticket Type Filter */}
                     <div>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            🎟️ Loại vé tham quan
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Loại vé tham quan
                         </label>
                         <select
                             className="form-select"
@@ -314,7 +314,7 @@ export default function AdminTicketsPage() {
                     </div>
 
                     {/* Filter Actions */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {isFilteringActive && (
                             <button
                                 type="button"
@@ -322,10 +322,10 @@ export default function AdminTicketsPage() {
                                 onClick={handleResetFilters}
                                 style={{ padding: '8px 14px', fontSize: '0.85rem' }}
                             >
-                                ↺ Đặt lại bộ lọc
+                                Đặt lại bộ lọc
                             </button>
                         )}
-                        <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: '600', marginLeft: 'auto' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: '600', marginLeft: isFilteringActive ? '0' : 'auto' }}>
                             Hiển thị: <strong>{filteredTickets.length}</strong> / {tickets.length} vé
                         </span>
                     </div>
@@ -393,12 +393,11 @@ export default function AdminTicketsPage() {
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan="6" style={{ textAlign: 'center', padding: '32px 16px', color: '#64748B' }}>
-                                            <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🔍</div>
-                                            <div style={{ fontWeight: '700', fontSize: '1rem', color: '#1E293B' }}>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '36px 16px', color: '#64748B' }}>
+                                            <div style={{ fontWeight: '700', fontSize: '1rem', color: '#1E293B', marginBottom: '4px' }}>
                                                 Không tìm thấy vé nào phù hợp
                                             </div>
-                                            <p style={{ margin: '4px 0 12px 0', fontSize: '0.88rem' }}>
+                                            <p style={{ margin: '4px 0 14px 0', fontSize: '0.88rem' }}>
                                                 Thử thay đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc trạng thái và loại vé.
                                             </p>
                                             {isFilteringActive && (
@@ -407,7 +406,7 @@ export default function AdminTicketsPage() {
                                                     className="btn btn-sm btn-primary"
                                                     onClick={handleResetFilters}
                                                 >
-                                                    ↺ Đặt lại bộ lọc
+                                                    Đặt lại bộ lọc
                                                 </button>
                                             )}
                                         </td>

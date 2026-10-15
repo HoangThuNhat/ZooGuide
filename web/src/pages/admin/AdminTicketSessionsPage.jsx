@@ -73,7 +73,7 @@ export default function AdminTicketSessionsPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
-                        {isLoading ? "Đang tải..." : "🔄 Làm mới"}
+                        {isLoading ? "Đang tải..." : "Làm mới"}
                     </button>
                     <span className="badge badge-success font-bold" style={{ fontSize: '0.9rem', padding: '8px 12px' }}>
                         {activeCount} phiên trực tuyến
@@ -148,7 +148,7 @@ export default function AdminTicketSessionsPage() {
             </div>
 
             <div className="mt-4 pt-3 border-t border-border text-xs text-muted">
-                💡 <em>Ghi chú: Mỗi vé khi quét thành công sẽ sinh một mã `TicketSession` lưu trong cơ sở dữ liệu Supabase, cấp quyền định vị vị trí và phát âm thanh thuyết minh tại chỗ.</em>
+                <em>Ghi chú: Mỗi vé khi quét thành công sẽ sinh một mã `TicketSession` lưu trong cơ sở dữ liệu Supabase, cấp quyền định vị vị trí và phát âm thanh thuyết minh tại chỗ.</em>
             </div>
         </div>
     );

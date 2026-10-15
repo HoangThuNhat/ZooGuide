@@ -286,7 +286,7 @@ export default function AdminAreasPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
-                        {isLoading ? "Đang tải..." : "🔄 Làm mới"}
+                        {isLoading ? "Đang tải..." : "Làm mới"}
                     </button>
                     <span className="chip font-bold" style={{ background: '#DCFCE7', color: '#166534' }}>
                         {areas.length} Phân Khu
@@ -298,11 +298,11 @@ export default function AdminAreasPage() {
             </div>
 
             {/* Sub-Tabs Selector */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E2E8F0', marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
+            <div style={{ display: 'flex', gap: '12px', borderBottom: '2px solid #E2E8F0', marginBottom: '28px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
                 <button
                     className="btn btn-sm"
                     style={{
-                        padding: '10px 20px',
+                        padding: '12px 22px',
                         fontWeight: 700,
                         borderBottom: activeTab === 'areas' ? '3px solid #15803D' : '3px solid transparent',
                         borderRadius: '0',
@@ -311,12 +311,12 @@ export default function AdminAreasPage() {
                     }}
                     onClick={() => setActiveTab('areas')}
                 >
-                    🗺️ Danh Sách Phân Khu ({areas.length})
+                    Danh Sách Phân Khu ({areas.length})
                 </button>
                 <button
                     className="btn btn-sm"
                     style={{
-                        padding: '10px 20px',
+                        padding: '12px 22px',
                         fontWeight: 700,
                         borderBottom: activeTab === 'enclosures' ? '3px solid #15803D' : '3px solid transparent',
                         borderRadius: '0',
@@ -325,7 +325,7 @@ export default function AdminAreasPage() {
                     }}
                     onClick={() => setActiveTab('enclosures')}
                 >
-                    🏠 Quản Lý Chuồng Trại ({enclosures.length})
+                    Quản Lý Chuồng Trại ({enclosures.length})
                 </button>
             </div>
 
@@ -335,15 +335,12 @@ export default function AdminAreasPage() {
                     {/* Areas Grid with Scroll Container */}
                     <div>
                         {/* Thanh tìm kiếm nhanh phân khu */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', gap: '12px', flexWrap: 'wrap' }}>
                             <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
-                                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }}>
-                                    🔍
-                                </span>
                                 <input
                                     type="text"
                                     className="form-input"
-                                    style={{ paddingLeft: '34px', paddingRight: areaSearchQuery ? '32px' : '10px', height: '38px', fontSize: '0.875rem' }}
+                                    style={{ paddingLeft: '14px', paddingRight: areaSearchQuery ? '32px' : '12px', height: '40px', fontSize: '0.875rem' }}
                                     placeholder="Tìm kiếm phân khu theo tên, mã khu..."
                                     value={areaSearchQuery}
                                     onChange={(e) => setAreaSearchQuery(e.target.value)}
@@ -379,9 +376,10 @@ export default function AdminAreasPage() {
                             <div className="p-6 text-center text-muted">Đang tải danh sách phân khu...</div>
                         ) : filteredAreas.length === 0 ? (
                             <div className="admin-card text-center p-6 text-muted">
-                                <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🗺️</div>
-                                <strong>Không tìm thấy phân khu nào phù hợp</strong>
-                                <p style={{ margin: '6px 0 12px 0', fontSize: '0.85rem' }}>
+                                <strong style={{ display: 'block', fontSize: '1rem', color: '#1E293B', marginBottom: '4px' }}>
+                                    Không tìm thấy phân khu nào phù hợp
+                                </strong>
+                                <p style={{ margin: '6px 0 14px 0', fontSize: '0.85rem' }}>
                                     Vui lòng kiểm tra lại từ khóa tìm kiếm "{areaSearchQuery}".
                                 </p>
                                 <button className="btn btn-sm btn-outline" onClick={() => setAreaSearchQuery('')}>

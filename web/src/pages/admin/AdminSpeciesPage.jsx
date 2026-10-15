@@ -231,18 +231,18 @@ export default function AdminSpeciesPage() {
                         disabled={isLoading}
                         title="Làm mới dữ liệu từ máy chủ"
                     >
-                        {isLoading ? "..." : "🔄 Làm mới"}
+                        {isLoading ? "..." : "Làm mới"}
                     </button>
                 </div>
             </div>
 
             {/* Search and Filters Bar */}
-            <div className="admin-card" style={{ marginBottom: '20px', padding: '16px' }}>
+            <div className="admin-card" style={{ marginBottom: '24px', padding: '18px 20px' }}>
                 <div className="admin-filter-grid">
                     {/* Search Field */}
                     <div style={{ position: 'relative' }}>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            🔍 Tìm kiếm theo tên loại
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Tìm kiếm theo tên loại
                         </label>
                         <div style={{ position: 'relative' }}>
                             <input
@@ -279,8 +279,8 @@ export default function AdminSpeciesPage() {
 
                     {/* Conservation Status Filter (IUCN) */}
                     <div>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            🛡️ Tình trạng bảo tồn (IUCN)
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Tình trạng bảo tồn (IUCN)
                         </label>
                         <select
                             className="form-select"
@@ -299,8 +299,8 @@ export default function AdminSpeciesPage() {
 
                     {/* Sort */}
                     <div>
-                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            ↕️ Sắp xếp danh sách
+                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.85rem', fontWeight: '600' }}>
+                            Sắp xếp danh sách
                         </label>
                         <select
                             className="form-select"
@@ -316,7 +316,7 @@ export default function AdminSpeciesPage() {
                     </div>
 
                     {/* Filter Actions */}
-                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                         {isFilteringActive && (
                             <button
                                 type="button"
@@ -324,10 +324,10 @@ export default function AdminSpeciesPage() {
                                 onClick={handleResetFilters}
                                 style={{ padding: '8px 14px', fontSize: '0.85rem' }}
                             >
-                                ↺ Xóa bộ lọc
+                                Xóa bộ lọc
                             </button>
                         )}
-                        <span style={{ fontSize: '0.82rem', color: '#64748B', fontWeight: '600', marginLeft: isFilteringActive ? '0' : 'auto' }}>
+                        <span style={{ fontSize: '0.85rem', color: '#64748B', fontWeight: '600', marginLeft: isFilteringActive ? '0' : 'auto' }}>
                             Hiển thị: <strong>{filteredSpecies.length}</strong> / {speciesList.length} loài sinh thái
                         </span>
                     </div>
@@ -393,11 +393,10 @@ export default function AdminSpeciesPage() {
                                 ) : (
                                     <tr>
                                         <td colSpan="5" style={{ textAlign: 'center', padding: '36px 16px', color: '#64748B' }}>
-                                            <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🔍</div>
-                                            <div style={{ fontWeight: '700', fontSize: '1rem', color: '#1E293B' }}>
+                                            <div style={{ fontWeight: '700', fontSize: '1rem', color: '#1E293B', marginBottom: '4px' }}>
                                                 Không tìm thấy loài sinh thái nào phù hợp
                                             </div>
-                                            <p style={{ margin: '4px 0 12px 0', fontSize: '0.88rem' }}>
+                                            <p style={{ margin: '4px 0 14px 0', fontSize: '0.88rem' }}>
                                                 Thử thay đổi từ khóa tìm kiếm hoặc điều chỉnh bộ lọc tình trạng bảo tồn.
                                             </p>
                                             {isFilteringActive && (
@@ -406,7 +405,7 @@ export default function AdminSpeciesPage() {
                                                     className="btn btn-sm btn-primary"
                                                     onClick={handleResetFilters}
                                                 >
-                                                    ↺ Xóa bộ lọc
+                                                    Xóa bộ lọc
                                                 </button>
                                             )}
                                         </td>

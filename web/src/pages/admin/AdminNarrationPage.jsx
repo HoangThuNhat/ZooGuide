@@ -204,7 +204,7 @@ export default function AdminNarrationPage() {
                 </div>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
-                        {isLoading ? "Đang tải..." : "🔄 Làm mới"}
+                        {isLoading ? "Đang tải..." : "Làm mới"}
                     </button>
                     <span className="chip font-bold">{narrationsList.length} bài biên tập</span>
                 </div>
@@ -227,7 +227,7 @@ export default function AdminNarrationPage() {
                                     <div className="narration-item-header">
                                         <div>
                                             <span className={`badge ${item.languageCode === 'vi' ? 'badge-primary' : 'badge-amber'} uppercase`}>
-                                                {item.languageCode === 'vi' ? '🇻🇳 Tiếng Việt' : item.languageCode === 'en' ? '🇬🇧 English' : item.languageName || item.languageCode}
+                                                {item.languageCode === 'vi' ? 'Tiếng Việt' : item.languageCode === 'en' ? 'English' : item.languageName || item.languageCode}
                                             </span>
                                             <span className={`badge ${item.status === 'Published' ? 'badge-success' : 'badge-info'} uppercase ml-2`}>
                                                 {item.status === 'Published' ? 'Đã xuất bản' : 'Bản nháp'}
@@ -246,7 +246,7 @@ export default function AdminNarrationPage() {
                                     </p>
                                     <div className="mt-3 flex gap-2 items-center justify-between" style={{ flexWrap: 'wrap' }}>
                                         <span className="text-xs text-success font-semibold">
-                                            🎧 File Audio: {item.audioUrl || "Mặc định hệ thống"}
+                                            File âm thanh: {item.audioUrl || "Mặc định hệ thống"}
                                         </span>
                                         <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                                             <button 
@@ -388,7 +388,7 @@ export default function AdminNarrationPage() {
                                     className="btn btn-sm btn-outline" 
                                     onClick={() => document.getElementById('narration-file-upload').click()}
                                 >
-                                    📁 Tải file âm thanh (.mp3, .wav)
+                                    Tải file âm thanh (.mp3, .wav)
                                 </button>
                                 {audioFile && (
                                     <span className="text-xs text-success" style={{ fontWeight: 600 }}>

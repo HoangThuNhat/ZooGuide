@@ -263,12 +263,23 @@ export default function AdminAnimalsPage() {
                 {/* Animal Grid List & Filters */}
                 <div>
                     {/* BỘ LỌC ĐỘNG VẬT */}
-                    <div className="admin-card" style={{ marginBottom: '16px', padding: '16px', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                    <div className="admin-card" style={{ marginBottom: '24px', padding: '20px 22px', background: '#FFFFFF', border: '1px solid #E2E8F0' }}>
                         {/* Hàng 1: Ô tìm kiếm từ khóa */}
-                        <div style={{ position: 'relative', marginBottom: '12px' }}>
-                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }}>
-                                🔍
-                            </span>
+                        <div style={{ position: 'relative', marginBottom: '14px' }}>
+                            <svg 
+                                width="16" 
+                                height="16" 
+                                viewBox="0 0 24 24" 
+                                fill="none" 
+                                stroke="#94A3B8" 
+                                strokeWidth="2" 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+                            >
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
                             <input
                                 type="text"
                                 className="form-input"
@@ -301,15 +312,15 @@ export default function AdminAnimalsPage() {
                         </div>
 
                         {/* Hàng 2: Dropdown bộ lọc theo Phân khu, Loài, IUCN */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '14px', marginBottom: '14px' }}>
                             {/* Lọc theo Phân khu */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
                                     Phân khu nuôi thả
                                 </label>
                                 <select
                                     className="form-select"
-                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    style={{ height: '38px', fontSize: '0.85rem' }}
                                     value={selectedAreaFilter}
                                     onChange={(e) => setSelectedAreaFilter(e.target.value)}
                                 >
@@ -324,12 +335,12 @@ export default function AdminAnimalsPage() {
 
                             {/* Lọc theo Loài sinh học */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
                                     Loài sinh học
                                 </label>
                                 <select
                                     className="form-select"
-                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    style={{ height: '38px', fontSize: '0.85rem' }}
                                     value={selectedSpeciesFilter}
                                     onChange={(e) => setSelectedSpeciesFilter(e.target.value)}
                                 >
@@ -344,12 +355,12 @@ export default function AdminAnimalsPage() {
 
                             {/* Lọc theo Tình trạng IUCN */}
                             <div>
-                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '6px' }}>
                                     Bảo tồn (IUCN)
                                 </label>
                                 <select
                                     className="form-select"
-                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    style={{ height: '38px', fontSize: '0.85rem' }}
                                     value={selectedIucnFilter}
                                     onChange={(e) => setSelectedIucnFilter(e.target.value)}
                                 >
@@ -366,7 +377,7 @@ export default function AdminAnimalsPage() {
                         </div>
 
                         {/* Hàng 3: Trạng thái & Nút xóa lọc */}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '10px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '8px' }}>
                             <div style={{ fontSize: '0.85rem', color: '#64748B' }}>
                                 Hiển thị <strong>{filteredAnimals.length}</strong> / <strong>{animals.length}</strong> cá thể động vật
                             </div>
@@ -374,10 +385,10 @@ export default function AdminAnimalsPage() {
                                 <button
                                     type="button"
                                     className="btn btn-sm btn-outline text-danger"
-                                    style={{ borderColor: '#FECACA', color: '#DC2626', padding: '4px 10px', fontSize: '0.8rem' }}
+                                    style={{ borderColor: '#FECACA', color: '#DC2626', padding: '4px 12px', fontSize: '0.8rem' }}
                                     onClick={handleResetFilters}
                                 >
-                                    ✕ Đặt lại bộ lọc
+                                    Đặt lại bộ lọc
                                 </button>
                             )}
                         </div>
@@ -401,11 +412,10 @@ export default function AdminAnimalsPage() {
                                 {filteredAnimals.length === 0 ? (
                                     <tr>
                                         <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: '#64748B' }}>
-                                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🐾</div>
                                             <strong style={{ display: 'block', fontSize: '1rem', color: '#334155', marginBottom: '4px' }}>
                                                 Không tìm thấy cá thể động vật nào phù hợp
                                             </strong>
-                                            <p style={{ margin: '0 0 12px 0', fontSize: '0.875rem' }}>
+                                            <p style={{ margin: '0 0 14px 0', fontSize: '0.875rem' }}>
                                                 Vui lòng thử điều chỉnh lại từ khóa tìm kiếm hoặc các tiêu chí bộ lọc.
                                             </p>
                                             {hasActiveFilters && (
