@@ -193,7 +193,7 @@ export default function AdminNarrationPage() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Nội Dung Thuyết Minh (Audio Narration CMS)
@@ -202,7 +202,7 @@ export default function AdminNarrationPage() {
                         Biên soạn lời thoại đa ngôn ngữ (Việt, Anh, Trung, Nhật), quản lý âm thanh và trạng thái kiểm duyệt xuất bản.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
                         {isLoading ? "Đang tải..." : "🔄 Làm mới"}
                     </button>
@@ -244,11 +244,11 @@ export default function AdminNarrationPage() {
                                     <p className="text-xs text-muted mt-2" style={{ whiteSpace: 'pre-line', maxHeight: '90px', overflow: 'hidden' }}>
                                         {item.content}
                                     </p>
-                                    <div className="mt-3 flex gap-2 items-center justify-between">
+                                    <div className="mt-3 flex gap-2 items-center justify-between" style={{ flexWrap: 'wrap' }}>
                                         <span className="text-xs text-success font-semibold">
                                             🎧 File Audio: {item.audioUrl || "Mặc định hệ thống"}
                                         </span>
-                                        <div className="flex gap-2">
+                                        <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
                                             <button 
                                                 className="btn btn-sm btn-outline"
                                                 onClick={() => handleToggleStatus(item)}

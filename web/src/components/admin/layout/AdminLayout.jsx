@@ -16,59 +16,53 @@ export default function AdminLayout() {
     ];
 
     return (
-        <div className="admin-portal-wrapper" style={{ display: 'flex', minHeight: '100vh', background: '#F8FAFC' }}>
+        <div className="admin-portal-wrapper">
+            {/* Backdrop for Mobile Drawer */}
+            {isMobileMenuOpen && (
+                <div 
+                    className="admin-sidebar-backdrop" 
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
             {/* Admin Sidebar */}
-            <aside 
-                className={`admin-portal-sidebar ${isMobileMenuOpen ? 'open' : ''}`}
-                style={{
-                    width: '260px',
-                    background: '#0F172A',
-                    color: '#F8FAFC',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    flexShrink: 0,
-                    zIndex: 100,
-                    transition: 'all 200ms ease'
-                }}
-            >
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid #1E293B', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <aside className={`admin-portal-sidebar ${isMobileMenuOpen ? 'open' : ''}`}>
+                <div className="admin-sidebar-header">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2">
                                 <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
                                 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path>
                             </svg>
                         </div>
                         <div>
-                            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#FFF' }}>ZooAdmin</h2>
-                            <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>Bảng Quản Trị Hệ Thống</span>
+                            <h2 style={{ fontSize: '1.1rem', fontWeight: 800, margin: 0, color: '#FFF', whiteSpace: 'nowrap' }}>ZooAdmin</h2>
+                            <span style={{ fontSize: '0.75rem', color: '#94A3B8', whiteSpace: 'nowrap' }}>Bảng Quản Trị Hệ Thống</span>
                         </div>
                     </div>
+                    {/* Mobile close button */}
+                    <button
+                        type="button"
+                        className="admin-sidebar-close-btn"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        aria-label="Đóng menu quản trị"
+                    >
+                        ✕
+                    </button>
                 </div>
 
                 {/* Navigation Menu */}
-                <nav style={{ padding: '16px 12px', flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <nav className="admin-sidebar-nav">
                     {adminNavLinks.map(link => (
                         <NavLink
                             key={link.path}
                             to={link.path}
                             end={link.exact}
                             onClick={() => setIsMobileMenuOpen(false)}
-                            style={({ isActive }) => ({
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '12px',
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                fontSize: '0.9rem',
-                                fontWeight: isActive ? 600 : 500,
-                                textDecoration: 'none',
-                                color: isActive ? '#FFFFFF' : '#94A3B8',
-                                background: isActive ? '#15803D' : 'transparent',
-                                transition: 'all 150ms ease'
-                            })}
+                            className={({ isActive }) => `admin-sidebar-link ${isActive ? 'active' : ''}`}
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
                                 <path d={link.icon}></path>
                             </svg>
                             <span>{link.label}</span>
@@ -77,24 +71,12 @@ export default function AdminLayout() {
                 </nav>
 
                 {/* Back to Visitor Portal Button */}
-                <div style={{ padding: '16px 14px', borderTop: '1px solid #1E293B' }}>
+                <div className="admin-sidebar-footer">
                     <Link
                         to="/"
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: '8px',
-                            padding: '10px',
-                            borderRadius: '8px',
-                            background: '#334155',
-                            color: '#F8FAFC',
-                            textDecoration: 'none',
-                            fontSize: '0.85rem',
-                            fontWeight: 600
-                        }}
+                        className="admin-sidebar-visitor-link"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
                             <line x1="19" y1="12" x2="5" y2="12"></line>
                             <polyline points="12 19 5 12 12 5"></polyline>
                         </svg>
@@ -104,41 +86,38 @@ export default function AdminLayout() {
             </aside>
 
             {/* Admin Content Area */}
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div className="admin-content-area">
                 {/* Admin Top Header */}
-                <header style={{
-                    height: '64px',
-                    background: '#FFFFFF',
-                    borderBottom: '1px solid #E2E8F0',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0 24px'
-                }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <header className="admin-header">
+                    <div className="admin-header-left">
                         <button
-                            className="btn btn-icon btn-sm"
-                            style={{ display: 'none' }}
+                            type="button"
+                            className="admin-menu-toggle"
                             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                            aria-label="Toggle menu"
+                            aria-label="Mở menu điều hướng"
                         >
-                            ☰
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="3" y1="12" x2="21" y2="12"></line>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="3" y1="18" x2="21" y2="18"></line>
+                            </svg>
                         </button>
-                        <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#475569' }}>
-                            ZooGuide Management Portal • Cán bộ phụ trách: <strong>Quản Trị Viên</strong>
-                        </span>
+                        <div className="admin-header-title">
+                            <span className="admin-portal-badge-text">ZooGuide Management Portal</span>
+                            <span className="admin-header-subtitle"> • Cán bộ: <strong>Quản Trị Viên</strong></span>
+                        </div>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                        <span className="badge badge-success">Máy Chủ Trực Tuyến</span>
-                        <Link to="/" className="btn btn-sm btn-outline">
+                    <div className="admin-header-right">
+                        <span className="badge badge-success admin-status-badge">Máy Chủ Trực Tuyến</span>
+                        <Link to="/" className="btn btn-sm btn-outline admin-header-guest-btn">
                             Xem Website Khách
                         </Link>
                     </div>
                 </header>
 
                 {/* Main Dynamic View */}
-                <main style={{ padding: '24px', flex: 1, overflowY: 'auto' }}>
+                <main className="admin-main-content">
                     <Outlet />
                 </main>
             </div>

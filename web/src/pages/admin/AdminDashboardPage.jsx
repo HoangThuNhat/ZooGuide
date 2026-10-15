@@ -20,6 +20,17 @@ export default function AdminDashboardPage() {
     });
     const [animalOptions, setAnimalOptions] = useState([]);
 
+    // Time filter states
+    const [selectedPeriod, setSelectedPeriod] = useState('all');
+    const [customStartDate, setCustomStartDate] = useState('');
+    const [customEndDate, setCustomEndDate] = useState('');
+    const [appliedFilter, setAppliedFilter] = useState({
+        period: 'all',
+        fromDate: null,
+        toDate: null,
+        label: 'Toàn bộ thời gian'
+    });
+
     // Form inputs for Health Log
     const [healthForm, setHealthForm] = useState({
         animalCode: '',
@@ -31,11 +42,96 @@ export default function AdminDashboardPage() {
         actionRequired: ''
     });
 
-    const loadDashboardData = async () => {
+    // Calculate start & end ISO strings for a chosen period preset
+    const calculatePeriodRange = (period, startStr = '', endStr = '') => {
+        const now = new Date();
+        const startOfDay = (d) => {
+            const date = new Date(d);
+            date.setHours(0, 0, 0, 0);
+            return date.toISOString();
+        };
+        const endOfDay = (d) => {
+            const date = new Date(d);
+            date.setHours(23, 59, 59, 999);
+            return date.toISOString();
+        };
+
+        if (period === 'today') {
+            const dateStr = now.toLocaleDateString('vi-VN');
+            return {
+                fromDate: startOfDay(now),
+                toDate: endOfDay(now),
+                label: 'Hôm nay',
+                rangeDesc: dateStr
+            };
+        } else if (period === 'last7days') {
+            const past7 = new Date(now);
+            past7.setDate(past7.getDate() - 6);
+            return {
+                fromDate: startOfDay(past7),
+                toDate: endOfDay(now),
+                label: '7 ngày gần nhất',
+                rangeDesc: `${past7.toLocaleDateString('vi-VN')} - ${now.toLocaleDateString('vi-VN')}`
+            };
+        } else if (period === 'last30days') {
+            const past30 = new Date(now);
+            past30.setDate(past30.getDate() - 29);
+            return {
+                fromDate: startOfDay(past30),
+                toDate: endOfDay(now),
+                label: '30 ngày gần nhất',
+                rangeDesc: `${past30.toLocaleDateString('vi-VN')} - ${now.toLocaleDateString('vi-VN')}`
+            };
+        } else if (period === 'thisMonth') {
+            const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+            return {
+                fromDate: startOfDay(startMonth),
+                toDate: endOfDay(endMonth),
+                label: 'Tháng này',
+                rangeDesc: `01/${now.getMonth() + 1}/${now.getFullYear()} - ${endMonth.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
+            };
+        } else if (period === 'lastMonth') {
+            const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const endLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+            return {
+                fromDate: startOfDay(startLastMonth),
+                toDate: endOfDay(endLastMonth),
+                label: 'Tháng trước',
+                rangeDesc: `01/${startLastMonth.getMonth() + 1}/${startLastMonth.getFullYear()} - ${endLastMonth.getDate()}/${startLastMonth.getMonth() + 1}/${startLastMonth.getFullYear()}`
+            };
+        } else if (period === 'custom') {
+            if (!startStr && !endStr) {
+                return { fromDate: null, toDate: null, label: 'Tùy chỉnh khoảng ngày', rangeDesc: 'Chưa chọn khoảng ngày' };
+            }
+            const from = startStr ? startOfDay(new Date(startStr)) : null;
+            const to = endStr ? endOfDay(new Date(endStr)) : null;
+            return {
+                fromDate: from,
+                toDate: to,
+                label: 'Tùy chỉnh khoảng ngày',
+                rangeDesc: `${startStr ? new Date(startStr).toLocaleDateString('vi-VN') : '...'} đến ${endStr ? new Date(endStr).toLocaleDateString('vi-VN') : '...'}`
+            };
+        }
+
+        // 'all'
+        return {
+            fromDate: null,
+            toDate: null,
+            label: 'Toàn bộ thời gian',
+            rangeDesc: 'Tất cả dữ liệu ghi nhận'
+        };
+    };
+
+    const loadDashboardData = async (filterObj = appliedFilter) => {
         setIsLoading(true);
         try {
+            const apiFilter = {};
+            if (filterObj.fromDate) apiFilter.fromDate = filterObj.fromDate;
+            if (filterObj.toDate) apiFilter.toDate = filterObj.toDate;
+
             const [statsRes, animalsRes] = await Promise.all([
-                ZooApi.getDashboardStats(),
+                ZooApi.getDashboardStats(apiFilter),
                 ZooApi.getAnimals()
             ]);
 
@@ -59,8 +155,41 @@ export default function AdminDashboardPage() {
     };
 
     useEffect(() => {
-        loadDashboardData();
+        loadDashboardData(appliedFilter);
     }, []);
+
+    const handleApplyFilter = (period = selectedPeriod) => {
+        if (period === 'custom') {
+            if (!customStartDate && !customEndDate) {
+                showToast("Vui lòng chọn ngày bắt đầu hoặc ngày kết thúc.", "error");
+                return;
+            }
+            if (customStartDate && customEndDate && customStartDate > customEndDate) {
+                showToast("Ngày bắt đầu không được lớn hơn ngày kết thúc.", "error");
+                return;
+            }
+        }
+
+        const range = calculatePeriodRange(period, customStartDate, customEndDate);
+        const newApplied = { period, ...range };
+        setAppliedFilter(newApplied);
+        loadDashboardData(newApplied);
+    };
+
+    const handleResetFilter = () => {
+        setSelectedPeriod('all');
+        setCustomStartDate('');
+        setCustomEndDate('');
+        const defaultFilter = {
+            period: 'all',
+            fromDate: null,
+            toDate: null,
+            label: 'Toàn bộ thời gian',
+            rangeDesc: 'Tất cả dữ liệu ghi nhận'
+        };
+        setAppliedFilter(defaultFilter);
+        loadDashboardData(defaultFilter);
+    };
 
     const handleHealthSubmit = async (e) => {
         e.preventDefault();
@@ -95,7 +224,7 @@ export default function AdminDashboardPage() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Trung Tâm Điều Hành ZooGuide
@@ -104,20 +233,137 @@ export default function AdminDashboardPage() {
                         Thống kê tổng quan tình trạng vận hành, động vật, chuồng trại và dịch vụ tham quan thời gian thực từ cơ sở dữ liệu.
                     </p>
                 </div>
-                <button 
-                    className="btn btn-sm btn-outline" 
-                    onClick={loadDashboardData}
-                    disabled={isLoading}
-                    title="Cập nhật số liệu"
-                >
-                    {isLoading ? "Đang đồng bộ..." : "🔄 Làm mới số liệu"}
-                </button>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <button 
+                        className="btn btn-sm btn-outline" 
+                        onClick={() => loadDashboardData(appliedFilter)}
+                        disabled={isLoading}
+                        title="Đồng bộ lại số liệu"
+                    >
+                        {isLoading ? "Đang đồng bộ..." : "🔄 Làm mới số liệu"}
+                    </button>
+                </div>
+            </div>
+
+            {/* Time Period Filter Bar */}
+            <div className="admin-card" style={{ marginBottom: '20px', padding: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '1.1rem' }}>📅</span>
+                        <span style={{ fontWeight: '700', fontSize: '0.95rem', color: '#0F172A' }}>
+                            Bộ Lọc Thời Gian Tổng Quan
+                        </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span className="badge badge-info" style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+                            Đang áp dụng: <strong>{appliedFilter.label}</strong> {appliedFilter.rangeDesc ? `(${appliedFilter.rangeDesc})` : ''}
+                        </span>
+                        {appliedFilter.period !== 'all' && (
+                            <button
+                                type="button"
+                                className="btn btn-sm btn-secondary"
+                                onClick={handleResetFilter}
+                                style={{ fontSize: '0.8rem', padding: '3px 10px' }}
+                                title="Đưa về mặc định toàn bộ thời gian"
+                            >
+                                ↺ Đặt lại mặc định
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                <div className="admin-filter-grid">
+                    {/* Period Preset Dropdown */}
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
+                            Khoảng thời gian thống kê
+                        </label>
+                        <select
+                            className="form-select"
+                            value={selectedPeriod}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setSelectedPeriod(val);
+                                if (val !== 'custom') {
+                                    handleApplyFilter(val);
+                                }
+                            }}
+                            style={{ width: '100%' }}
+                        >
+                            <option value="all">Toàn bộ thời gian (Tất cả)</option>
+                            <option value="today">Hôm nay</option>
+                            <option value="last7days">7 ngày gần nhất</option>
+                            <option value="last30days">30 ngày gần nhất</option>
+                            <option value="thisMonth">Tháng này</option>
+                            <option value="lastMonth">Tháng trước</option>
+                            <option value="custom">Tùy chỉnh khoảng ngày...</option>
+                        </select>
+                    </div>
+
+                    {/* Custom Start Date */}
+                    {selectedPeriod === 'custom' && (
+                        <div>
+                            <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                Từ ngày
+                            </label>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={customStartDate}
+                                onChange={(e) => setCustomStartDate(e.target.value)}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Custom End Date */}
+                    {selectedPeriod === 'custom' && (
+                        <div>
+                            <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
+                                Đến ngày
+                            </label>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={customEndDate}
+                                onChange={(e) => setCustomEndDate(e.target.value)}
+                                style={{ width: '100%' }}
+                            />
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                        {selectedPeriod === 'custom' && (
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => handleApplyFilter('custom')}
+                                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
+                            >
+                                Áp dụng bộ lọc
+                            </button>
+                        )}
+                        {appliedFilter.period !== 'all' && selectedPeriod !== 'custom' && (
+                            <button
+                                type="button"
+                                className="btn btn-secondary"
+                                onClick={handleResetFilter}
+                                style={{ padding: '8px 14px', fontSize: '0.85rem' }}
+                            >
+                                ↺ Xóa bộ lọc
+                            </button>
+                        )}
+                    </div>
+                </div>
             </div>
 
             {/* Metrics Row */}
             <div className="admin-metrics-row">
                 <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">Tổng vé phát hành</span>
+                    <span className="text-xs text-muted uppercase font-bold">
+                        {appliedFilter.period !== 'all' ? `Vé phát hành (${appliedFilter.label})` : 'Tổng vé phát hành'}
+                    </span>
                     <span className="metric-number">
                         {isLoading ? "..." : (stats.totalTickets || 0)}
                     </span>
@@ -142,19 +388,21 @@ export default function AdminDashboardPage() {
                     <span className="text-xs text-success">100% đạt chuẩn an toàn</span>
                 </div>
                 <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">Bài thuyết minh đa ngữ</span>
+                    <span className="text-xs text-muted uppercase font-bold">
+                        {appliedFilter.period !== 'all' ? `Bài thuyết minh (${appliedFilter.label})` : 'Bài thuyết minh đa ngữ'}
+                    </span>
                     <span className="metric-number">
                         {isLoading ? "..." : (stats.totalNarrations || 0)}
                     </span>
                     <span className="text-xs text-muted">
-                        {stats.activeSessions || 0} phiên khách trực tuyến
+                        {stats.activeSessions || 0} phiên khách trong kỳ
                     </span>
                 </div>
             </div>
 
             {/* Health & Breeding Quick Log Section */}
             <div className="ticket-page-layout mt-4">
-                {/* Left: Health Log Records */}
+                {/* Left: Health Log Records & Recent Activities */}
                 <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <h3 className="font-bold text-base m-0">Nhật Ký Y Tế & Sinh Sản Gần Nhất</h3>
@@ -164,7 +412,7 @@ export default function AdminDashboardPage() {
                     </div>
 
                     <div id="admin-health-logs-list">
-                        {isLoading && (!stats.recentHealthLogs || stats.recentHealthLogs.length === 0) ? (
+                        {isLoading ? (
                             <div className="text-center p-6 text-muted">Đang tải nhật ký kiểm tra y tế...</div>
                         ) : stats.recentHealthLogs && stats.recentHealthLogs.length > 0 ? (
                             stats.recentHealthLogs.map(log => (
@@ -189,11 +437,68 @@ export default function AdminDashboardPage() {
                                 </div>
                             ))
                         ) : (
-                            <div className="admin-card text-center text-muted p-6">
-                                Chưa có nhật ký y tế nào được ghi nhận hôm nay.
+                            <div className="admin-card text-center text-muted p-6" style={{ marginBottom: '16px' }}>
+                                <div style={{ fontSize: '1.6rem', marginBottom: '6px' }}>📋</div>
+                                <div style={{ fontWeight: '600', color: '#1E293B', marginBottom: '4px' }}>
+                                    Không có nhật ký y tế nào trong khoảng thời gian đã chọn
+                                </div>
+                                <p style={{ margin: '0 0 12px 0', fontSize: '0.85rem' }}>
+                                    {appliedFilter.label} {appliedFilter.rangeDesc ? `(${appliedFilter.rangeDesc})` : ''}
+                                </p>
+                                {appliedFilter.period !== 'all' && (
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline"
+                                        onClick={handleResetFilter}
+                                    >
+                                        ↺ Xem toàn bộ nhật ký
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
+
+                    {/* Operational Activities Section */}
+                    {stats.recentActivities && stats.recentActivities.length > 0 && (
+                        <div style={{ marginTop: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                                <h3 className="font-bold text-base m-0">Dòng Hoạt Động Vận Hành Gần Nhất</h3>
+                                <span className="text-xs text-muted">{stats.recentActivities.length} sự kiện</span>
+                            </div>
+                            <div className="admin-card" style={{ padding: '8px 16px' }}>
+                                {stats.recentActivities.map((act, idx) => (
+                                    <div 
+                                        key={idx} 
+                                        style={{ 
+                                            padding: '10px 0', 
+                                            borderBottom: idx !== stats.recentActivities.length - 1 ? '1px dashed #E2E8F0' : 'none',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center',
+                                            gap: '12px'
+                                        }}
+                                    >
+                                        <div>
+                                            <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#1E293B' }}>
+                                                {act.title}
+                                            </div>
+                                            <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
+                                                {act.description}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                            <span className={`badge ${act.type === 'Ticket' ? 'badge-success' : 'badge-info'}`} style={{ fontSize: '0.72rem' }}>
+                                                {act.type}
+                                            </span>
+                                            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
+                                                {new Date(act.timestamp).toLocaleDateString('vi-VN')}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right: Add Health Log Form */}

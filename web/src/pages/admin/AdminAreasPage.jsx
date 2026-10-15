@@ -275,7 +275,7 @@ export default function AdminAreasPage() {
     return (
         <div>
             {/* Page Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Phân Khu & Chuồng Trại (Areas & Enclosures)
@@ -284,7 +284,7 @@ export default function AdminAreasPage() {
                         Cấu trúc phân cấp chuẩn: <strong>Sở thú → Phân khu (Area) → Chuồng trại (Enclosure) → Cá thể động vật</strong>.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
                         {isLoading ? "Đang tải..." : "🔄 Làm mới"}
                     </button>
@@ -298,7 +298,7 @@ export default function AdminAreasPage() {
             </div>
 
             {/* Sub-Tabs Selector */}
-            <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E2E8F0', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', borderBottom: '2px solid #E2E8F0', marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', maxWidth: '100%' }}>
                 <button
                     className="btn btn-sm"
                     style={{
@@ -878,7 +878,7 @@ export default function AdminAreasPage() {
                                 ℹ️ Khi chuyển chuồng, hệ thống sẽ tự động cập nhật phân khu (Area) của động vật theo phân khu của chuồng mới.
                             </p>
                         </div>
-                        <div className="modal-footer" style={{ padding: '14px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                        <div className="modal-footer" style={{ padding: '14px 20px', borderTop: '1px solid #E2E8F0', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
                             <button className="btn btn-secondary btn-sm" onClick={() => setMovingAnimal(null)}>
                                 Hủy Bỏ
                             </button>

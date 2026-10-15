@@ -17,6 +17,7 @@ public class EndToEndIntegrationTests : IDisposable
 {
     private readonly ZooGuideDbContext _context;
     private readonly DashboardService _dashboardService;
+    private readonly SpeciesService _speciesService;
     private readonly TicketService _ticketService;
     private readonly TicketSessionService _ticketSessionService;
     private readonly NarrationService _narrationService;
@@ -38,6 +39,7 @@ public class EndToEndIntegrationTests : IDisposable
         // Services
         _auditLogService = new AuditLogService();
         _dashboardService = new DashboardService(_context);
+        _speciesService = new SpeciesService(_context);
         _ticketSessionService = new TicketSessionService(ticketRepo, sessionRepo);
         _ticketService = new TicketService(_context, _ticketSessionService);
         _narrationService = new NarrationService(_context);
@@ -423,5 +425,104 @@ public class EndToEndIntegrationTests : IDisposable
         var logs = _auditLogService.GetLogs(10);
         Assert.NotEmpty(logs);
         Assert.Contains(logs, l => l.Action == "DELETE" && l.TargetEntity == "Animal");
+    }
+
+    // ==========================================
+    // G. TEST SPECIES FILTERING
+    // ==========================================
+    [Fact]
+    public async Task Species_WhenFilteredByName_ShouldReturnAccurateResults()
+    {
+        // Add tiger species to test Panthera scientific name match
+        _context.Species.Add(new Species
+        {
+            SpeciesId = 2,
+            Name = "Hổ Bengal",
+            ScientificName = "Panthera tigris",
+            ConservationStatus = "EN - Nguy cấp"
+        });
+        await _context.SaveChangesAsync();
+
+        // 1. Search by Vietnamese name
+        var lions = await _speciesService.GetAllAsync(search: "Sư tử");
+        Assert.Single(lions);
+        Assert.Equal("Sư tử Châu Phi", lions.First().Name);
+
+        // 2. Search by Scientific name (matches Panthera leo and Panthera tigris)
+        var pantheras = await _speciesService.GetAllAsync(search: "Panthera");
+        Assert.Equal(2, pantheras.Count());
+
+        // 3. Search non-existent
+        var notFound = await _speciesService.GetAllAsync(search: "KhongTonTai12345");
+        Assert.Empty(notFound);
+    }
+
+    [Fact]
+    public async Task Species_WhenFilteredByConservationStatus_ShouldReturnAccurateResults()
+    {
+        _context.Species.AddRange(
+            new Species { SpeciesId = 2, Name = "Hổ Bengal", ScientificName = "Panthera tigris", ConservationStatus = "EN - Nguy cấp" },
+            new Species { SpeciesId = 3, Name = "Voi Châu Á", ScientificName = "Elephas maximus", ConservationStatus = "EN - Nguy cấp" },
+            new Species { SpeciesId = 4, Name = "Kỳ giông Axolotl", ScientificName = "Ambystoma mexicanum", ConservationStatus = "CR - Cực kỳ nguy cấp" }
+        );
+        await _context.SaveChangesAsync();
+
+        // Filter by Endangered ("EN - Nguy cấp")
+        var endangered = await _speciesService.GetAllAsync(conservationStatus: "EN - Nguy cấp");
+        Assert.Equal(2, endangered.Count());
+        Assert.All(endangered, s => Assert.Equal("EN - Nguy cấp", s.ConservationStatus));
+
+        // Combined filter: search "Voi" + conservationStatus "EN"
+        var combined = await _speciesService.GetAllAsync(search: "Voi", conservationStatus: "EN - Nguy cấp");
+        Assert.Single(combined);
+        Assert.Equal("Voi Châu Á", combined.First().Name);
+
+        // "all" returns all 4 species
+        var all = await _speciesService.GetAllAsync(conservationStatus: "all");
+        Assert.Equal(4, all.Count());
+    }
+
+    // ==========================================
+    // H. TEST DASHBOARD TIME FILTERING
+    // ==========================================
+    [Fact]
+    public async Task Dashboard_TimeFilter_ShouldPreserveCumulativeStatsAndFilterTimeMetrics()
+    {
+        // 1. Unfiltered (Toàn bộ thời gian)
+        var initialStats = await _dashboardService.GetStatsAsync();
+        Assert.Equal(1, initialStats.TotalSpecies);
+        Assert.Equal(1, initialStats.TotalAnimals);
+        Assert.Equal(1, initialStats.TotalAreas);
+        Assert.Equal(3, initialStats.TotalTickets); // 3 seeded tickets (Valid, Used, Expired)
+
+        // 2. Filtered for past period where no tickets were issued
+        var pastStats = await _dashboardService.GetStatsAsync(
+            fromDate: DateTime.UtcNow.AddYears(-5),
+            toDate: DateTime.UtcNow.AddYears(-4)
+        );
+
+        // Cumulative stats MUST NOT change
+        Assert.Equal(1, pastStats.TotalSpecies);
+        Assert.Equal(1, pastStats.TotalAnimals);
+        Assert.Equal(1, pastStats.TotalAreas);
+
+        // Time-dependent metrics MUST be 0 for a period with no activity
+        Assert.Equal(0, pastStats.TotalTickets);
+        Assert.Equal(0, pastStats.ActiveTickets);
+    }
+
+    [Fact]
+    public async Task DashboardController_WhenStartDateGreaterThanEndDate_ShouldReturnBadRequest()
+    {
+        var controller = new DashboardController(_dashboardService);
+        var tomorrow = DateTime.UtcNow.AddDays(1);
+        var yesterday = DateTime.UtcNow.AddDays(-1);
+
+        var result = await controller.GetStats(fromDate: tomorrow, toDate: yesterday);
+
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result);
+        var apiResponse = Assert.IsAssignableFrom<ApiResponse<DashboardStatsDto>>(badRequest.Value);
+        Assert.False(apiResponse.Success);
+        Assert.Contains("Ngày bắt đầu không được lớn hơn ngày kết thúc", apiResponse.Message);
     }
 }

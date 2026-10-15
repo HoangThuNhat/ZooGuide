@@ -16,9 +16,11 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<SpeciesDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<SpeciesDto>>> GetAll(
+        [FromQuery] string? search = null,
+        [FromQuery] string? conservationStatus = null)
     {
-        var species = await _speciesService.GetAllAsync();
+        var species = await _speciesService.GetAllAsync(search, conservationStatus);
         return Ok(species);
     }
 

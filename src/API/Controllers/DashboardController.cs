@@ -21,9 +21,15 @@ public class DashboardController : ControllerBase
     /// </summary>
     [HttpGet("stats")]
     [ProducesResponseType(typeof(ApiResponse<DashboardStatsDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetStats()
+    [ProducesResponseType(typeof(ApiResponse<DashboardStatsDto>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> GetStats([FromQuery] DateTime? fromDate = null, [FromQuery] DateTime? toDate = null)
     {
-        var stats = await _dashboardService.GetStatsAsync();
+        if (fromDate.HasValue && toDate.HasValue && fromDate.Value > toDate.Value)
+        {
+            return BadRequest(ApiResponse<DashboardStatsDto>.Fail("Ngày bắt đầu không được lớn hơn ngày kết thúc."));
+        }
+
+        var stats = await _dashboardService.GetStatsAsync(fromDate, toDate);
         return Ok(ApiResponse<DashboardStatsDto>.Ok(stats));
     }
 }

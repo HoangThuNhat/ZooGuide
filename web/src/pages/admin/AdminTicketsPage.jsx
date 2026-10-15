@@ -39,9 +39,9 @@ export default function AdminTicketsPage() {
         setLoading(true);
         try {
             const res = await ZooApi.getTickets();
-            if (res.success) setTickets(res.data);
+            if (res && res.data) setTickets(res.data);
             const resTypes = await ZooApi.getTicketTypes();
-            if (resTypes.success) setTicketTypes(resTypes.data);
+            if (resTypes && resTypes.data) setTicketTypes(resTypes.data);
         } catch (err) {
             console.error("Load tickets error:", err);
         } finally {
@@ -53,6 +53,42 @@ export default function AdminTicketsPage() {
         loadData();
     }, []);
 
+    // Combine ticket types from API and tickets list to guarantee complete options
+    const availableTicketTypes = useMemo(() => {
+        const map = new Map();
+
+        // 1. Types from TicketTypes API
+        if (Array.isArray(ticketTypes)) {
+            ticketTypes.forEach(tt => {
+                const id = tt.ticketTypeId || tt.id;
+                if (id !== undefined && id !== null) {
+                    map.set(String(id), {
+                        id: id,
+                        ticketTypeId: id,
+                        name: tt.name || `Hạng vé #${id}`
+                    });
+                }
+            });
+        }
+
+        // 2. Supplement any ticket types present in tickets list
+        if (Array.isArray(tickets)) {
+            tickets.forEach(t => {
+                const id = t.ticketTypeId;
+                const name = t.ticketTypeName || t.ticketType;
+                if (id !== undefined && id !== null && !map.has(String(id))) {
+                    map.set(String(id), {
+                        id: id,
+                        ticketTypeId: id,
+                        name: name || `Hạng vé #${id}`
+                    });
+                }
+            });
+        }
+
+        return Array.from(map.values());
+    }, [ticketTypes, tickets]);
+
     // Filtered tickets based on search term, status, type, and date
     const filteredTickets = useMemo(() => {
         return tickets.filter(t => {
@@ -61,9 +97,10 @@ export default function AdminTicketsPage() {
                 const term = searchTerm.trim().toLowerCase();
                 const matchCode = (t.ticketCode || '').toLowerCase().includes(term);
                 const matchType = (t.ticketType || '').toLowerCase().includes(term);
+                const matchTypeName = (t.ticketTypeName || '').toLowerCase().includes(term);
                 const matchCust = (t.customerName || '').toLowerCase().includes(term);
                 const matchId = String(t.id || t.ticketId || '').includes(term);
-                if (!matchCode && !matchType && !matchCust && !matchId) {
+                if (!matchCode && !matchType && !matchTypeName && !matchCust && !matchId) {
                     return false;
                 }
             }
@@ -78,7 +115,25 @@ export default function AdminTicketsPage() {
 
             // Ticket Type filter
             if (typeFilter !== 'all') {
-                if (String(t.ticketTypeId) !== String(typeFilter) && t.ticketType !== typeFilter) {
+                const filterStr = String(typeFilter).trim().toLowerCase();
+                const selectedType = availableTicketTypes.find(
+                    at => String(at.id).toLowerCase() === filterStr ||
+                          String(at.ticketTypeId).toLowerCase() === filterStr ||
+                          (at.name && at.name.trim().toLowerCase() === filterStr)
+                );
+
+                const ticketTypeIdStr = t.ticketTypeId !== undefined && t.ticketTypeId !== null ? String(t.ticketTypeId).trim().toLowerCase() : '';
+                const ticketTypeStr = (t.ticketType || '').trim().toLowerCase();
+                const ticketTypeNameStr = (t.ticketTypeName || '').trim().toLowerCase();
+
+                const matchesId = ticketTypeIdStr === filterStr;
+                const matchesName = selectedType && selectedType.name
+                    ? (ticketTypeNameStr === selectedType.name.trim().toLowerCase() ||
+                       ticketTypeStr === selectedType.name.trim().toLowerCase())
+                    : false;
+                const matchesDirectName = ticketTypeStr === filterStr || ticketTypeNameStr === filterStr;
+
+                if (!matchesId && !matchesName && !matchesDirectName) {
                     return false;
                 }
             }
@@ -93,7 +148,7 @@ export default function AdminTicketsPage() {
 
             return true;
         });
-    }, [tickets, searchTerm, statusFilter, typeFilter, dateFilter]);
+    }, [tickets, availableTicketTypes, searchTerm, statusFilter, typeFilter, dateFilter]);
 
     const handleResetFilters = () => {
         setSearchTerm('');
@@ -167,7 +222,7 @@ export default function AdminTicketsPage() {
     return (
         <div>
             {/* Page Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Vé Tham Quan (Tickets Management)
@@ -176,7 +231,7 @@ export default function AdminTicketsPage() {
                         Danh sách vé đã phát hành, tra cứu mã vé QR/Barcode, ngày hiệu lực và trạng thái phiên.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                     <span className="badge badge-success">Đang hoạt động: {activeTicketsCount}</span>
                     <span className="badge badge-danger">Hết hạn / Khác: {expiredTicketsCount}</span>
                 </div>
@@ -184,7 +239,7 @@ export default function AdminTicketsPage() {
 
             {/* Search and Filters Bar */}
             <div className="admin-card" style={{ marginBottom: '20px', padding: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', alignItems: 'flex-end' }}>
+                <div className="admin-filter-grid">
                     {/* Search Field */}
                     <div style={{ position: 'relative' }}>
                         <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
@@ -252,7 +307,7 @@ export default function AdminTicketsPage() {
                             onChange={(e) => setTypeFilter(e.target.value)}
                         >
                             <option value="all">-- Tất cả loại vé --</option>
-                            {ticketTypes.map(tt => (
+                            {availableTicketTypes.map(tt => (
                                 <option key={tt.id} value={tt.id}>{tt.name}</option>
                             ))}
                         </select>
@@ -294,11 +349,20 @@ export default function AdminTicketsPage() {
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredTickets.length > 0 ? (
+                                {loading ? (
+                                    <tr>
+                                        <td colSpan="6" style={{ textAlign: 'center', padding: '36px 16px', color: '#64748B' }}>
+                                            <div style={{ fontSize: '1.2rem', marginBottom: '8px' }}>⏳</div>
+                                            <div style={{ fontWeight: '600', fontSize: '0.95rem', color: '#334155' }}>
+                                                Đang tải danh sách vé...
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ) : filteredTickets.length > 0 ? (
                                     filteredTickets.map(t => (
                                         <tr key={t.ticketCode}>
                                             <td className="font-mono font-bold" style={{ color: '#0F172A' }}>{t.ticketCode}</td>
-                                            <td>{t.ticketType}</td>
+                                            <td>{t.ticketTypeName || t.ticketType}</td>
                                             <td style={{ fontSize: '0.85rem' }}>{t.validFromDate}</td>
                                             <td style={{ fontSize: '0.85rem' }}>{t.validUntilDate}</td>
                                             <td>
@@ -377,7 +441,7 @@ export default function AdminTicketsPage() {
                                 onChange={(e) => setFormData({ ...formData, ticketTypeId: e.target.value })}
                             >
                                 <option value="">-- Chọn loại vé --</option>
-                                {ticketTypes.map(t => (
+                                {availableTicketTypes.map(t => (
                                     <option key={t.id} value={t.id}>{t.name}</option>
                                 ))}
                             </select>

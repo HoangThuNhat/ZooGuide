@@ -15,9 +15,24 @@ public class SpeciesService : ISpeciesService
         _context = context;
     }
 
-    public async Task<IEnumerable<SpeciesDto>> GetAllAsync()
+    public async Task<IEnumerable<SpeciesDto>> GetAllAsync(string? search = null, string? conservationStatus = null)
     {
-        return await _context.Species
+        var query = _context.Species.AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var s = search.Trim().ToLower();
+            query = query.Where(x => x.Name.ToLower().Contains(s) || 
+                                    (x.ScientificName != null && x.ScientificName.ToLower().Contains(s)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(conservationStatus) && conservationStatus != "all")
+        {
+            var cs = conservationStatus.Trim().ToLower();
+            query = query.Where(x => x.ConservationStatus != null && x.ConservationStatus.ToLower().Contains(cs));
+        }
+
+        return await query
             .Select(s => new SpeciesDto
             {
                 SpeciesId = s.SpeciesId,

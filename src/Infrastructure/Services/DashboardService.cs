@@ -15,25 +15,73 @@ public class DashboardService : IDashboardService
         _context = context;
     }
 
-    public async Task<DashboardStatsDto> GetStatsAsync()
+    public async Task<DashboardStatsDto> GetStatsAsync(DateTime? fromDate = null, DateTime? toDate = null)
     {
         var now = DateTime.UtcNow;
 
-        var totalTickets = await _context.Tickets.CountAsync();
-        var activeTickets = await _context.Tickets.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
-        var expiredTickets = await _context.Tickets.CountAsync(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
+        DateTime? utcFrom = fromDate.HasValue
+            ? (fromDate.Value.Kind == DateTimeKind.Utc ? fromDate.Value : DateTime.SpecifyKind(fromDate.Value, DateTimeKind.Utc))
+            : null;
 
+        DateTime? utcTo = toDate.HasValue
+            ? (toDate.Value.Kind == DateTimeKind.Utc ? toDate.Value : DateTime.SpecifyKind(toDate.Value, DateTimeKind.Utc))
+            : null;
+
+        if (utcTo.HasValue && utcTo.Value.TimeOfDay == TimeSpan.Zero)
+        {
+            utcTo = utcTo.Value.Date.AddDays(1).AddTicks(-1);
+        }
+
+        // 1. Dữ liệu vé (có trường ngày phát hành IssuedAt / CreatedAt -> chịu ảnh hưởng của bộ lọc thời gian)
+        var ticketQuery = _context.Tickets.AsQueryable();
+        if (utcFrom.HasValue)
+        {
+            ticketQuery = ticketQuery.Where(t => t.IssuedAt >= utcFrom.Value || t.CreatedAt >= utcFrom.Value);
+        }
+        if (utcTo.HasValue)
+        {
+            ticketQuery = ticketQuery.Where(t => t.IssuedAt <= utcTo.Value && t.CreatedAt <= utcTo.Value);
+        }
+
+        var totalTickets = await ticketQuery.CountAsync();
+        var activeTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
+        var expiredTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
+
+        // 2. Chỉ số tổng tích lũy không phụ thuộc thời gian (Động vật, Loài sinh thái, Khu chuồng trại, Thuyết minh, Audio)
         var totalAnimals = await _context.Animals.CountAsync();
         var totalSpecies = await _context.Species.CountAsync();
         var totalAreas = await _context.Areas.CountAsync();
         var totalNarrations = await _context.Narrations.CountAsync();
         var totalAudios = await _context.Audios.CountAsync();
 
-        var activeSessions = await _context.TicketSessions.CountAsync(s => s.Status == SessionStatus.Active && s.ExpiredAt > now);
+        // 3. Phiên khách tham quan (StartedAt trong kỳ)
+        var sessionQuery = _context.TicketSessions.AsQueryable();
+        if (utcFrom.HasValue)
+        {
+            sessionQuery = sessionQuery.Where(s => s.StartedAt >= utcFrom.Value);
+        }
+        if (utcTo.HasValue)
+        {
+            sessionQuery = sessionQuery.Where(s => s.StartedAt <= utcTo.Value);
+        }
 
-        // Lấy danh sách kiểm tra sức khỏe từ các cá thể động vật thực tế
-        var animals = await _context.Animals
+        var activeSessions = await sessionQuery.CountAsync(s => s.Status == SessionStatus.Active && (s.ExpiredAt > now || !utcFrom.HasValue));
+
+        // 4. Lấy danh sách kiểm tra sức khỏe từ các cá thể động vật thực tế theo thời gian cập nhật
+        var animalQuery = _context.Animals
             .Include(a => a.Species)
+            .AsQueryable();
+
+        if (utcFrom.HasValue)
+        {
+            animalQuery = animalQuery.Where(a => (a.UpdatedAt ?? a.CreatedAt) >= utcFrom.Value);
+        }
+        if (utcTo.HasValue)
+        {
+            animalQuery = animalQuery.Where(a => (a.UpdatedAt ?? a.CreatedAt) <= utcTo.Value);
+        }
+
+        var animals = await animalQuery
             .OrderByDescending(a => a.UpdatedAt ?? a.CreatedAt)
             .Take(10)
             .ToListAsync();
@@ -52,8 +100,8 @@ public class DashboardService : IDashboardService
             ActionRequired = a.Status == AnimalStatus.UnderTreatment ? "Cần theo dõi sát sao phác đồ điều trị" : ""
         }).ToList();
 
-        // Lấy các hoạt động gần đây
-        var recentTickets = await _context.Tickets
+        // 5. Lấy các hoạt động gần đây trong kỳ
+        var recentTickets = await ticketQuery
             .OrderByDescending(t => t.IssuedAt)
             .Take(3)
             .Select(t => new DashboardActivityDto
@@ -65,7 +113,7 @@ public class DashboardService : IDashboardService
             })
             .ToListAsync();
 
-        var recentAnimals = await _context.Animals
+        var recentAnimals = await animalQuery
             .OrderByDescending(a => a.CreatedAt)
             .Take(2)
             .Select(a => new DashboardActivityDto

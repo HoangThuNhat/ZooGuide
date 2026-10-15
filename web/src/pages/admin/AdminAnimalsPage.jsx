@@ -236,8 +236,9 @@ export default function AdminAnimalsPage() {
 
     return (
         <div>
-            {/* Page Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+
+            <div className="admin-page-header">
+
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Động Vật (Animal Records CMS)
@@ -667,8 +668,8 @@ export default function AdminAnimalsPage() {
                             />
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-                            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 1, minWidth: '130px' }}>
                                 {isEditing ? 'Cập Nhật Hồ Sơ' : 'Lưu Động Vật'}
                             </button>
                             {isEditing && (
@@ -676,6 +677,7 @@ export default function AdminAnimalsPage() {
                                     type="button" 
                                     className="btn btn-secondary" 
                                     onClick={() => { setIsEditing(null); setFormData(initialForm); }}
+                                    style={{ minWidth: '80px' }}
                                 >
                                     Hủy
                                 </button>

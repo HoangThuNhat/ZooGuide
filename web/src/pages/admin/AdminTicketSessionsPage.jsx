@@ -62,7 +62,7 @@ export default function AdminTicketSessionsPage() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Giám Sát Phiên Tham Quan (Ticket Sessions Monitor)
@@ -71,7 +71,7 @@ export default function AdminTicketSessionsPage() {
                         Theo dõi thiết bị của khách du lịch đang kích hoạt trong vườn thú để sử dụng Thuyết minh tự động & Bản đồ dẫn đường.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button className="btn btn-sm btn-outline" onClick={loadData} disabled={isLoading}>
                         {isLoading ? "Đang tải..." : "🔄 Làm mới"}
                     </button>

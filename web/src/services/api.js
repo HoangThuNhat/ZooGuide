@@ -17,18 +17,18 @@ export const API_CONFIG = {
 // ==========================================
 export const MOCK_DB = {
     species: [
-        { id: 1, nameVi: "Họ Mèo lớn", nameEn: "Big Cats (Felidae)", scientificOrder: "Carnivora", description: "Các loài thú ăn thịt đầu bảng với sức mạnh và móng vuốt sắc nhọn." },
-        { id: 2, nameVi: "Linh trưởng Cựu Thế Giới", nameEn: "Old World Monkeys", scientificOrder: "Primates", description: "Các loài khỉ, vượn và voọc sinh sống tại châu Á và châu Phi." },
-        { id: 3, nameVi: "Động vật móng guốc chẵn", nameEn: "Even-toed Ungulates", scientificOrder: "Artiodactyla", description: "Hươu, nai, hươu cao cổ, ngựa vằn sinh sống trên thảo nguyên." },
-        { id: 4, nameVi: "Bộ Cá sấu", nameEn: "Crocodilians", scientificOrder: "Crocodilia", description: "Bò sát thủy sinh cỡ lớn ăn thịt từ thời tiền sử." },
-        { id: 5, nameVi: "Bộ Hồng hạc", nameEn: "Flamingos", scientificOrder: "Phoenicopteriformes", description: "Các loài chim lội nước chân dài với bộ lông màu hồng rực rỡ." }
+        { id: 1, nameVi: "Họ Mèo lớn", nameEn: "Big Cats (Felidae)", scientificOrder: "Carnivora", conservationStatus: "VU - Sắp nguy cấp", description: "Các loài thú ăn thịt đầu bảng với sức mạnh và móng vuốt sắc nhọn." },
+        { id: 2, nameVi: "Linh trưởng Cựu Thế Giới", nameEn: "Old World Monkeys", scientificOrder: "Primates", conservationStatus: "EN - Nguy cấp", description: "Các loài khỉ, vượn và voọc sinh sống tại châu Á và châu Phi." },
+        { id: 3, nameVi: "Động vật móng guốc chẵn", nameEn: "Even-toed Ungulates", scientificOrder: "Artiodactyla", conservationStatus: "LC - Ít quan tâm", description: "Hươu, nai, hươu cao cổ, ngựa vằn sinh sống trên thảo nguyên." },
+        { id: 4, nameVi: "Bộ Cá sấu", nameEn: "Crocodilians", scientificOrder: "Crocodilia", conservationStatus: "CR - Cực kỳ nguy cấp", description: "Bò sát thủy sinh cỡ lớn ăn thịt từ thời tiền sử." },
+        { id: 5, nameVi: "Bộ Hồng hạc", nameEn: "Flamingos", scientificOrder: "Phoenicopteriformes", conservationStatus: "NT - Sắp bị đe dọa", description: "Các loài chim lội nước chân dài với bộ lông màu hồng rực rỡ." }
     ],
 
     ticketTypes: [
-        { id: 1, code: "VIP-FAM", name: "VIP Family Pass", price: 350000, description: "Vé trọn gói gia đình 4 người, gồm quyền Audio Guide và xe điện toàn khu." },
-        { id: 2, code: "STD-ADULT", name: "Standard Adult", price: 120000, description: "Vé tiêu chuẩn người lớn tham quan 5 phân khu." },
-        { id: 3, code: "STD-CHILD", name: "Standard Child", price: 60000, description: "Vé trẻ em dưới 1m3 tham quan và trải nghiệm giáo dục." },
-        { id: 4, code: "AUDIO-ADD", name: "Audio Tour Add-on", price: 40000, description: "Gói nâng cấp thuyết minh song ngữ tự động theo vị trí." }
+        { id: 1, ticketTypeId: 1, code: "VIP-FAM", name: "VIP Family Pass", price: 350000, description: "Vé trọn gói gia đình 4 người, gồm quyền Audio Guide và xe điện toàn khu." },
+        { id: 2, ticketTypeId: 2, code: "STD-ADULT", name: "Standard Adult", price: 120000, description: "Vé tiêu chuẩn người lớn tham quan 5 phân khu." },
+        { id: 3, ticketTypeId: 3, code: "STD-CHILD", name: "Standard Child", price: 60000, description: "Vé trẻ em dưới 1m3 tham quan và trải nghiệm giáo dục." },
+        { id: 4, ticketTypeId: 4, code: "AUDIO-ADD", name: "Audio Tour Add-on", price: 40000, description: "Gói nâng cấp thuyết minh song ngữ tự động theo vị trí." }
     ],
 
     ticketSessions: [
@@ -38,28 +38,46 @@ export const MOCK_DB = {
 
     tickets: [
         {
+            id: 1,
+            ticketId: 1,
             ticketCode: "ZOO-8899-VIP",
+            ticketTypeId: 1,
             customerName: "Nguyễn Văn An",
             ticketType: "VIP Family Pass",
+            ticketTypeName: "VIP Family Pass",
             validDate: "2026-09-30",
+            validFromDate: "30/09/2026, 08:30:00",
+            validUntilDate: "30/09/2026, 18:30:00",
             status: "Active",
             zonesAllowed: ["ALL"],
             hasAudioGuide: true
         },
         {
+            id: 2,
+            ticketId: 2,
             ticketCode: "ZOO-1234-STD",
+            ticketTypeId: 2,
             customerName: "Trần Thị Mai",
             ticketType: "Standard Adult",
+            ticketTypeName: "Standard Adult",
             validDate: "2026-09-30",
+            validFromDate: "30/09/2026, 09:15:00",
+            validUntilDate: "30/09/2026, 17:15:00",
             status: "Active",
             zonesAllowed: ["A", "B", "C"],
             hasAudioGuide: true
         },
         {
+            id: 3,
+            ticketId: 3,
             ticketCode: "ZOO-9999-EXP",
+            ticketTypeId: 2,
             customerName: "Lê Hoàng Phúc",
             ticketType: "Standard Adult",
+            ticketTypeName: "Standard Adult",
             validDate: "2026-09-01",
+            validFromDate: "01/09/2026, 08:00:00",
+            validUntilDate: "01/09/2026, 16:00:00",
             status: "Expired",
             zonesAllowed: ["ALL"],
             hasAudioGuide: false
@@ -1941,9 +1959,15 @@ export const ZooApi = {
     },
 
     // 8. ADMIN: SPECIES CRUD
-    async getSpecies() {
+    async getSpecies(filters = {}) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/species`);
+            const params = new URLSearchParams();
+            if (filters.search) params.append('search', filters.search);
+            if (filters.conservationStatus && filters.conservationStatus !== 'all') {
+                params.append('conservationStatus', filters.conservationStatus);
+            }
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await fetch(`${API_CONFIG.BASE_URL}/species${qs}`);
             if (!res.ok) throw new Error("API lỗi");
             const data = await res.json();
             const mapped = data.map(s => ({
@@ -1957,7 +1981,20 @@ export const ZooApi = {
             return { success: true, data: mapped };
         } catch (err) {
             console.error(err);
-            return { success: false, data: MOCK_DB.species, error: err.message };
+            let list = [...MOCK_DB.species];
+            if (filters.search) {
+                const q = filters.search.toLowerCase().trim();
+                list = list.filter(s => 
+                    (s.nameVi && s.nameVi.toLowerCase().includes(q)) || 
+                    (s.nameEn && s.nameEn.toLowerCase().includes(q)) ||
+                    (s.description && s.description.toLowerCase().includes(q))
+                );
+            }
+            if (filters.conservationStatus && filters.conservationStatus !== 'all') {
+                const cs = filters.conservationStatus.toLowerCase().trim();
+                list = list.filter(s => s.conservationStatus && s.conservationStatus.toLowerCase().includes(cs));
+            }
+            return { success: true, data: list, error: err.message };
         }
     },
     async createSpecies(data) {
@@ -2246,14 +2283,18 @@ export const ZooApi = {
             const data = await res.json();
             const mapped = data.map(t => {
                 let statusStr = 'Active';
-                if (t.status === 2) statusStr = 'Used';
-                if (t.status === 3) statusStr = 'Expired';
+                if (t.status === 2 || t.status === 'Used') statusStr = 'Used';
+                if (t.status === 3 || t.status === 'Expired') statusStr = 'Expired';
+                if (t.status === 4 || t.status === 'Cancelled') statusStr = 'Cancelled';
+                if (t.status === 5 || t.status === 'Locked') statusStr = 'Locked';
                 return {
                     id: t.ticketId,
                     ticketId: t.ticketId,
                     ticketCode: t.ticketCode,
-                    customerName: "Khách hàng",
+                    ticketTypeId: t.ticketTypeId,
+                    customerName: t.customerName || "Khách hàng",
                     ticketType: t.ticketTypeName || "Standard",
+                    ticketTypeName: t.ticketTypeName || "Standard",
                     validFromDate: t.validFrom ? new Date(t.validFrom).toLocaleString('vi-VN') : '',
                     validUntilDate: t.validUntil ? new Date(t.validUntil).toLocaleString('vi-VN') : '',
                     status: statusStr,
@@ -2289,11 +2330,13 @@ export const ZooApi = {
                 id: created.ticketId,
                 ticketId: created.ticketId,
                 ticketCode: created.ticketCode,
+                ticketTypeId: created.ticketTypeId || parseInt(data.ticketTypeId),
                 status: 'Active',
                 validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
                 validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
                 customerName: data.customerName || "Khách hàng",
                 ticketType: created.ticketTypeName || "Standard",
+                ticketTypeName: created.ticketTypeName || "Standard",
                 zonesAllowed: ["ALL"]
             }};
         } catch (err) {
@@ -2355,6 +2398,7 @@ export const ZooApi = {
             const data = await res.json();
             const mapped = data.map(t => ({
                 id: t.ticketTypeId,
+                ticketTypeId: t.ticketTypeId,
                 code: "TYPE-" + t.ticketTypeId,
                 name: t.name,
                 price: t.price,
@@ -2493,10 +2537,14 @@ export const ZooApi = {
     },
 
     // 14. ADMIN: DASHBOARD REAL-TIME STATS
-    async getDashboardStats() {
+    async getDashboardStats(filter = {}) {
         if (!API_CONFIG.USE_MOCK) {
             try {
-                const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/stats`);
+                const params = new URLSearchParams();
+                if (filter.fromDate) params.append('fromDate', filter.fromDate);
+                if (filter.toDate) params.append('toDate', filter.toDate);
+                const qs = params.toString() ? `?${params.toString()}` : '';
+                const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/stats${qs}`);
                 if (res.ok) {
                     const data = await res.json();
                     return { success: true, data: data.data || data };
@@ -2507,33 +2555,66 @@ export const ZooApi = {
         }
         await this._simulateLatency(100);
         const now = new Date();
-        const activeT = MOCK_DB.tickets.filter(t => t.status === 'Active').length;
+
+        let tickets = MOCK_DB.tickets || [];
+        if (filter.fromDate || filter.toDate) {
+            const fromTime = filter.fromDate ? new Date(filter.fromDate).getTime() : 0;
+            const toTime = filter.toDate ? new Date(filter.toDate).getTime() : Infinity;
+            tickets = tickets.filter(t => {
+                const dStr = t.validDate || t.validFrom || "2026-09-30";
+                const tTime = new Date(dStr).getTime();
+                return tTime >= fromTime && tTime <= toTime;
+            });
+        }
+        const activeT = tickets.filter(t => t.status === 'Active').length;
+
+        let sessions = MOCK_DB.ticketSessions || [];
+        if (filter.fromDate || filter.toDate) {
+            const fromTime = filter.fromDate ? new Date(filter.fromDate).getTime() : 0;
+            const toTime = filter.toDate ? new Date(filter.toDate).getTime() : Infinity;
+            sessions = sessions.filter(s => {
+                const dStr = s.activatedAt || "2026-09-30";
+                const sTime = new Date(dStr).getTime();
+                return sTime >= fromTime && sTime <= toTime;
+            });
+        }
+
+        let healthLogs = [
+            {
+                id: 1,
+                animalCode: "ANI-001",
+                animalName: "Sư tử Simba",
+                date: now.toISOString().slice(0, 10),
+                veterinarian: "BS. Trần Minh Quân",
+                healthStatus: "Rất tốt",
+                weightKg: 215.5,
+                temperatureC: 38.2,
+                notes: "Thể lực sung mãn, bờm phát triển tốt.",
+                actionRequired: ""
+            }
+        ];
+        if (filter.fromDate || filter.toDate) {
+            const fromTime = filter.fromDate ? new Date(filter.fromDate).getTime() : 0;
+            const toTime = filter.toDate ? new Date(filter.toDate).getTime() : Infinity;
+            healthLogs = healthLogs.filter(h => {
+                const hTime = new Date(h.date).getTime();
+                return hTime >= fromTime && hTime <= toTime;
+            });
+        }
+
         return {
             success: true,
             data: {
-                totalTickets: MOCK_DB.tickets.length,
+                totalTickets: tickets.length,
                 activeTickets: activeT,
-                expiredTickets: MOCK_DB.tickets.length - activeT,
+                expiredTickets: tickets.length - activeT,
                 totalAnimals: MOCK_DB.animals.length,
                 totalSpecies: MOCK_DB.species.length,
                 totalAreas: MOCK_DB.areas.length,
                 totalNarrations: Object.keys(MOCK_DB.narrations || {}).length * 2,
                 totalAudios: Object.keys(MOCK_DB.narrations || {}).length * 2,
-                activeSessions: MOCK_DB.ticketSessions.length,
-                recentHealthLogs: [
-                    {
-                        id: 1,
-                        animalCode: "ANI-001",
-                        animalName: "Sư tử Simba",
-                        date: now.toISOString().slice(0, 10),
-                        veterinarian: "BS. Trần Minh Quân",
-                        healthStatus: "Rất tốt",
-                        weightKg: 215.5,
-                        temperatureC: 38.2,
-                        notes: "Thể lực sung mãn, bờm phát triển tốt.",
-                        actionRequired: ""
-                    }
-                ],
+                activeSessions: sessions.length,
+                recentHealthLogs: healthLogs,
                 recentActivities: []
             }
         };

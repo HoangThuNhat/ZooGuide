@@ -149,7 +149,7 @@ export default function AdminTicketTypesPage() {
     return (
         <div>
             {/* Page Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+            <div className="admin-page-header">
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Loại Vé & Bảng Giá (Ticket Types & Pricing)
@@ -163,7 +163,7 @@ export default function AdminTicketTypesPage() {
 
             {/* Search and Filters Bar */}
             <div className="admin-card" style={{ marginBottom: '20px', padding: '16px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', alignItems: 'flex-end' }}>
+                <div className="admin-filter-grid">
                     {/* Search Field */}
                     <div style={{ position: 'relative' }}>
                         <label className="form-label" style={{ marginBottom: '4px', fontSize: '0.82rem', fontWeight: '700' }}>
@@ -386,12 +386,12 @@ export default function AdminTicketTypesPage() {
                                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                             ></textarea>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                            <button type="submit" className="btn btn-primary" style={{ flex: 1, minWidth: '130px' }}>
                                 {editMode ? 'Lưu Thay Đổi' : 'Thêm Loại Vé'}
                             </button>
                             {editMode && (
-                                <button type="button" className="btn btn-secondary" onClick={cancelEdit}>
+                                <button type="button" className="btn btn-secondary" onClick={cancelEdit} style={{ minWidth: '80px' }}>
                                     Hủy
                                 </button>
                             )}
