@@ -1,0 +1,424 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" modified="2026-10-08T15:00:00.000Z" agent="Antigravity" version="24.0.0" type="device">
+  <!-- ========================================== -->
+  <!-- TRANG 1: SƠ ĐỒ PHÂN RÃ PRODUCT BACKLOG     -->
+  <!-- ========================================== -->
+  <diagram id="diagram_backlog" name="1. Phân rã Product Backlog">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1650" pageHeight="1050" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- HEADER BANNER -->
+        <mxCell id="p1_header" value="&lt;b style=&quot;font-size: 20px; color: #0F172A;&quot;&gt;HỆ THỐNG QUẢN LÝ BẢO HIỂM Y TẾ &amp; GIÁM ĐỊNH ĐƠN THUỐC (HICAMS)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 13px; color: #475569;&quot;&gt;SƠ ĐỒ PHÂN RÃ PRODUCT BACKLOG (EPIC &amp; USER STORY MAPPING)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="50" y="30" width="1540" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- LEGEND / CHÚ THÍCH -->
+        <mxCell id="p1_legend" value="&lt;b&gt;Chú thích Ưu tiên:&lt;/b&gt; &amp;nbsp;&amp;nbsp; &lt;span style=&quot;background-color: #EF4444; color: white; padding: 2px 8px; border-radius: 4px;&quot;&gt;&lt;b&gt;Must-have&lt;/b&gt;&lt;/span&gt; Bắt buộc trong MVP &amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; &lt;span style=&quot;background-color: #3B82F6; color: white; padding: 2px 8px; border-radius: 4px;&quot;&gt;&lt;b&gt;Should-have&lt;/b&gt;&lt;/span&gt; Quan trọng đợt 2 &amp;nbsp;&amp;nbsp;|&amp;nbsp;&amp;nbsp; &lt;span style=&quot;background-color: #10B981; color: white; padding: 2px 8px; border-radius: 4px;&quot;&gt;&lt;b&gt;SP&lt;/b&gt;&lt;/span&gt; Story Points ước lượng" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#E2E8F0;strokeWidth=1;align=center;fontSize=12;fontColor=#334155;" vertex="1" parent="1">
+          <mxGeometry x="50" y="115" width="1540" height="35" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CỘT 1: EPIC 01 ==================== -->
+        <mxCell id="col1_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0F9FF;strokeColor=#BAE6FD;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="50" y="165" width="290" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="epic1_hdr" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;EPIC 01&lt;/b&gt;&lt;br/&gt;&lt;b style=&quot;font-size: 13px;&quot;&gt;XÁC THỰC QUYỀN LỢI&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 11px;&quot;&gt;(Eligibility Verification)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0284C7;strokeColor=#0369A1;fontColor=#FFFFFF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="60" y="175" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- US-01 -->
+        <mxCell id="us01" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #0369A1;&quot;&gt;US-01: Tra cứu Quyền lợi Realtime&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Dược sĩ quầy thuốc&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Quét mã thẻ BHYT gửi điện 270.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Nhận phản hồi 271 (&amp;lt; 1.5s): trạng thái Eligible, hạn mức Deductible và OOP Max còn lại.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;ELIGIBILITY_CHECK&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="65" y="255" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-01b -->
+        <mxCell id="us01b" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #0369A1;&quot;&gt;US-01b: Quản lý Thẻ &amp; Hợp đồng&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 3 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Nhân viên tiếp đón&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Lưu thông tin thẻ, thời hạn và thứ tự bảo hiểm chính/phụ.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Xác định thứ tự ưu tiên COB (1: Primary, 2: Secondary).&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;MEMBER_POLICY&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="65" y="425" width="260" height="145" as="geometry" />
+        </mxCell>
+
+        <!-- US-01c (Cache) -->
+        <mxCell id="us01c" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #0369A1;&quot;&gt;US-01c: Cache Hạn mức Quyền lợi&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #2563EB;&quot;&gt;&lt;b&gt;[Should-have | 3 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Mục tiêu:&lt;/b&gt; Cache kết quả kiểm tra 15 phút trong Redis để giảm tải truy vấn lặp lại sang cổng Payer.&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#93C5FD;strokeWidth=1;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="65" y="585" width="260" height="110" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CỘT 2: EPIC 02 ==================== -->
+        <mxCell id="col2_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDFA;strokeColor=#99F6E4;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="360" y="165" width="290" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="epic2_hdr" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;EPIC 02&lt;/b&gt;&lt;br/&gt;&lt;b style=&quot;font-size: 13px;&quot;&gt;DANH MỤC &amp; LÂM SÀNG&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 11px;&quot;&gt;(Formulary &amp; Clinical DUR)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0D9488;strokeColor=#0F766E;fontColor=#FFFFFF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="370" y="175" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- US-02 -->
+        <mxCell id="us02" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #0F766E;&quot;&gt;US-02: Đối chiếu Danh mục &amp; Bậc thuốc&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Động cơ quy tắc danh mục&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Đối chiếu hoạt chất đơn thuốc với danh mục gói bảo hiểm.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Xác định Tier 1/2/3/4, cờ PA, Step therapy, giới hạn ngày/số lượng và mã DAW.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;FORMULARY_DRUG&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5EEAD4;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="375" y="255" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-03 -->
+        <mxCell id="us03" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #0F766E;&quot;&gt;US-03: Rà soát Lâm sàng DUR Realtime&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 8 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Bác sĩ / Dược sĩ&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Kiểm tra tương tác thuốc - thuốc, dị ứng, quá liều và cấp phát quá sớm (early refill).&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Cảnh báo Hard Stop hoặc yêu cầu ghi đè lý do (Override Reason).&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;DUR_ALERT&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#5EEAD4;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="375" y="425" width="260" height="160" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CỘT 3: EPIC 03 ==================== -->
+        <mxCell id="col3_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#E9D5FF;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="670" y="165" width="290" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="epic3_hdr" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;EPIC 03&lt;/b&gt;&lt;br/&gt;&lt;b style=&quot;font-size: 13px;&quot;&gt;THẨM ĐỊNH &amp; TÀI CHÍNH&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 11px;&quot;&gt;(Claim Adjudication)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7C3AED;strokeColor=#6D28D9;fontColor=#FFFFFF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="680" y="175" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- US-04 -->
+        <mxCell id="us04" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #6D28D9;&quot;&gt;US-04: Thẩm định Tự động Claim Line&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 13 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Động cơ Giám định chi phí&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Bóc tách tài chính từng dòng đơn.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Tính toán chính xác: allowed_amount, deductible_applied, copay, coinsurance, payer_paid; cập nhật bộ đếm tích lũy.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;CLAIM, CLAIM_LINE&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="685" y="255" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-05 -->
+        <mxCell id="us05" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #6D28D9;&quot;&gt;US-05: Phối hợp Quyền lợi (COB)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #2563EB;&quot;&gt;&lt;b&gt;[Should-have | 8 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Dược sĩ quầy thuốc&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Tự động chuyển claim sang Payer phụ sau khi Payer chính chi trả xong.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Giảm tối đa tiền bệnh nhân tự chi trả, duy trì vết đối soát primary_claim_id.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;CLAIM.primary_claim_id&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="685" y="425" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-08 -->
+        <mxCell id="us08" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #6D28D9;&quot;&gt;US-08: Hoàn hủy Giao dịch (Reversal)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Dược sĩ quầy thuốc&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Hủy giao dịch đã duyệt khi bệnh nhân đổi đơn thuốc ngay trong ca.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Hoàn trả tồn kho on_hand, giảm trừ hạn mức tích lũy đã ghi nhận.&lt;br/&gt;&lt;b&gt;Trạng thái:&lt;/b&gt; &lt;i&gt;CLAIM: REVERSED&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C4B5FD;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="685" y="595" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CỘT 4: EPIC 04 ==================== -->
+        <mxCell id="col4_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#FDE68A;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="980" y="165" width="290" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="epic4_hdr" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;EPIC 04&lt;/b&gt;&lt;br/&gt;&lt;b style=&quot;font-size: 13px;&quot;&gt;PHÊ DUYỆT TRƯỚC (PA)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 11px;&quot;&gt;(Prior Authorization)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D97706;strokeColor=#B45309;fontColor=#FFFFFF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="990" y="175" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- US-06a -->
+        <mxCell id="us06a" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #B45309;&quot;&gt;US-06a: Khởi tạo Hồ sơ Lâm sàng PA&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #2563EB;&quot;&gt;&lt;b&gt;[Should-have | 8 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Bác sĩ / Nhân viên bảo hiểm&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Tạo hồ sơ đề nghị phê duyệt thuốc đặc trị / ngoài danh mục.&lt;br/&gt;&lt;b&gt;Nội dung:&lt;/b&gt; Đính kèm chẩn đoán ICD-10, bằng chứng thất bại với phác đồ bậc thấp.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;PRIOR_AUTHORIZATION&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="995" y="255" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-06b -->
+        <mxCell id="us06b" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #B45309;&quot;&gt;US-06b: Tiếp nhận Mã PA &amp; Tái nộp&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #2563EB;&quot;&gt;&lt;b&gt;[Should-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Dược sĩ quầy thuốc&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Nhận auth_approval_code được Payer duyệt.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Hệ thống tự động gán mã PA vào đơn bị từ chối trước đó và gửi tái thẩm định thành công.&lt;br/&gt;&lt;b&gt;Trạng thái:&lt;/b&gt; &lt;i&gt;PA: APPROVED&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FCD34D;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="995" y="425" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CỘT 5: EPIC 05 ==================== -->
+        <mxCell id="col5_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F0FDF4;strokeColor=#BBF7D0;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="1290" y="165" width="300" height="820" as="geometry" />
+        </mxCell>
+        <mxCell id="epic5_hdr" value="&lt;b style=&quot;font-size: 14px;&quot;&gt;EPIC 05&lt;/b&gt;&lt;br/&gt;&lt;b style=&quot;font-size: 13px;&quot;&gt;QUẦY THUỐC &amp; VẬN HÀNH&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 11px;&quot;&gt;(POS, Inventory &amp; Audit)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#16A34A;strokeColor=#15803D;fontColor=#FFFFFF;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1305" y="175" width="270" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- US-07 -->
+        <mxCell id="us07" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #15803D;&quot;&gt;US-07: Thu tiền Quầy, Trừ kho, In EOB&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Thu ngân / Dược sĩ quầy&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Thu đúng khoản patient_copay từ người bệnh.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Tự động trừ tồn kho on_hand, in bảng kê EOB kèm hóa đơn, chuyển claim sang PAID.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;DRUG_PHARMACY.on_hand&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="255" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-09 -->
+        <mxCell id="us09" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #15803D;&quot;&gt;US-09: Ghi Log Bảo mật &amp; Che mờ PHI&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #DC2626;&quot;&gt;&lt;b&gt;[Must-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Cán bộ An toàn Thông tin&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Lưu vết toàn bộ bản tin request/response trao đổi với cổng Payer.&lt;br/&gt;&lt;b&gt;Yêu cầu:&lt;/b&gt; Tự động che mờ (mask) CCCD, SĐT, Tên bệnh nhân trước khi ghi đĩa.&lt;br/&gt;&lt;b&gt;Bảng dữ liệu:&lt;/b&gt; &lt;i&gt;PHARMACY_CLAIM_TXN&lt;/i&gt;&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;strokeWidth=1.5;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="425" width="260" height="155" as="geometry" />
+        </mxCell>
+
+        <!-- US-10 -->
+        <mxCell id="us10" value="&lt;div style=&quot;text-align: left;&quot;&gt;&lt;b style=&quot;color: #15803D;&quot;&gt;US-10: Đối soát Thanh toán Công nợ&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 10px; color: #2563EB;&quot;&gt;&lt;b&gt;[Should-have | 5 SP]&lt;/b&gt;&lt;/span&gt;&lt;hr style=&quot;border: 0.5px solid #CBD5E1;&quot;&gt;&lt;b&gt;Vai trò:&lt;/b&gt; Kế toán viện / Nhà thuốc&lt;br/&gt;&lt;b&gt;Hành động:&lt;/b&gt; Tự động đối soát bảng kê giải ngân điện tử 835 ERA từ Payer.&lt;br/&gt;&lt;b&gt;Kết quả:&lt;/b&gt; Phát hiện chênh lệch xuất toán, theo dõi chu kỳ dòng tiền về (TAT).&lt;/div&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#86EFAC;strokeWidth=1;shadow=1;fontSize=11;fontColor=#1E293B;spacing=8;" vertex="1" parent="1">
+          <mxGeometry x="1310" y="595" width="260" height="145" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <!-- ========================================== -->
+  <!-- TRANG 2: SƠ ĐỒ LUỒNG NGHIỆP VỤ NGƯỜI DÙNG  -->
+  <!-- ========================================== -->
+  <diagram id="diagram_userflow" name="2. Luồng Nghiệp vụ Người dùng">
+    <mxGraphModel dx="1800" dy="1200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1950" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- HEADER BANNER -->
+        <mxCell id="p2_header" value="&lt;b style=&quot;font-size: 20px; color: #0F172A;&quot;&gt;QUY TRÌNH NGHIỆP VỤ ĐẦU - CUỐI (END-TO-END BUSINESS PROCESS FLOW)&lt;/b&gt;&lt;br/&gt;&lt;span style=&quot;font-size: 13px; color: #475569;&quot;&gt;HÀNH TRÌNH TỪ TIẾP ĐÓN ĐẾN THẨM ĐỊNH CHI PHÍ, CẤP PHÁT THUỐC &amp; ĐỐI SOÁT BẢO HIỂM&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#CBD5E1;strokeWidth=2;shadow=1;align=center;verticalAlign=middle;" vertex="1" parent="1">
+          <mxGeometry x="50" y="30" width="1850" height="65" as="geometry" />
+        </mxCell>
+
+        <!-- SWIMLANES (CÁC LÀN BƠI PHÂN VAI) -->
+        <!-- LANE 1: BỆNH NHÂN -->
+        <mxCell id="lane1" value="&lt;b style=&quot;font-size: 13px; color: #1E293B;&quot;&gt;BỆNH NHÂN&lt;br/&gt;(PATIENT)&lt;/b&gt;" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#F8FAFC;strokeColor=#94A3B8;strokeWidth=1.5;startSize=50;" vertex="1" parent="1">
+          <mxGeometry x="50" y="110" width="1850" height="200" as="geometry" />
+        </mxCell>
+
+        <!-- LANE 2: DƯỢC SĨ QUẦY -->
+        <mxCell id="lane2" value="&lt;b style=&quot;font-size: 13px; color: #0369A1;&quot;&gt;DƯỢC SĨ QUẦY / POS&lt;br/&gt;(PHARMACY COUNTER)&lt;/b&gt;" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#F0F9FF;strokeColor=#38BDF8;strokeWidth=1.5;startSize=50;" vertex="1" parent="1">
+          <mxGeometry x="50" y="310" width="1850" height="260" as="geometry" />
+        </mxCell>
+
+        <!-- LANE 3: HỆ THỐNG LÕI HICAMS -->
+        <mxCell id="lane3" value="&lt;b style=&quot;font-size: 13px; color: #6D28D9;&quot;&gt;HỆ THỐNG HICAMS&lt;br/&gt;(RULES &amp; ADJUDICATION)&lt;/b&gt;" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#C084FC;strokeWidth=1.5;startSize=50;" vertex="1" parent="1">
+          <mxGeometry x="50" y="570" width="1850" height="320" as="geometry" />
+        </mxCell>
+
+        <!-- LANE 4: CỔNG PAYER & KHO DƯỢC -->
+        <mxCell id="lane4" value="&lt;b style=&quot;font-size: 13px; color: #B45309;&quot;&gt;CỔNG CHI TRẢ &amp; KHO&lt;br/&gt;(PAYERS &amp; INVENTORY)&lt;/b&gt;" style="swimlane;horizontal=0;whiteSpace=wrap;html=1;fillColor=#FEFCE8;strokeColor=#FACC15;strokeWidth=1.5;startSize=50;" vertex="1" parent="1">
+          <mxGeometry x="50" y="890" width="1850" height="260" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CÁC NÚT TIẾN TRÌNH (PROCESS NODES) ==================== -->
+
+        <!-- START -->
+        <mxCell id="start_node" value="BẮT ĐẦU" style="ellipse;whiteSpace=wrap;html=1;fillColor=#22C55E;strokeColor=#16A34A;fontColor=#FFFFFF;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="90" y="175" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- BƯỚC 1: TIẾP ĐÓN & TRA QUYỀN LỢI -->
+        <mxCell id="act_p1" value="Xuất trình Thẻ BHYT&lt;br/&gt;&amp; Đơn thuốc tại Quầy" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E1;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="190" y="180" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pos1" value="Quét mã Thẻ / Barcode&lt;br/&gt;Gửi lệnh tra cứu quyền lợi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#38BDF8;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="190" y="380" width="140" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_core1" value="Eligibility Service:&lt;br/&gt;Đóng gói điện 270 Inquiry&lt;br/&gt;&amp; gọi Cổng Payer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C084FC;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="180" y="660" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pay1" value="Cổng Payer phản hồi 271:&lt;br/&gt;Trạng thái hiệu lực thẻ, gói,&lt;br/&gt;Deductible &amp; OOP còn lại" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FACC15;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="175" y="980" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- DECISION 1: THẺ CÒN HẠN? -->
+        <mxCell id="dec_elig" value="Thẻ hợp lệ&lt;br/&gt;&amp; còn hạn?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF08A;strokeColor=#CA8A04;fontColor=#854D0E;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="380" y="650" width="110" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pos_reject" value="Cảnh báo Thẻ hết hạn / Khóa&lt;br/&gt;Chuyển sang thanh toán tự túc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FEE2E2;strokeColor=#EF4444;fontColor=#991B1B;strokeWidth=1.5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="355" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- BƯỚC 2: NHẬP ĐƠN & DANH MỤC -->
+        <mxCell id="act_pos2" value="Nhập đơn thuốc (HIS/POS):&lt;br/&gt;Hoạt chất, liều, ngày dùng,&lt;br/&gt;Mã chỉ định cấp phát (DAW)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#38BDF8;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="540" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_core2" value="Formulary Engine:&lt;br/&gt;Đối chiếu danh mục gói,&lt;br/&gt;Xác định Tier 1-4, Days Limit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C084FC;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="540" y="660" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- BƯỚC 3: RÀ SOÁT LÂM SÀNG DUR -->
+        <mxCell id="act_core3" value="Clinical DUR Engine:&lt;br/&gt;Kiểm tra Tương tác thuốc,&lt;br/&gt;Quá liều, Early refill" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C084FC;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="740" y="660" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- DECISION 2: CẦN PA HOẶC LỖI DUR? -->
+        <mxCell id="dec_pa" value="Thuốc cần PA&lt;br/&gt;hoặc Lỗi DUR?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF08A;strokeColor=#CA8A04;fontColor=#854D0E;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="930" y="650" width="120" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- LUỒNG PHÊ DUYỆT TRƯỚC (PA) -->
+        <mxCell id="act_pa_req" value="Lập hồ sơ lâm sàng PA:&lt;br/&gt;Đính kèm bệnh án, ICD-10&lt;br/&gt;&amp; bằng chứng gửi Payer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFBEB;strokeColor=#F59E0B;strokeWidth=1.5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="910" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pa_pay" value="Hội đồng Giám định Payer:&lt;br/&gt;Xét duyệt hồ sơ điều trị &amp;&lt;br/&gt;Cấp mã auth_approval_code" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FACC15;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="905" y="980" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- BƯỚC 4: THẨM ĐỊNH CHI PHÍ (CLAIM ADJUDICATION) -->
+        <mxCell id="act_core4" value="Claim Adjudication Engine:&lt;br/&gt;Tính Allowed, Deductible,&lt;br/&gt;Copay, Coinsurance, Payer Paid" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C084FC;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="660" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pay_adj" value="Cổng Payer Adjudication:&lt;br/&gt;Xác nhận số tiền chấp thuận,&lt;br/&gt;Phản hồi kết quả dòng claim" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FACC15;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="980" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- DECISION 3: CÓ BẢO HIỂM PHỤ (COB)? -->
+        <mxCell id="dec_cob" value="Có Bảo hiểm&lt;br/&gt;Phụ (COB)?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#FEF08A;strokeColor=#CA8A04;fontColor=#854D0E;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1300" y="650" width="110" height="80" as="geometry" />
+        </mxCell>
+
+        <!-- NHÁNH COB -->
+        <mxCell id="act_cob_send" value="COB Engine:&lt;br/&gt;Tạo Claim phụ gửi Payer 2&lt;br/&gt;yêu cầu bù trừ phần tự trả" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FAF5FF;strokeColor=#A855F7;strokeWidth=1.5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1275" y="780" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_cob_pay" value="Payer Phụ (Secondary):&lt;br/&gt;Chi trả tiếp khoản đồng chi trả&lt;br/&gt;theo phạm vi hợp đồng" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FACC15;strokeWidth=1.5;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1270" y="980" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- BƯỚC 5: THU TIỀN, TRỪ KHO & HOÀN TẤT TẠI POS -->
+        <mxCell id="act_pos_cash" value="Màn hình POS hiển thị:&lt;br/&gt;Số tiền Bệnh nhân cần nộp&lt;br/&gt;&lt;b&gt;(patient_copay)&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#38BDF8;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1460" y="380" width="160" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pat_pay" value="Bệnh nhân thanh toán&lt;br/&gt;phần Đồng chi trả&lt;br/&gt;(Tiền mặt / Thẻ / QR)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#CBD5E1;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1465" y="180" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_pos_finish" value="Thu ngân xác nhận:&lt;br/&gt;In Bảng kê chi phí EOB&lt;br/&gt;&amp; Hóa đơn thanh toán" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#38BDF8;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1660" y="380" width="150" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_core_audit" value="Hệ thống HICAMS:&lt;br/&gt;Che mờ PHI (masking) &amp;&lt;br/&gt;lưu log PHARMACY_CLAIM_TXN" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#C084FC;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1645" y="660" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="act_inv_deduct" value="Kho Dược vật lý:&lt;br/&gt;Tự động trừ số lượng xuất&lt;br/&gt;&lt;b&gt;DRUG_PHARMACY.on_hand&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#FACC15;strokeWidth=1.5;shadow=1;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="1650" y="980" width="170" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="end_node" value="KẾT THÚC&lt;br/&gt;(Nhận thuốc)" style="ellipse;whiteSpace=wrap;html=1;fillColor=#EF4444;strokeColor=#DC2626;fontColor=#FFFFFF;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="1700" y="170" width="70" height="70" as="geometry" />
+        </mxCell>
+
+        <!-- ==================== CÁC ĐƯỜNG KẾT NỐI (CONNECTORS) ==================== -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#475569;strokeWidth=2;" edge="1" parent="1" source="start_node" target="act_p1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#475569;strokeWidth=2;" edge="1" parent="1" source="act_p1" target="act_pos1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_pos1" target="act_core1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_core1" target="act_pay1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_pay1" target="dec_elig">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="435" y="1010" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_elig_no" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#EF4444;strokeWidth=2;fontColor=#DC2626;fontStyle=1;" edge="1" parent="1" source="dec_elig" target="act_pos_reject">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e_elig_yes" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;fontColor=#15803D;fontStyle=1;" edge="1" parent="1" source="dec_elig" target="act_pos2">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_pos2" target="act_core2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_core2" target="act_core3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_core3" target="dec_pa">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <!-- PA BRANCH -->
+        <mxCell id="e_pa_yes" value="Cần PA" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;fontColor=#B45309;fontStyle=1;" edge="1" parent="1" source="dec_pa" target="act_pa_req">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D97706;strokeWidth=2;" edge="1" parent="1" source="act_pa_req" target="act_pa_pay">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="990" y="500" />
+              <mxPoint x="990" y="900" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e10" value="Duyệt mã Auth" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;fontColor=#15803D;fontStyle=1;" edge="1" parent="1" source="act_pa_pay" target="act_core4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1070" y="1010" />
+              <mxPoint x="1070" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_pa_no" value="Hợp lệ" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;fontColor=#15803D;fontStyle=1;" edge="1" parent="1" source="dec_pa" target="act_core4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e11" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_core4" target="act_pay_adj">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e12" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_pay_adj" target="dec_cob">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1270" y="1010" />
+              <mxPoint x="1270" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- COB BRANCH -->
+        <mxCell id="e_cob_yes" value="Có" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;fontColor=#6D28D9;fontStyle=1;" edge="1" parent="1" source="dec_cob" target="act_cob_send">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_cob_send" target="act_cob_pay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#7C3AED;strokeWidth=2;" edge="1" parent="1" source="act_cob_pay" target="act_pos_cash">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1450" y="1010" />
+              <mxPoint x="1450" y="410" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e_cob_no" value="Không" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;fontColor=#15803D;fontStyle=1;" edge="1" parent="1" source="dec_cob" target="act_pos_cash">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1480" y="690" />
+              <mxPoint x="1480" y="440" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- FINISH FLOW -->
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_pos_cash" target="act_pat_pay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_pat_pay" target="act_pos_finish">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1630" y="210" />
+              <mxPoint x="1630" y="410" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <mxCell id="e17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_pos_finish" target="act_core_audit">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#0284C7;strokeWidth=2;" edge="1" parent="1" source="act_core_audit" target="act_inv_deduct">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e19" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#16A34A;strokeWidth=2;" edge="1" parent="1" source="act_pos_finish" target="end_node">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1735" y="300" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

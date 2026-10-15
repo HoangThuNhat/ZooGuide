@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <title>Sơ đồ Phân rã Product Backlog (HICAMS) - Dành cho Google Docs</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: #F1F5F9;
+      margin: 0;
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .toolbar {
+      background: #FFFFFF;
+      padding: 16px 24px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      margin-bottom: 25px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      text-decoration: none;
+    }
+    .btn-primary {
+      background-color: #0284C7;
+      color: #FFFFFF;
+    }
+    .btn-primary:hover {
+      background-color: #0369A1;
+      transform: translateY(-1px);
+    }
+    .btn-success {
+      background-color: #16A34A;
+      color: #FFFFFF;
+    }
+    .btn-success:hover {
+      background-color: #15803D;
+      transform: translateY(-1px);
+    }
+    .status-msg {
+      font-size: 13px;
+      color: #16A34A;
+      font-weight: 600;
+      margin-left: 10px;
+      display: none;
+    }
+    .canvas-card {
+      background: #FFFFFF;
+      padding: 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+      max-width: 1280px;
+      width: 100%;
+      overflow-x: auto;
+    }
+    svg {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    .docs-tip {
+      margin-top: 20px;
+      max-width: 1240px;
+      background: #EFF6FF;
+      border-left: 4px solid #3B82F6;
+      padding: 12px 18px;
+      border-radius: 6px;
+      font-size: 13.5px;
+      color: #1E3A8A;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="downloadPNG()">
+      📥 Tải ảnh PNG Độ Nét Cao (300 DPI) cho Google Docs
+    </button>
+    <button class="btn btn-success" onclick="copyImageToClipboard()">
+      📋 Sao Chép Ảnh Vào Clipboard (Paste Ctrl+V vào Docs)
+    </button>
+    <span id="status" class="status-msg">✔ Đã sao chép ảnh vào Clipboard! Hãy mở Google Docs và bấm Ctrl + V</span>
+  </div>
+
+  <div class="canvas-card">
+    <div id="svgContainer">
+      <!-- Embedded SVG -->
+      <svg id="diagramSvg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1240 760" width="1240" height="760">
+        <defs>
+          <filter id="cardShadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#0F172A" flood-opacity="0.08"/>
+          </filter>
+          <filter id="headerShadow" x="-2%" y="-5%" width="104%" height="115%" filterUnits="userSpaceOnUse">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0F172A" flood-opacity="0.06"/>
+          </filter>
+        </defs>
+
+        <rect width="1240" height="760" fill="#FFFFFF"/>
+
+        <!-- Header -->
+        <g filter="url(#headerShadow)">
+          <rect x="30" y="25" width="1180" height="72" rx="10" ry="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="1.5"/>
+        </g>
+        <text x="620" y="52" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="19" font-weight="700" fill="#0F172A" text-anchor="middle">
+          HỆ THỐNG QUẢN LÝ BẢO HIỂM Y TẾ &amp; GIÁM ĐỊNH ĐƠN THUỐC (HICAMS)
+        </text>
+        <text x="620" y="78" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="600" fill="#475569" text-anchor="middle" letter-spacing="1">
+          SƠ ĐỒ PHÂN RÃ PRODUCT BACKLOG (EPICS &amp; USER STORIES)
+        </text>
+
+        <!-- Legend -->
+        <rect x="30" y="108" width="1180" height="34" rx="6" ry="6" fill="#F1F5F9" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="50" y="130" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" font-weight="700" fill="#334155">
+          CHÚ THÍCH PHÂN LOẠI:
+        </text>
+        <rect x="180" y="115" width="80" height="20" rx="4" ry="4" fill="#EF4444"/>
+        <text x="220" y="129" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must-have</text>
+        <text x="268" y="129" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#475569">Bắt buộc cho MVP</text>
+        <rect x="400" y="115" width="85" height="20" rx="4" ry="4" fill="#3B82F6"/>
+        <text x="442" y="129" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Should-have</text>
+        <text x="493" y="129" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#475569">Giai đoạn kế tiếp</text>
+        <circle cx="630" cy="125" r="7" fill="#10B981"/>
+        <text x="645" y="129" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11" fill="#475569">Độ phức tạp tính theo Story Points (SP)</text>
+
+        <!-- Col 1: EPIC 01 -->
+        <rect x="30" y="152" width="224" height="580" rx="10" ry="10" fill="#F0F9FF" stroke="#BAE6FD" stroke-width="1.2"/>
+        <g filter="url(#cardShadow)">
+          <rect x="40" y="162" width="204" height="64" rx="8" ry="8" fill="#0284C7" stroke="#0369A1" stroke-width="1.5"/>
+        </g>
+        <text x="142" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle">EPIC 01</text>
+        <text x="142" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#E0F2FE" text-anchor="middle">Eligibility Check</text>
+        <text x="142" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="400" fill="#BAE6FD" text-anchor="middle">(Xác thực Quyền lợi)</text>
+
+        <line x1="142" y1="226" x2="142" y2="255" stroke="#0284C7" stroke-width="2"/>
+        <polygon points="142,258 138,250 146,250" fill="#0284C7"/>
+
+        <!-- US-01 -->
+        <g filter="url(#cardShadow)">
+          <rect x="40" y="258" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#93C5FD" stroke-width="1.5"/>
+        </g>
+        <rect x="50" y="268" width="70" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="85" y="281" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 5 SP</text>
+        <text x="142" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#0369A1" text-anchor="middle">US-01: Tra cứu Quyền lợi</text>
+        <text x="142" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Realtime (270/271)</text>
+        <line x1="52" y1="326" x2="232" y2="326" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="52" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Quét mã thẻ BHYT tại quầy</text>
+        <text x="52" y="354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Lấy Deductible, OOP còn lại</text>
+        <text x="52" y="368" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: ELIGIBILITY_CHECK</text>
+
+        <!-- Col 2: EPIC 02 -->
+        <rect x="269" y="152" width="224" height="580" rx="10" ry="10" fill="#F0FDFA" stroke="#99F6E4" stroke-width="1.2"/>
+        <g filter="url(#cardShadow)">
+          <rect x="279" y="162" width="204" height="64" rx="8" ry="8" fill="#0D9488" stroke="#0F766E" stroke-width="1.5"/>
+        </g>
+        <text x="381" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle">EPIC 02</text>
+        <text x="381" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#CCFBF1" text-anchor="middle">Formulary &amp; DUR</text>
+        <text x="381" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="400" fill="#99F6E4" text-anchor="middle">(Danh mục &amp; Lâm sàng)</text>
+
+        <line x1="381" y1="226" x2="381" y2="255" stroke="#0D9488" stroke-width="2"/>
+        <polygon points="381,258 377,250 385,250" fill="#0D9488"/>
+
+        <!-- US-02 -->
+        <g filter="url(#cardShadow)">
+          <rect x="279" y="258" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#5EEAD4" stroke-width="1.5"/>
+        </g>
+        <rect x="289" y="268" width="70" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="324" y="281" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 5 SP</text>
+        <text x="381" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#0F766E" text-anchor="middle">US-02: Đối chiếu Tier,</text>
+        <text x="381" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Giới hạn &amp; Mã DAW</text>
+        <line x1="291" y1="326" x2="471" y2="326" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="291" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Xác định Tier 1/2/3/4 của gói</text>
+        <text x="291" y="354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Kiểm tra cờ PA, Days limit, DAW</text>
+        <text x="291" y="368" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: FORMULARY_DRUG</text>
+
+        <!-- US-03 -->
+        <line x1="381" y1="376" x2="381" y2="395" stroke="#0D9488" stroke-width="2"/>
+        <polygon points="381,398 377,390 385,390" fill="#0D9488"/>
+        <g filter="url(#cardShadow)">
+          <rect x="279" y="398" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#5EEAD4" stroke-width="1.5"/>
+        </g>
+        <rect x="289" y="408" width="70" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="324" y="421" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 8 SP</text>
+        <text x="381" y="443" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#0F766E" text-anchor="middle">US-03: Rà soát Lâm sàng</text>
+        <text x="381" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Tương tác thuốc (DUR)</text>
+        <line x1="291" y1="466" x2="471" y2="466" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="291" y="480" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Cảnh báo tương tác, quá liều</text>
+        <text x="291" y="494" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Chặn early refill / Override log</text>
+        <text x="291" y="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: DUR_ALERT</text>
+
+        <!-- Col 3: EPIC 03 -->
+        <rect x="508" y="152" width="224" height="580" rx="10" ry="10" fill="#FAF5FF" stroke="#E9D5FF" stroke-width="1.2"/>
+        <g filter="url(#cardShadow)">
+          <rect x="518" y="162" width="204" height="64" rx="8" ry="8" fill="#7C3AED" stroke="#6D28D9" stroke-width="1.5"/>
+        </g>
+        <text x="620" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle">EPIC 03</text>
+        <text x="620" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#EDE9FE" text-anchor="middle">Claim Adjudication</text>
+        <text x="620" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="400" fill="#DDD6FE" text-anchor="middle">(Thẩm định &amp; Chi phí)</text>
+
+        <line x1="620" y1="226" x2="620" y2="255" stroke="#7C3AED" stroke-width="2"/>
+        <polygon points="620,258 616,250 624,250" fill="#7C3AED"/>
+
+        <!-- US-04 -->
+        <g filter="url(#cardShadow)">
+          <rect x="518" y="258" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#C4B5FD" stroke-width="1.5"/>
+        </g>
+        <rect x="528" y="268" width="75" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="565" y="281" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 13 SP</text>
+        <text x="620" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#6D28D9" text-anchor="middle">US-04: Thẩm định Tự động</text>
+        <text x="620" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Chi phí Claim Line</text>
+        <line x1="530" y1="326" x2="710" y2="326" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="530" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Tính allowed, copay, coinsurance</text>
+        <text x="530" y="354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Tự động trừ Deductible tích lũy</text>
+        <text x="530" y="368" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: CLAIM, CLAIM_LINE</text>
+
+        <!-- US-05 -->
+        <line x1="620" y1="376" x2="620" y2="395" stroke="#7C3AED" stroke-width="2"/>
+        <polygon points="620,398 616,390 624,390" fill="#7C3AED"/>
+        <g filter="url(#cardShadow)">
+          <rect x="518" y="398" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#C4B5FD" stroke-width="1.5"/>
+        </g>
+        <rect x="528" y="408" width="85" height="18" rx="3" ry="3" fill="#3B82F6"/>
+        <text x="570" y="421" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Should | 8 SP</text>
+        <text x="620" y="443" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#6D28D9" text-anchor="middle">US-05: Điều phối Quyền lợi</text>
+        <text x="620" y="458" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Đa bảo hiểm (COB)</text>
+        <line x1="530" y1="466" x2="710" y2="466" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="530" y="480" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Gửi Payer chính → Payer phụ</text>
+        <text x="530" y="494" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Bù trừ tối đa tiền tự chi trả</text>
+        <text x="530" y="508" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ FK: primary_claim_id</text>
+
+        <!-- US-08 -->
+        <line x1="620" y1="516" x2="620" y2="535" stroke="#7C3AED" stroke-width="2"/>
+        <polygon points="620,538 616,530 624,530" fill="#7C3AED"/>
+        <g filter="url(#cardShadow)">
+          <rect x="518" y="538" width="204" height="118" rx="8" ry="8" fill="#FFFFFF" stroke="#C4B5FD" stroke-width="1.5"/>
+        </g>
+        <rect x="528" y="548" width="70" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="563" y="561" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 5 SP</text>
+        <text x="620" y="583" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#6D28D9" text-anchor="middle">US-08: Hoàn hủy Giao dịch</text>
+        <text x="620" y="598" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">(Claim Reversal)</text>
+        <line x1="530" y1="606" x2="710" y2="606" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="530" y="620" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Hủy claim đổi đơn ngay trong ca</text>
+        <text x="530" y="634" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Hoàn kho &amp; khôi phục hạn mức</text>
+        <text x="530" y="648" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Trạng thái: REVERSED</text>
+
+        <!-- Col 4: EPIC 04 -->
+        <rect x="747" y="152" width="224" height="580" rx="10" ry="10" fill="#FFFBEB" stroke="#FDE68A" stroke-width="1.2"/>
+        <g filter="url(#cardShadow)">
+          <rect x="757" y="162" width="204" height="64" rx="8" ry="8" fill="#D97706" stroke="#B45309" stroke-width="1.5"/>
+        </g>
+        <text x="859" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle">EPIC 04</text>
+        <text x="859" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#FEF3C7" text-anchor="middle">Prior Authorization</text>
+        <text x="859" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="400" fill="#FDE68A" text-anchor="middle">(Phê duyệt trước - PA)</text>
+
+        <line x1="859" y1="226" x2="859" y2="255" stroke="#D97706" stroke-width="2"/>
+        <polygon points="859,258 855,250 863,250" fill="#D97706"/>
+
+        <!-- US-06 -->
+        <g filter="url(#cardShadow)">
+          <rect x="757" y="258" width="204" height="124" rx="8" ry="8" fill="#FFFFFF" stroke="#FCD34D" stroke-width="1.5"/>
+        </g>
+        <rect x="767" y="268" width="85" height="18" rx="3" ry="3" fill="#3B82F6"/>
+        <text x="809" y="281" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Should | 8 SP</text>
+        <text x="859" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#B45309" text-anchor="middle">US-06: Hồ sơ Lâm sàng &amp;</text>
+        <text x="859" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Mã Phê duyệt trước (PA)</text>
+        <line x1="769" y1="326" x2="949" y2="326" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="769" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Đính kèm bệnh án, ICD-10</text>
+        <text x="769" y="354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Gửi Payer thẩm định đặc cách</text>
+        <text x="769" y="368" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Nhận auth_approval_code tái nộp</text>
+        <text x="769" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: PRIOR_AUTHORIZATION</text>
+
+        <!-- Col 5: EPIC 05 -->
+        <rect x="986" y="152" width="224" height="580" rx="10" ry="10" fill="#F0FDF4" stroke="#BBF7D0" stroke-width="1.2"/>
+        <g filter="url(#cardShadow)">
+          <rect x="996" y="162" width="204" height="64" rx="8" ry="8" fill="#16A34A" stroke="#15803D" stroke-width="1.5"/>
+        </g>
+        <text x="1098" y="188" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="13" font-weight="800" fill="#FFFFFF" text-anchor="middle">EPIC 05</text>
+        <text x="1098" y="206" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="12" font-weight="600" fill="#DCFCE7" text-anchor="middle">POS &amp; Inventory</text>
+        <text x="1098" y="219" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-weight="400" fill="#BBF7D0" text-anchor="middle">(Quầy thuốc &amp; Trừ kho)</text>
+
+        <line x1="1098" y1="226" x2="1098" y2="255" stroke="#16A34A" stroke-width="2"/>
+        <polygon points="1098,258 1094,250 1102,250" fill="#16A34A"/>
+
+        <!-- US-07 -->
+        <g filter="url(#cardShadow)">
+          <rect x="996" y="258" width="204" height="124" rx="8" ry="8" fill="#FFFFFF" stroke="#86EFAC" stroke-width="1.5"/>
+        </g>
+        <rect x="1006" y="268" width="70" height="18" rx="3" ry="3" fill="#EF4444"/>
+        <text x="1041" y="281" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-weight="700" fill="#FFFFFF" text-anchor="middle">Must | 5 SP</text>
+        <text x="1098" y="303" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="11.5" font-weight="700" fill="#15803D" text-anchor="middle">US-07: Thu tiền Quầy,</text>
+        <text x="1098" y="318" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10.5" font-weight="600" fill="#0F172A" text-anchor="middle">Trừ kho &amp; In EOB</text>
+        <line x1="1008" y1="326" x2="1188" y2="326" stroke="#E2E8F0" stroke-width="1"/>
+        <text x="1008" y="340" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Thu đúng khoản patient_copay</text>
+        <text x="1008" y="354" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• Trừ kho vật lý DRUG_PHARMACY</text>
+        <text x="1008" y="368" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" fill="#475569">• In bảng kê EOB + Lưu masked log</text>
+        <text x="1008" y="380" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="9.5" font-style="italic" fill="#64748B">→ Bảng: PHARMACY_CLAIM_TXN</text>
+
+        <!-- Footer -->
+        <rect x="30" y="736" width="1180" height="18" fill="none"/>
+        <text x="620" y="749" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="10" font-style="italic" fill="#94A3B8" text-anchor="middle">
+          Tài liệu thiết kế kiến trúc hệ thống HICAMS • Tương thích tối ưu cho tài liệu kỹ thuật &amp; Google Docs (Khổ A4/16:9)
+        </text>
+      </svg>
+    </div>
+  </div>
+
+  <div class="docs-tip">
+    💡 <b>Mẹo chèn nhanh vào Google Docs:</b>
+    <br/>1. Bấm nút <b>"Sao Chép Ảnh Vào Clipboard"</b> ở trên.
+    <br/>2. Mở tài liệu Google Docs của bạn, đặt con trỏ chuột vào vị trí cần chèn và nhấn tổ hợp phím <b>Ctrl + V</b> (Paste). Ảnh sẽ hiển thị với kích thước chuẩn, chữ sắc nét và nền trắng sạch sẽ!
+    <br/>3. Hoặc bấm <b>"Tải ảnh PNG Độ Nét Cao"</b> để lưu file về máy rồi dùng menu <i>Chèn → Hình ảnh → Tải lên từ máy tính</i> trong Google Docs.
+  </div>
+
+  <!-- Hidden Canvas for high-res PNG export -->
+  <canvas id="exportCanvas" style="display:none;"></canvas>
+
+  <script>
+    // Hàm xuất ảnh PNG độ phân giải 2x (tương đương 300 DPI)
+    function renderSvgToCanvas(scale = 2) {
+      return new Promise((resolve, reject) => {
+        const svgElement = document.getElementById('diagramSvg');
+        const svgString = new XMLSerializer().serializeToString(svgElement);
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const URL = window.URL || window.webkitURL || window;
+        const blobURL = URL.createObjectURL(svgBlob);
+
+        const image = new Image();
+        image.onload = () => {
+          const canvas = document.getElementById('exportCanvas');
+          const width = 1240 * scale;
+          const height = 760 * scale;
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(image, 0, 0, width, height);
+          URL.revokeObjectURL(blobURL);
+          resolve(canvas);
+        };
+        image.onerror = (err) => reject(err);
+        image.src = blobURL;
+      });
+    }
+
+    async function downloadPNG() {
+      try {
+        const canvas = await renderSvgToCanvas(2.5); // 3100 x 1900 px (Ultra Sharp)
+        const pngUrl = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.href = pngUrl;
+        downloadLink.download = 'Phan_Ra_Product_Backlog_HICAMS.png';
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+      } catch (e) {
+        alert('Lỗi xuất ảnh: ' + e);
+      }
+    }
+
+    async function copyImageToClipboard() {
+      try {
+        const canvas = await renderSvgToCanvas(2);
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            alert('Không thể tạo ảnh');
+            return;
+          }
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': blob })
+          ]);
+          const status = document.getElementById('status');
+          status.style.display = 'inline';
+          setTimeout(() => { status.style.display = 'none'; }, 5000);
+        }, 'image/png');
+      } catch (err) {
+        // Fallback: nếu browser chặn clipboard image trực tiếp
+        downloadPNG();
+      }
+    }
+  </script>
+</body>
+</html>

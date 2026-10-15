@@ -10,6 +10,13 @@ export default function AdminAnimalsPage() {
     const [speciesOptions, setSpeciesOptions] = useState([]);
     const [isEditing, setIsEditing] = useState(null);
 
+    // Filters State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+    const [selectedSpeciesFilter, setSelectedSpeciesFilter] = useState('all');
+    const [selectedIucnFilter, setSelectedIucnFilter] = useState('all');
+    const [selectedHealthFilter, setSelectedHealthFilter] = useState('all');
+
     const initialForm = {
         nameVi: '',
         nameEn: '',
@@ -158,6 +165,67 @@ export default function AdminAnimalsPage() {
         }
     };
 
+    const filteredAnimals = animals.filter(a => {
+        // Keyword Search
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase().trim();
+            const matchNameVi = (a.nameVi || a.name || '').toLowerCase().includes(q);
+            const matchNameEn = (a.nameEn || '').toLowerCase().includes(q);
+            const matchSci = (a.scientificName || '').toLowerCase().includes(q);
+            const matchCode = (a.code || '').toLowerCase().includes(q);
+            const matchSpecies = (a.species || '').toLowerCase().includes(q);
+            const matchOrigin = (a.origin || '').toLowerCase().includes(q);
+            if (!matchNameVi && !matchNameEn && !matchSci && !matchCode && !matchSpecies && !matchOrigin) {
+                return false;
+            }
+        }
+
+        // Area Filter
+        if (selectedAreaFilter !== 'all') {
+            const matchArea = String(a.areaId) === String(selectedAreaFilter) ||
+                              String(a.zoneId) === String(selectedAreaFilter) ||
+                              String(a.zoneCode).toUpperCase() === String(selectedAreaFilter).toUpperCase();
+            if (!matchArea) return false;
+        }
+
+        // Species Filter
+        if (selectedSpeciesFilter !== 'all') {
+            const matchSpecies = String(a.speciesId) === String(selectedSpeciesFilter) ||
+                                 (a.species && a.species.toLowerCase() === selectedSpeciesFilter.toLowerCase());
+            if (!matchSpecies) return false;
+        }
+
+        // IUCN Filter
+        if (selectedIucnFilter !== 'all') {
+            if (!(a.iucnStatus || '').toUpperCase().includes(selectedIucnFilter.toUpperCase())) {
+                return false;
+            }
+        }
+
+        // Health Status Filter
+        if (selectedHealthFilter !== 'all') {
+            if (!(a.healthStatus || '').toLowerCase().includes(selectedHealthFilter.toLowerCase())) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    const hasActiveFilters = searchQuery !== '' ||
+                            selectedAreaFilter !== 'all' ||
+                            selectedSpeciesFilter !== 'all' ||
+                            selectedIucnFilter !== 'all' ||
+                            selectedHealthFilter !== 'all';
+
+    const handleResetFilters = () => {
+        setSearchQuery('');
+        setSelectedAreaFilter('all');
+        setSelectedSpeciesFilter('all');
+        setSelectedIucnFilter('all');
+        setSelectedHealthFilter('all');
+    };
+
     const getIucnBadgeClass = (status) => {
         const s = (status || '').toUpperCase();
         if (s.includes('CR') || s.includes('CỰC KỲ') || s.includes('EX') || s.includes('EW')) return 'badge-danger';
@@ -168,7 +236,8 @@ export default function AdminAnimalsPage() {
 
     return (
         <div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            {/* Page Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <div>
                     <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
                         Quản Lý Động Vật (Animal Records CMS)
@@ -177,14 +246,145 @@ export default function AdminAnimalsPage() {
                         Hồ sơ các cá thể thú, liên kết phân loại loài (Species), định vị chuồng trại trên bản đồ và tình trạng bảo tồn IUCN.
                     </p>
                 </div>
-                <span className="chip font-bold">{animals.length} cá thể động vật</span>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <span className="chip font-bold" style={{ background: '#DCFCE7', color: '#166534' }}>
+                        {animals.length} Tổng số cá thể
+                    </span>
+                    {hasActiveFilters && (
+                        <span className="chip font-bold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
+                            Khớp lọc: {filteredAnimals.length}
+                        </span>
+                    )}
+                </div>
             </div>
 
             <div className="ticket-page-layout">
-                {/* Animal Grid List */}
+                {/* Animal Grid List & Filters */}
                 <div>
-                    <div className="admin-table-wrapper ticket-table-scroll">
-                        <table className="admin-table">
+                    {/* BỘ LỌC ĐỘNG VẬT */}
+                    <div className="admin-card" style={{ marginBottom: '16px', padding: '16px', background: '#F8FAFC', border: '1px solid #E2E8F0' }}>
+                        {/* Hàng 1: Ô tìm kiếm từ khóa */}
+                        <div style={{ position: 'relative', marginBottom: '12px' }}>
+                            <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }}>
+                                🔍
+                            </span>
+                            <input
+                                type="text"
+                                className="form-input"
+                                style={{ paddingLeft: '38px', paddingRight: searchQuery ? '36px' : '12px', height: '42px', fontSize: '0.9rem' }}
+                                placeholder="Tìm kiếm cá thể theo tên, mã (ANI-...), tên Latin, xuất xứ..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                            />
+                            {searchQuery && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchQuery('')}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '10px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        background: 'none',
+                                        border: 'none',
+                                        color: '#94A3B8',
+                                        cursor: 'pointer',
+                                        fontSize: '1rem',
+                                        padding: '4px'
+                                    }}
+                                    title="Xóa tìm kiếm"
+                                >
+                                    ✕
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Hàng 2: Dropdown bộ lọc theo Phân khu, Loài, IUCN */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px', marginBottom: '10px' }}>
+                            {/* Lọc theo Phân khu */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                    Phân khu nuôi thả
+                                </label>
+                                <select
+                                    className="form-select"
+                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    value={selectedAreaFilter}
+                                    onChange={(e) => setSelectedAreaFilter(e.target.value)}
+                                >
+                                    <option value="all">Tất cả phân khu</option>
+                                    {areas.map(z => (
+                                        <option key={z.id || z.areaId} value={z.code || z.id || z.areaId}>
+                                            Khu {z.code} - {z.nameVi || z.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Lọc theo Loài sinh học */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                    Loài sinh học
+                                </label>
+                                <select
+                                    className="form-select"
+                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    value={selectedSpeciesFilter}
+                                    onChange={(e) => setSelectedSpeciesFilter(e.target.value)}
+                                >
+                                    <option value="all">Tất cả loài</option>
+                                    {speciesOptions.map(sp => (
+                                        <option key={sp.id} value={sp.id}>
+                                            {sp.nameVi}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* Lọc theo Tình trạng IUCN */}
+                            <div>
+                                <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: '#475569', marginBottom: '4px' }}>
+                                    Bảo tồn (IUCN)
+                                </label>
+                                <select
+                                    className="form-select"
+                                    style={{ height: '36px', fontSize: '0.85rem', padding: '4px 8px' }}
+                                    value={selectedIucnFilter}
+                                    onChange={(e) => setSelectedIucnFilter(e.target.value)}
+                                >
+                                    <option value="all">Tất cả mức độ</option>
+                                    <option value="CR">CR - Cực kỳ nguy cấp</option>
+                                    <option value="EN">EN - Nguy cấp</option>
+                                    <option value="VU">VU - Sắp nguy cấp</option>
+                                    <option value="NT">NT - Sắp bị đe dọa</option>
+                                    <option value="LC">LC - Ít quan tâm</option>
+                                    <option value="EW">EW - Tuyệt chủng TN</option>
+                                    <option value="EX">EX - Tuyệt chủng</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Hàng 3: Trạng thái & Nút xóa lọc */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '8px', borderTop: '1px solid #E2E8F0', flexWrap: 'wrap', gap: '8px' }}>
+                            <div style={{ fontSize: '0.85rem', color: '#64748B' }}>
+                                Hiển thị <strong>{filteredAnimals.length}</strong> / <strong>{animals.length}</strong> cá thể động vật
+                            </div>
+                            {hasActiveFilters && (
+                                <button
+                                    type="button"
+                                    className="btn btn-sm btn-outline text-danger"
+                                    style={{ borderColor: '#FECACA', color: '#DC2626', padding: '4px 10px', fontSize: '0.8rem' }}
+                                    onClick={handleResetFilters}
+                                >
+                                    ✕ Đặt lại bộ lọc
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* BẢNG ĐỘNG VẬT CÓ THANH CUỘN (SCROLLABLE TABLE CONTAINER) */}
+                    <div className="admin-animals-table-scroll custom-scrollbar">
+                        <table className="admin-table" style={{ minWidth: '850px' }}>
                             <thead>
                                 <tr>
                                     <th>Mã / Hình</th>
@@ -193,67 +393,96 @@ export default function AdminAnimalsPage() {
                                     <th>Chuồng trại</th>
                                     <th>Bảo tồn (IUCN)</th>
                                     <th>Hồ sơ sức khỏe</th>
-                                    <th>Thao tác</th>
+                                    <th style={{ textAlign: 'center' }}>Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {animals.map(a => (
-                                    <tr key={a.id}>
-                                        <td>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                <img src={a.imageUrl} alt={a.nameVi} style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} />
-                                                <span className="font-mono text-xs font-bold">{a.code}</span>
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <strong>{a.nameVi}</strong>
-                                            <div className="text-xs text-muted">
-                                                <span className="font-semibold text-primary">{a.species}</span>
-                                                {a.scientificName && <span> • <em className="italic">{a.scientificName}</em></span>}
-                                            </div>
-                                        </td>
-                                        <td>
-                                            <span className="chip chip-sm">Khu {a.zoneCode}</span>
-                                        </td>
-                                        <td>
-                                            {a.enclosureName ? (
-                                                <span className="chip chip-sm font-semibold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
-                                                    {a.enclosureName}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-muted italic">Chưa xếp chuồng</span>
+                                {filteredAnimals.length === 0 ? (
+                                    <tr>
+                                        <td colSpan="7" style={{ textAlign: 'center', padding: '40px 20px', color: '#64748B' }}>
+                                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🐾</div>
+                                            <strong style={{ display: 'block', fontSize: '1rem', color: '#334155', marginBottom: '4px' }}>
+                                                Không tìm thấy cá thể động vật nào phù hợp
+                                            </strong>
+                                            <p style={{ margin: '0 0 12px 0', fontSize: '0.875rem' }}>
+                                                Vui lòng thử điều chỉnh lại từ khóa tìm kiếm hoặc các tiêu chí bộ lọc.
+                                            </p>
+                                            {hasActiveFilters && (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-sm btn-outline"
+                                                    onClick={handleResetFilters}
+                                                >
+                                                    Xóa tất cả bộ lọc
+                                                </button>
                                             )}
                                         </td>
-                                        <td>
-                                            <span className={`badge ${getIucnBadgeClass(a.iucnStatus)}`}>{a.iucnStatus}</span>
-                                        </td>
-                                        <td className="text-xs text-success">{a.healthStatus}</td>
-                                        <td>
-                                            <div style={{ display: 'flex', gap: '4px' }}>
-                                                <button 
-                                                    className="btn btn-sm btn-outline" 
-                                                    onClick={() => handleEdit(a)}
-                                                >
-                                                    Sửa
-                                                </button>
-                                                <button 
-                                                    className="btn btn-sm btn-outline text-danger" 
-                                                    style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
-                                                    onClick={() => handleDelete(a.id)}
-                                                >
-                                                    Xóa
-                                                </button>
-                                            </div>
-                                        </td>
                                     </tr>
-                                ))}
+                                ) : (
+                                    filteredAnimals.map(a => (
+                                        <tr key={a.id}>
+                                            <td>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                    <img 
+                                                        src={a.imageUrl || 'https://images.unsplash.com/photo-1546182990-dffeafbe841d?auto=format&fit=crop&w=120&q=80'} 
+                                                        alt={a.nameVi} 
+                                                        style={{ width: '40px', height: '40px', borderRadius: '6px', objectFit: 'cover' }} 
+                                                    />
+                                                    <span className="font-mono text-xs font-bold">{a.code}</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <strong>{a.nameVi}</strong>
+                                                <div className="text-xs text-muted">
+                                                    <span className="font-semibold text-primary">{a.species}</span>
+                                                    {a.scientificName && <span> • <em className="italic">{a.scientificName}</em></span>}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span className="chip chip-sm">Khu {a.zoneCode}</span>
+                                            </td>
+                                            <td>
+                                                {a.enclosureName ? (
+                                                    <span className="chip chip-sm font-semibold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
+                                                        {a.enclosureName}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted italic">Chưa xếp chuồng</span>
+                                                )}
+                                            </td>
+                                            <td>
+                                                <span className={`badge ${getIucnBadgeClass(a.iucnStatus)}`}>{a.iucnStatus}</span>
+                                            </td>
+                                            <td className="text-xs text-success">{a.healthStatus}</td>
+                                            <td>
+                                                <div style={{ display: 'flex', gap: '4px', justifyContent: 'center' }}>
+                                                    <button 
+                                                        className="btn btn-sm btn-outline" 
+                                                        onClick={() => handleEdit(a)}
+                                                        title="Sửa thông tin cá thể"
+                                                    >
+                                                        Sửa
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-sm btn-outline text-danger" 
+                                                        style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
+                                                        onClick={() => handleDelete(a.id)}
+                                                        title="Xóa hồ sơ cá thể"
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))
+                                )}
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Create/Edit Form */}
-                <div className="admin-card">
+                {/* Create/Edit Form (Sticky on Desktop) */}
+                <div className="admin-card admin-sticky-card">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                         <h3 className="font-bold text-base m-0">
                             {isEditing ? 'Cập Nhật Hồ Sơ Động Vật' : 'Thêm Động Vật Mới'}

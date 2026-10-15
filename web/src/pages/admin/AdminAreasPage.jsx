@@ -9,6 +9,7 @@ export default function AdminAreasPage() {
     const [enclosures, setEnclosures] = useState([]);
     const [animals, setAnimals] = useState([]);
     const [selectedAreaFilter, setSelectedAreaFilter] = useState('all');
+    const [areaSearchQuery, setAreaSearchQuery] = useState('');
     const [isLoading, setIsLoading] = useState(true);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -256,6 +257,16 @@ export default function AdminAreasPage() {
         }
     };
 
+    const filteredAreas = areas.filter(area => {
+        if (!areaSearchQuery.trim()) return true;
+        const q = areaSearchQuery.toLowerCase().trim();
+        const nameVi = (area.nameVi || area.name || '').toLowerCase();
+        const nameEn = (area.nameEn || '').toLowerCase();
+        const code = (area.code || '').toLowerCase();
+        const desc = (area.descriptionVi || area.description || '').toLowerCase();
+        return nameVi.includes(q) || nameEn.includes(q) || code.includes(q) || desc.includes(q);
+    });
+
     const filteredEnclosures = enclosures.filter(e => {
         if (selectedAreaFilter === 'all') return true;
         return e.areaId === Number(selectedAreaFilter);
@@ -321,72 +332,127 @@ export default function AdminAreasPage() {
             {/* TAB 1: AREAS MANAGEMENT */}
             {activeTab === 'areas' && (
                 <div className="ticket-page-layout">
-                    {/* Areas Grid */}
+                    {/* Areas Grid with Scroll Container */}
                     <div>
+                        {/* Thanh tìm kiếm nhanh phân khu */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', gap: '10px', flexWrap: 'wrap' }}>
+                            <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+                                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#64748B', pointerEvents: 'none' }}>
+                                    🔍
+                                </span>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    style={{ paddingLeft: '34px', paddingRight: areaSearchQuery ? '32px' : '10px', height: '38px', fontSize: '0.875rem' }}
+                                    placeholder="Tìm kiếm phân khu theo tên, mã khu..."
+                                    value={areaSearchQuery}
+                                    onChange={(e) => setAreaSearchQuery(e.target.value)}
+                                />
+                                {areaSearchQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setAreaSearchQuery('')}
+                                        style={{
+                                            position: 'absolute',
+                                            right: '8px',
+                                            top: '50%',
+                                            transform: 'translateY(-50%)',
+                                            background: 'none',
+                                            border: 'none',
+                                            color: '#94A3B8',
+                                            cursor: 'pointer',
+                                            fontSize: '0.9rem',
+                                            padding: '2px 6px'
+                                        }}
+                                        title="Xóa tìm kiếm"
+                                    >
+                                        ✕
+                                    </button>
+                                )}
+                            </div>
+                            <span className="text-xs text-muted font-bold">
+                                Hiển thị {filteredAreas.length} / {areas.length} phân khu
+                            </span>
+                        </div>
+
                         {isLoading && areas.length === 0 ? (
                             <div className="p-6 text-center text-muted">Đang tải danh sách phân khu...</div>
+                        ) : filteredAreas.length === 0 ? (
+                            <div className="admin-card text-center p-6 text-muted">
+                                <div style={{ fontSize: '1.8rem', marginBottom: '8px' }}>🗺️</div>
+                                <strong>Không tìm thấy phân khu nào phù hợp</strong>
+                                <p style={{ margin: '6px 0 12px 0', fontSize: '0.85rem' }}>
+                                    Vui lòng kiểm tra lại từ khóa tìm kiếm "{areaSearchQuery}".
+                                </p>
+                                <button className="btn btn-sm btn-outline" onClick={() => setAreaSearchQuery('')}>
+                                    Xóa tìm kiếm
+                                </button>
+                            </div>
                         ) : (
-                            <div className="animals-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
-                                {areas.map(area => (
-                                    <div key={area.id || area.areaId} className="admin-card">
-                                        <div className="admin-card-header" style={{ borderLeft: `4px solid ${area.color || '#15803D'}` }}>
-                                            <div>
-                                                <span className="text-xs uppercase tracking-wider text-muted font-bold">Khu vực {area.code}</span>
-                                                <h4 className="font-bold text-base">{area.nameVi || area.name}</h4>
+                            /* Container có thanh cuộn cho danh sách phân khu */
+                            <div className="admin-areas-scroll-container custom-scrollbar">
+                                <div className="animals-grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
+                                    {filteredAreas.map(area => (
+                                        <div key={area.id || area.areaId} className="admin-card">
+                                            <div className="admin-card-header" style={{ borderLeft: `4px solid ${area.color || '#15803D'}` }}>
+                                                <div>
+                                                    <span className="text-xs uppercase tracking-wider text-muted font-bold">Khu vực {area.code}</span>
+                                                    <h4 className="font-bold text-base">{area.nameVi || area.name}</h4>
+                                                </div>
+                                                <span className="badge badge-success">Đạt chuẩn</span>
                                             </div>
-                                            <span className="badge badge-success">Đạt chuẩn</span>
+                                            <div className="admin-card-body">
+                                                <p className="text-sm text-muted mb-3" style={{ minHeight: '38px' }}>
+                                                    {area.descriptionVi || area.description || "Khu vực sinh thái sở thú."}
+                                                </p>
+                                                <div className="admin-stat-row">
+                                                    <span>Số chuồng hiện tại:</span>
+                                                    <strong className="text-primary">{area.enclosures ? area.enclosures.length : (area.enclosureCount || 0)} chuồng</strong>
+                                                </div>
+                                                <div className="admin-stat-row">
+                                                    <span>Số lượng cá thể thú:</span>
+                                                    <strong>{area.animalCount ?? 0} cá thể</strong>
+                                                </div>
+                                                <div className="admin-stat-row">
+                                                    <span>Bán kính định vị GPS:</span>
+                                                    <span className="text-xs font-mono">{area.radiusMeters || 50} mét</span>
+                                                </div>
+                                                <div className="admin-stat-row">
+                                                    <span>Tọa độ bản đồ (MapX, MapY):</span>
+                                                    <code>{area.mapX != null ? Math.round(area.mapX) : 'Chưa gán'}, {area.mapY != null ? Math.round(area.mapY) : 'Chưa gán'}</code>
+                                                </div>
+                                                <div className="admin-stat-row">
+                                                    <span>Màu nhận diện:</span>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                                                        <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: area.color || '#15803D' }}></span>
+                                                        <code>{area.color || '#15803D'}</code>
+                                                    </span>
+                                                </div>
+                                                <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                                                    <button
+                                                        className="btn btn-sm btn-outline"
+                                                        onClick={() => handleEditArea(area)}
+                                                    >
+                                                        Sửa khu
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-sm btn-outline text-danger"
+                                                        style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
+                                                        onClick={() => handleDeleteArea(area.areaId || area.id)}
+                                                    >
+                                                        Xóa
+                                                    </button>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="admin-card-body">
-                                            <p className="text-sm text-muted mb-3" style={{ minHeight: '38px' }}>
-                                                {area.descriptionVi || area.description || "Khu vực sinh thái sở thú."}
-                                            </p>
-                                            <div className="admin-stat-row">
-                                                <span>Số chuồng hiện tại:</span>
-                                                <strong className="text-primary">{area.enclosures ? area.enclosures.length : (area.enclosureCount || 0)} chuồng</strong>
-                                            </div>
-                                            <div className="admin-stat-row">
-                                                <span>Số lượng cá thể thú:</span>
-                                                <strong>{area.animalCount ?? 0} cá thể</strong>
-                                            </div>
-                                            <div className="admin-stat-row">
-                                                <span>Bán kính định vị GPS:</span>
-                                                <span className="text-xs font-mono">{area.radiusMeters || 50} mét</span>
-                                            </div>
-                                            <div className="admin-stat-row">
-                                                <span>Tọa độ bản đồ (MapX, MapY):</span>
-                                                <code>{area.mapX != null ? Math.round(area.mapX) : 'Chưa gán'}, {area.mapY != null ? Math.round(area.mapY) : 'Chưa gán'}</code>
-                                            </div>
-                                            <div className="admin-stat-row">
-                                                <span>Màu nhận diện:</span>
-                                                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: area.color || '#15803D' }}></span>
-                                                    <code>{area.color || '#15803D'}</code>
-                                                </span>
-                                            </div>
-                                            <div style={{ marginTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                                                <button
-                                                    className="btn btn-sm btn-outline"
-                                                    onClick={() => handleEditArea(area)}
-                                                >
-                                                    Sửa khu
-                                                </button>
-                                                <button
-                                                    className="btn btn-sm btn-outline text-danger"
-                                                    style={{ borderColor: '#FCA5A5', color: '#DC2626' }}
-                                                    onClick={() => handleDeleteArea(area.areaId || area.id)}
-                                                >
-                                                    Xóa
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>
 
-                    {/* Area Form */}
-                    <div className="admin-card">
+                    {/* Area Form (Sticky on Desktop) */}
+                    <div className="admin-card admin-sticky-card">
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 className="font-bold text-base m-0">
                                 {isEditingArea ? 'Cập Nhật Phân Khu Sở Thú' : 'Tạo Mới Phân Khu Sở Thú'}
@@ -556,8 +622,8 @@ export default function AdminAreasPage() {
                     <div className="ticket-page-layout">
                         {/* Enclosures List Table */}
                         <div>
-                            <div className="admin-table-wrapper ticket-table-scroll">
-                                <table className="admin-table">
+                            <div className="admin-table-wrapper ticket-table-scroll custom-scrollbar">
+                                <table className="admin-table" style={{ minWidth: '750px' }}>
                                     <thead>
                                         <tr>
                                             <th>Mã / Tên Chuồng Trại</th>
@@ -650,7 +716,7 @@ export default function AdminAreasPage() {
                         </div>
 
                         {/* Enclosure Create/Edit Form */}
-                        <div className="admin-card">
+                        <div className="admin-card admin-sticky-card">
                             <h3 className="font-bold text-base mb-3">
                                 {isEditingEnclosure ? 'Cập Nhật Chuồng Trại' : 'Tạo Mới Chuồng Trại (Enclosure)'}
                             </h3>
