@@ -22,9 +22,9 @@ public class AreasController : ControllerBase
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<AreaResponseDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAreas()
+    public async Task<IActionResult> GetAreas([FromQuery] string? lang = null)
     {
-        var areas = await _areaService.GetAllAreasAsync();
+        var areas = await _areaService.GetAllAreasAsync(lang);
         return Ok(ApiResponse<IEnumerable<AreaResponseDto>>.Ok(areas));
     }
 
@@ -34,9 +34,9 @@ public class AreasController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAreaById(int id)
+    public async Task<IActionResult> GetAreaById(int id, [FromQuery] string? lang = null)
     {
-        var area = await _areaService.GetAreaByIdAsync(id);
+        var area = await _areaService.GetAreaByIdAsync(id, lang);
         if (area == null)
         {
             return NotFound(ApiResponse<AreaResponseDto>.Fail($"Không tìm thấy khu vực với mã ID = {id}."));

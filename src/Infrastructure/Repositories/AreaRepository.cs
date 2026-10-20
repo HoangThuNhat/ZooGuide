@@ -19,7 +19,9 @@ public class AreaRepository : IAreaRepository
         return await _context.Areas
             .Include(a => a.Enclosures)
                 .ThenInclude(e => e.Animals)
+                    .ThenInclude(an => an.Species)
             .Include(a => a.Animals)
+                .ThenInclude(an => an.Species)
             .AsNoTracking()
             .ToListAsync();
     }
@@ -29,7 +31,9 @@ public class AreaRepository : IAreaRepository
         return await _context.Areas
             .Include(a => a.Enclosures)
                 .ThenInclude(e => e.Animals)
+                    .ThenInclude(an => an.Species)
             .Include(a => a.Animals)
+                .ThenInclude(an => an.Species)
             .FirstOrDefaultAsync(a => a.AreaId == areaId);
     }
 
@@ -66,5 +70,15 @@ public class AreaRepository : IAreaRepository
     public async Task<bool> HasAnimalsAsync(int areaId)
     {
         return await _context.Animals.AnyAsync(a => a.AreaId == areaId);
+    }
+
+    public async Task<List<ContentTranslation>> GetTranslationsByLanguageAsync(string languageCode)
+    {
+        var lang = (languageCode ?? "vi").Trim().ToLowerInvariant();
+        if (lang == "zh-cn" || lang == "zh_cn" || lang == "zh-hans") lang = "zh";
+        return await _context.ContentTranslations
+            .Where(ct => ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+            .AsNoTracking()
+            .ToListAsync();
     }
 }

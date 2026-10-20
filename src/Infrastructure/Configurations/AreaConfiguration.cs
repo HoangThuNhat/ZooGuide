@@ -60,6 +60,10 @@ public class AreaConfiguration : IEntityTypeConfiguration<Area>
             .HasPrecision(8, 2)
             .IsRequired(false);
 
+        builder.Property(a => a.ReferenceSource)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(a => a.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("now()");

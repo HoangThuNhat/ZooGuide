@@ -18,4 +18,5 @@ public interface IEnclosureRepository
     Task UpdateAsync(Enclosure enclosure);
     Task DeleteAsync(Enclosure enclosure);
     Task<bool> HasAnimalsAsync(int enclosureId);
+    Task<List<ContentTranslation>> GetTranslationsByLanguageAsync(string languageCode);
 }

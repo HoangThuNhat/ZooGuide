@@ -91,13 +91,15 @@ public class DashboardService : IDashboardService
             Id = a.AnimalId,
             AnimalCode = $"ANI-{a.AnimalId:D3}",
             AnimalName = a.Name,
-            Date = (a.UpdatedAt ?? a.CreatedAt).ToString("yyyy-MM-dd"),
-            Veterinarian = "BS. Thú Y ZooGuide",
+            Date = (a.LastHealthCheckAt ?? a.UpdatedAt ?? a.CreatedAt).ToString("yyyy-MM-dd"),
+            Veterinarian = string.IsNullOrWhiteSpace(a.VeterinarianName) ? "BS. Thú Y Thảo Cầm Viên" : a.VeterinarianName,
             HealthStatus = string.IsNullOrWhiteSpace(a.HealthStatus) ? "Bình thường" : a.HealthStatus,
-            WeightKg = 150.0m + (a.AnimalId * 15 % 80),
-            TemperatureC = 38.0m + (a.AnimalId % 5) * 0.1m,
-            Notes = string.IsNullOrWhiteSpace(a.ConservationNote) ? (a.Description ?? "Tình trạng sức khỏe ổn định") : a.ConservationNote,
-            ActionRequired = a.Status == AnimalStatus.UnderTreatment ? "Cần theo dõi sát sao phác đồ điều trị" : ""
+            WeightKg = a.WeightKg ?? 0m,
+            TemperatureC = a.TemperatureC ?? 0m,
+            Notes = string.IsNullOrWhiteSpace(a.ConservationNote) ? (a.Description ?? string.Empty) : a.ConservationNote,
+            ActionRequired = !string.IsNullOrWhiteSpace(a.HealthActionRequired)
+                ? a.HealthActionRequired
+                : (a.Status == AnimalStatus.UnderTreatment ? "Cần theo dõi sát sao phác đồ điều trị" : string.Empty)
         }).ToList();
 
         // 5. Lấy các hoạt động gần đây trong kỳ
@@ -114,7 +116,7 @@ public class DashboardService : IDashboardService
             .ToListAsync();
 
         var recentAnimals = await animalQuery
-            .OrderByDescending(a => a.CreatedAt)
+            .OrderByDescending(a => a.UpdatedAt ?? a.CreatedAt)
             .Take(2)
             .Select(a => new DashboardActivityDto
             {
@@ -142,6 +144,55 @@ public class DashboardService : IDashboardService
             ActiveSessions = activeSessions,
             RecentHealthLogs = healthLogs,
             RecentActivities = activities
+        };
+    }
+
+    public async Task<DashboardHealthLogDto?> RecordHealthCheckAsync(UpdateAnimalHealthDto dto)
+    {
+        var animal = await _context.Animals.FindAsync(dto.AnimalId);
+        if (animal == null) return null;
+
+        if (!string.IsNullOrWhiteSpace(dto.HealthStatus))
+        {
+            animal.HealthStatus = dto.HealthStatus.Trim();
+            if (dto.HealthStatus.Contains("điều trị", StringComparison.OrdinalIgnoreCase) ||
+                dto.HealthStatus.Contains("treatment", StringComparison.OrdinalIgnoreCase))
+            {
+                animal.Status = AnimalStatus.UnderTreatment;
+            }
+            else if (animal.Status == AnimalStatus.UnderTreatment)
+            {
+                animal.Status = AnimalStatus.Active;
+            }
+        }
+        if (dto.WeightKg.HasValue && dto.WeightKg.Value > 0)
+            animal.WeightKg = dto.WeightKg.Value;
+        if (dto.TemperatureC.HasValue && dto.TemperatureC.Value > 0)
+            animal.TemperatureC = dto.TemperatureC.Value;
+        if (!string.IsNullOrWhiteSpace(dto.VeterinarianName))
+            animal.VeterinarianName = dto.VeterinarianName.Trim();
+        if (!string.IsNullOrWhiteSpace(dto.Notes))
+            animal.ConservationNote = dto.Notes.Trim();
+        if (dto.ActionRequired != null)
+            animal.HealthActionRequired = dto.ActionRequired.Trim();
+
+        animal.LastHealthCheckAt = DateTime.UtcNow;
+        animal.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        return new DashboardHealthLogDto
+        {
+            Id = animal.AnimalId,
+            AnimalCode = $"ANI-{animal.AnimalId:D3}",
+            AnimalName = animal.Name,
+            Date = (animal.LastHealthCheckAt ?? animal.UpdatedAt ?? animal.CreatedAt).ToString("yyyy-MM-dd"),
+            Veterinarian = string.IsNullOrWhiteSpace(animal.VeterinarianName) ? "BS. Thú Y Thảo Cầm Viên" : animal.VeterinarianName,
+            HealthStatus = string.IsNullOrWhiteSpace(animal.HealthStatus) ? "Bình thường" : animal.HealthStatus,
+            WeightKg = animal.WeightKg ?? 0m,
+            TemperatureC = animal.TemperatureC ?? 0m,
+            Notes = string.IsNullOrWhiteSpace(animal.ConservationNote) ? (animal.Description ?? string.Empty) : animal.ConservationNote,
+            ActionRequired = animal.HealthActionRequired ?? string.Empty
         };
     }
 }

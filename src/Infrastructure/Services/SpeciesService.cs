@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs.Species;
 using ZooGuide.Application.Interfaces;
@@ -15,15 +16,27 @@ public class SpeciesService : ISpeciesService
         _context = context;
     }
 
-    public async Task<IEnumerable<SpeciesDto>> GetAllAsync(string? search = null, string? conservationStatus = null)
+    public async Task<IEnumerable<SpeciesDto>> GetAllAsync(string? search = null, string? conservationStatus = null, string? lang = null)
     {
-        var query = _context.Species.AsQueryable();
+        var normalizedLang = TranslationService.NormalizeLanguageCode(lang);
+        var query = _context.Species.AsNoTracking().AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
-            query = query.Where(x => x.Name.ToLower().Contains(s) || 
-                                    (x.ScientificName != null && x.ScientificName.ToLower().Contains(s)));
+            var matchingTranslatedSpeciesIds = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Species" && ct.IsPublished &&
+                             ((ct.Title != null && ct.Title.ToLower().Contains(s)) ||
+                              (ct.Description != null && ct.Description.ToLower().Contains(s))))
+                .Select(ct => ct.EntityId)
+                .Distinct()
+                .ToListAsync();
+
+            query = query.Where(x =>
+                x.Name.ToLower().Contains(s) ||
+                (x.ScientificName != null && x.ScientificName.ToLower().Contains(s)) ||
+                (x.Description != null && x.Description.ToLower().Contains(s)) ||
+                matchingTranslatedSpeciesIds.Contains(x.SpeciesId));
         }
 
         if (!string.IsNullOrWhiteSpace(conservationStatus) && conservationStatus != "all")
@@ -32,34 +45,74 @@ public class SpeciesService : ISpeciesService
             query = query.Where(x => x.ConservationStatus != null && x.ConservationStatus.ToLower().Contains(cs));
         }
 
-        return await query
-            .Select(s => new SpeciesDto
-            {
-                SpeciesId = s.SpeciesId,
-                Name = s.Name,
-                ScientificName = s.ScientificName,
-                Description = s.Description,
-                ConservationStatus = s.ConservationStatus,
-                ImageUrl = s.ImageUrl,
-                CreatedAt = s.CreatedAt,
-                UpdatedAt = s.UpdatedAt
-            })
-            .ToListAsync();
+        var speciesList = await query.OrderBy(s => s.SpeciesId).ToListAsync();
+        var translations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "Species" && ct.LanguageCode.ToLower() == normalizedLang && ct.IsPublished)
+            .AsNoTracking()
+            .ToDictionaryAsync(ct => ct.EntityId, ct => ct);
+
+        return speciesList.Select(s => MapToDto(s, normalizedLang, translations.TryGetValue(s.SpeciesId, out var tr) ? tr : null));
     }
 
-    public async Task<SpeciesDto?> GetByIdAsync(int id)
+    public async Task<SpeciesDto?> GetByIdAsync(int id, string? lang = null)
     {
+        var normalizedLang = TranslationService.NormalizeLanguageCode(lang);
         var s = await _context.Species.FindAsync(id);
         if (s == null) return null;
+
+        var tr = await _context.ContentTranslations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ct => ct.EntityType == "Species" && ct.EntityId == id && ct.LanguageCode.ToLower() == normalizedLang && ct.IsPublished);
+
+        return MapToDto(s, normalizedLang, tr);
+    }
+
+    private static SpeciesDto MapToDto(Species s, string lang, ContentTranslation? tr)
+    {
+        bool isDefaultVi = lang == "vi";
+        bool hasTr = isDefaultVi || (tr != null && !string.IsNullOrWhiteSpace(tr.Title));
+
+        string? habitat = isDefaultVi ? s.Habitat : null;
+        string? diet = isDefaultVi ? s.Diet : null;
+        string? lifespan = isDefaultVi ? s.Lifespan : null;
+        string? conservationStatus = s.ConservationStatus;
+
+        if (tr != null && !string.IsNullOrWhiteSpace(tr.ExtraJson))
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(tr.ExtraJson);
+                var root = doc.RootElement;
+                if (root.TryGetProperty("habitat", out var h) && h.ValueKind == JsonValueKind.String)
+                    habitat = h.GetString();
+                if (root.TryGetProperty("diet", out var d) && d.ValueKind == JsonValueKind.String)
+                    diet = d.GetString();
+                if (root.TryGetProperty("lifespan", out var l) && l.ValueKind == JsonValueKind.String)
+                    lifespan = l.GetString();
+                if (root.TryGetProperty("conservationStatus", out var cs) && cs.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(cs.GetString()))
+                    conservationStatus = cs.GetString();
+            }
+            catch
+            {
+                // Ignore invalid extra json
+            }
+        }
 
         return new SpeciesDto
         {
             SpeciesId = s.SpeciesId,
-            Name = s.Name,
+            OriginalName = s.Name,
+            Name = tr != null && !string.IsNullOrWhiteSpace(tr.Title) ? tr.Title : s.Name,
             ScientificName = s.ScientificName,
-            Description = s.Description,
-            ConservationStatus = s.ConservationStatus,
+            Description = tr != null && !string.IsNullOrWhiteSpace(tr.Description) ? tr.Description : (hasTr ? s.Description : null),
+            ConservationStatus = conservationStatus,
             ImageUrl = s.ImageUrl,
+            Habitat = habitat ?? (hasTr ? s.Habitat : null),
+            Diet = diet ?? (hasTr ? s.Diet : null),
+            Lifespan = lifespan ?? (hasTr ? s.Lifespan : null),
+            ReferenceSource = tr?.SourceReference ?? s.ReferenceSource,
+            LanguageCode = lang,
+            HasTranslation = hasTr,
             CreatedAt = s.CreatedAt,
             UpdatedAt = s.UpdatedAt
         };
@@ -81,6 +134,10 @@ public class SpeciesService : ISpeciesService
             Description = request.Description,
             ConservationStatus = request.ConservationStatus,
             ImageUrl = request.ImageUrl,
+            Habitat = request.Habitat,
+            Diet = request.Diet,
+            Lifespan = request.Lifespan,
+            ReferenceSource = request.ReferenceSource,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -110,6 +167,10 @@ public class SpeciesService : ISpeciesService
         species.Description = request.Description;
         species.ConservationStatus = request.ConservationStatus;
         species.ImageUrl = request.ImageUrl;
+        species.Habitat = request.Habitat ?? species.Habitat;
+        species.Diet = request.Diet ?? species.Diet;
+        species.Lifespan = request.Lifespan ?? species.Lifespan;
+        species.ReferenceSource = request.ReferenceSource ?? species.ReferenceSource;
         species.UpdatedAt = DateTime.UtcNow;
 
         await _context.SaveChangesAsync();

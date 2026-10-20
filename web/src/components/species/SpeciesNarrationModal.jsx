@@ -1,42 +1,64 @@
 import React, { useState, useEffect } from 'react';
-import { ZooApi, MOCK_DB } from '../../services/api';
+import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
-export default function SpeciesNarrationModal({ 
-    species, 
-    isOpen, 
-    onClose, 
-    onPlayAudio, 
-    onNavigateMap 
+export default function SpeciesNarrationModal({
+    species,
+    isOpen,
+    onClose,
+    onPlayAudio,
+    onNavigateMap
 }) {
-    const { 
-        currentLang, 
-        setLanguage, 
-        audioState, 
-        setAudioState,
+    const {
+        currentLang,
+        setLanguage,
+        supportedLanguages,
+        audioState,
         hasActiveSession,
         currentSession,
         setIsTicketModalOpen,
-        showToast
+        showToast,
+        t
     } = useApp();
 
     const [selectedLang, setSelectedLang] = useState(currentLang || 'vi');
     const [narration, setNarration] = useState(null);
+    const [narrationError, setNarrationError] = useState('');
+    const [constituentAnimals, setConstituentAnimals] = useState([]);
+    const [localizedSpecies, setLocalizedSpecies] = useState(null);
     const [loading, setLoading] = useState(true);
 
-    // Sync selectedLang when currentLang changes
     useEffect(() => {
         if (currentLang) setSelectedLang(currentLang);
     }, [currentLang]);
 
-    // Load narration data whenever species or selectedLang changes
     useEffect(() => {
         if (!isOpen || !species) return;
 
         let isMounted = true;
-        async function fetchNarration() {
+        async function fetchSpeciesDetailsAndNarration() {
             setLoading(true);
+            setNarrationError('');
             try {
+                // Fetch localized species & resident animals from Supabase
+                const [spRes, animRes] = await Promise.all([
+                    ZooApi.getSpecies({ lang: selectedLang }),
+                    ZooApi.getAnimals({ speciesId: species.id, lang: selectedLang })
+                ]);
+
+                if (isMounted) {
+                    if (spRes.success && Array.isArray(spRes.data)) {
+                        const foundSp = spRes.data.find(s => Number(s.id) === Number(species.id));
+                        if (foundSp) setLocalizedSpecies(foundSp);
+                        else setLocalizedSpecies(species);
+                    } else {
+                        setLocalizedSpecies(species);
+                    }
+                    if (animRes.success) {
+                        setConstituentAnimals(animRes.data || []);
+                    }
+                }
+
                 if (!hasActiveSession || !currentSession?.sessionId) {
                     if (isMounted) {
                         setNarration(null);
@@ -44,36 +66,42 @@ export default function SpeciesNarrationModal({
                     }
                     return;
                 }
+
                 const res = await ZooApi.getSpeciesNarration(species.id, selectedLang, currentSession.sessionId);
-                if (isMounted && res.success) {
-                    setNarration(res.data);
-                } else if (isMounted) {
-                    setNarration(null);
+                if (isMounted) {
+                    if (res.success) {
+                        setNarration(res.data);
+                        setNarrationError('');
+                    } else {
+                        setNarration(null);
+                        setNarrationError(res.message || t?.narrationMissingDesc || 'Chưa có bài thuyết minh cho ngôn ngữ này.');
+                    }
                 }
             } catch (err) {
-                console.error("Error fetching species narration:", err);
+                console.error('Error fetching species narration:', err);
+                if (isMounted) {
+                    setNarration(null);
+                    setNarrationError('Lỗi kết nối khi tải bài thuyết minh.');
+                }
             } finally {
                 if (isMounted) setLoading(false);
             }
         }
 
-        fetchNarration();
+        fetchSpeciesDetailsAndNarration();
         return () => { isMounted = false; };
-    }, [isOpen, species, selectedLang, hasActiveSession, currentSession]);
+    }, [isOpen, species, selectedLang, hasActiveSession, currentSession, t]);
 
     if (!isOpen || !species) return null;
 
-    // Check if currently playing this species narration
-    const isCurrentlyPlayingThis = 
-        audioState.isVisible && 
-        audioState.isPlaying && 
-        audioState.narration && 
-        (audioState.narration.speciesId === species.id || (audioState.animal && audioState.animal.speciesId === species.id));
+    const spDisplay = localizedSpecies || species;
+    const isCurrentlyPlayingThis =
+        audioState.isVisible &&
+        audioState.isPlaying &&
+        audioState.narration &&
+        Number(audioState.narration.speciesId) === Number(species.id) &&
+        audioState.narration.languageCode === selectedLang;
 
-    // Constituent animals
-    const constituentAnimals = MOCK_DB.animals.filter(a => a.speciesId === species.id);
-
-    // Helper for IUCN tag color
     const getIucnColor = (status) => {
         if (!status) return '#64748B';
         const s = status.toUpperCase();
@@ -98,7 +126,7 @@ export default function SpeciesNarrationModal({
 
     const handlePlayClick = () => {
         if (!hasActiveSession) {
-            showToast("Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.", "error");
+            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
             setIsTicketModalOpen(true);
             return;
         }
@@ -107,206 +135,239 @@ export default function SpeciesNarrationModal({
         }
     };
 
+    const activeLangObj = supportedLanguages.find(l => l.code === selectedLang);
+
     return (
         <div id="species-narration-modal" className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 1200 }}>
             <div className="modal-backdrop" onClick={onClose}></div>
-            <div className="modal-dialog" style={{ maxWidth: '640px', width: '92%', maxHeight: '90vh', overflowY: 'auto' }}>
-                {/* Header */}
+            <div className="modal-dialog" style={{ maxWidth: '680px', width: '94%', maxHeight: '90vh', overflowY: 'auto' }}>
                 <div className="modal-header" style={{ alignItems: 'flex-start' }}>
                     <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                        <img 
-                            src={species.imageUrl || "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=800"} 
-                            alt={species.nameVi}
-                            style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #E2E8F0' }}
-                        />
+                        {spDisplay.imageUrl && (
+                            <img
+                                src={spDisplay.imageUrl}
+                                alt={spDisplay.name || spDisplay.nameVi}
+                                style={{ width: '64px', height: '64px', borderRadius: '12px', objectFit: 'cover', border: '2px solid #E2E8F0' }}
+                            />
+                        )}
                         <div>
-                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px' }}>
-                                <span 
-                                    className="badge" 
-                                    style={{ 
-                                        backgroundColor: `${getIucnColor(species.conservationStatus)}18`, 
-                                        color: getIucnColor(species.conservationStatus),
+                            <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '2px', flexWrap: 'wrap' }}>
+                                <span
+                                    className="badge"
+                                    style={{
+                                        backgroundColor: `${getIucnColor(spDisplay.conservationStatus)}18`,
+                                        color: getIucnColor(spDisplay.conservationStatus),
                                         fontWeight: '700',
                                         fontSize: '0.72rem'
                                     }}
                                 >
-                                    {species.conservationStatus || "Ít quan tâm"}
+                                    {spDisplay.conservationStatus || 'IUCN'}
                                 </span>
                                 {constituentAnimals.length > 0 && (
                                     <span className="badge" style={{ backgroundColor: '#F1F5F9', color: '#475569', fontSize: '0.72rem' }}>
-                                        {constituentAnimals.length} cá thể tại sở thú
+                                        {constituentAnimals.length} {t?.individualsCount || 'cá thể'}
                                     </span>
                                 )}
                             </div>
                             <h3 className="font-bold text-lg" style={{ margin: 0 }}>
-                                {species.nameVi}
+                                {spDisplay.name || spDisplay.nameVi}
                             </h3>
                             <p style={{ margin: 0, fontStyle: 'italic', fontSize: '0.85rem', color: '#64748B' }}>
-                                {species.nameEn || species.scientificName}
+                                {spDisplay.scientificName}
                             </p>
                         </div>
                     </div>
 
-                    <button 
-                        id="btn-close-species-narration" 
-                        className="btn btn-icon btn-sm" 
-                        aria-label="Đóng"
+                    <button
+                        id="btn-close-species-narration"
+                        className="btn btn-icon btn-sm"
+                        aria-label="Close"
                         onClick={onClose}
                     >
                         ✕
                     </button>
                 </div>
 
-                {/* Body */}
                 <div className="modal-body" style={{ paddingTop: '12px' }}>
-                    {/* Species Description */}
-                    <div style={{ fontSize: '0.875rem', color: '#334155', lineHeight: '1.5', marginBottom: '14px', backgroundColor: '#F8FAFC', padding: '10px 14px', borderRadius: '8px' }}>
-                        {species.description || "Loài động vật đặc sắc đang được bảo tồn và chăm sóc tự nhiên tại sở thú ZooGuide."}
+                    <div style={{ fontSize: '0.875rem', color: '#334155', lineHeight: '1.5', marginBottom: '12px', backgroundColor: '#F8FAFC', padding: '10px 14px', borderRadius: '8px' }}>
+                        {spDisplay.description}
+                        {spDisplay.referenceSource && (
+                            <div style={{ marginTop: '6px', fontSize: '0.74rem', color: '#64748B' }}>
+                                📚 <strong>{t?.animalReferenceLabel || 'Nguồn tham khảo'}:</strong> {spDisplay.referenceSource}
+                            </div>
+                        )}
                     </div>
 
-                    {/* Constituent Animals */}
                     {constituentAnimals.length > 0 && (
-                        <div style={{ marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569' }}>
-                                🐾 Các cá thể thuộc loài:
+                                🐾 {t?.individualsCount || 'Cá thể'}:
                             </span>
                             {constituentAnimals.map(a => (
-                                <span 
-                                    key={a.id} 
-                                    style={{ 
-                                        backgroundColor: '#EFF6FF', 
-                                        color: '#1D4ED8', 
-                                        padding: '3px 8px', 
-                                        borderRadius: '6px', 
-                                        fontSize: '0.78rem', 
-                                        fontWeight: '600' 
+                                <span
+                                    key={a.id}
+                                    style={{
+                                        backgroundColor: '#EFF6FF',
+                                        color: '#1D4ED8',
+                                        padding: '3px 8px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.78rem',
+                                        fontWeight: '600'
                                     }}
                                 >
-                                    {a.nameVi} ({a.code})
+                                    {a.name || a.nameVi} ({a.code})
                                 </span>
                             ))}
                         </div>
                     )}
 
-                    {/* Step 2: Language Selector */}
+                    {/* 12-Language Selector Grid */}
                     <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '12px', marginBottom: '14px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
                             <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1E293B' }}>
-                                🌐 Ngôn ngữ thuyết minh (Language):
+                                🌐 {t?.languageLabel || 'Ngôn ngữ thuyết minh'} ({supportedLanguages.length}):
                             </label>
-                            <span style={{ fontSize: '0.75rem', color: '#64748B' }}>Chọn ngôn ngữ để đổi giọng đọc & nội dung</span>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                                type="button"
-                                className={`btn btn-sm ${selectedLang === 'vi' ? 'btn-primary' : 'btn-outline'}`}
-                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                onClick={() => handleLanguageChange('vi')}
-                            >
-                                <span>🇻🇳</span>
-                                <strong>Tiếng Việt</strong>
-                            </button>
-                            <button
-                                type="button"
-                                className={`btn btn-sm ${selectedLang === 'en' ? 'btn-primary' : 'btn-outline'}`}
-                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                                onClick={() => handleLanguageChange('en')}
-                            >
-                                <span>🇬🇧</span>
-                                <strong>English</strong>
-                            </button>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))', gap: '6px' }}>
+                            {supportedLanguages.map(lang => (
+                                <button
+                                    key={lang.code}
+                                    type="button"
+                                    className={`btn btn-sm ${selectedLang === lang.code ? 'btn-primary' : 'btn-outline'}`}
+                                    style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '6px', padding: '6px 10px', fontSize: '0.78rem' }}
+                                    onClick={() => handleLanguageChange(lang.code)}
+                                >
+                                    <span>{lang.flagIcon || '🌐'}</span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        <strong>{lang.nativeName || lang.name}</strong>
+                                    </span>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
-                    {/* Step 3 & 4: Narration Content & Audio Player */}
+                    {/* Narration Content & Audio Player */}
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '24px 0', color: '#64748B' }}>
-                            Đang tải bài thuyết minh cho loài {species.nameVi}...
+                            {t?.loadingData || 'Đang tải bài thuyết minh từ Supabase...'}
+                        </div>
+                    ) : !hasActiveSession ? (
+                        <div style={{ textAlign: 'center', padding: '24px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
+                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔒</div>
+                            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A', margin: '0 0 6px 0' }}>
+                                {t?.ticketLockedTitle || 'Tính Năng Thuyết Minh Yêu Cầu Vé Tham Quan'}
+                            </h4>
+                            <p style={{ fontSize: '0.88rem', color: '#64748B', margin: '0 0 16px 0' }}>
+                                {t?.ticketLockedDesc || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.'}
+                            </p>
+                            <button
+                                type="button"
+                                className="btn btn-primary"
+                                onClick={() => {
+                                    onClose();
+                                    setIsTicketModalOpen(true);
+                                }}
+                            >
+                                🎟️ {t?.heroScanBtn || 'Kích hoạt vé tham quan'}
+                            </button>
                         </div>
                     ) : narration ? (
                         <div style={{ backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>
-                            {/* Narration Title & Narrator */}
                             <div style={{ marginBottom: '10px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
                                     <h4 style={{ margin: '0 0 4px 0', fontSize: '1.05rem', color: '#166534', fontWeight: '700' }}>
                                         {narration.title}
                                     </h4>
-                                    <span style={{ fontSize: '0.78rem', color: '#15803D', fontWeight: '600', backgroundColor: '#DCFCE7', padding: '2px 8px', borderRadius: '10px' }}>
-                                        ⏱ {narration.durationFormatted || '01:30'}
+                                    <span style={{ fontSize: '0.78rem', color: '#15803D', fontWeight: '600', backgroundColor: '#DCFCE7', padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap' }}>
+                                        ⏱ {narration.durationFormatted || '--:--'}
                                     </span>
                                 </div>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803D' }}>
-                                    Giọng đọc: <strong>{narration.narrator}</strong>
+                                    {t?.narratorLabel || 'Giọng đọc'}: <strong>{narration.narrator}</strong>
+                                    {narration.languageCode && (
+                                        <span style={{ marginLeft: '8px', opacity: 0.85 }}>
+                                            • [{narration.languageCode.toUpperCase()}]
+                                        </span>
+                                    )}
                                 </p>
                             </div>
 
-                            {/* Narration Summary */}
-                            <div style={{ fontSize: '0.85rem', color: '#14532D', marginBottom: '14px', lineHeight: '1.45' }}>
-                                {narration.summary}
+                            <div style={{ fontSize: '0.86rem', color: '#14532D', marginBottom: '14px', lineHeight: '1.55', whiteSpace: 'pre-line' }}>
+                                {narration.content || narration.summary}
                             </div>
 
-                            {/* Play Button Action */}
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '16px' }}>
-                                <button 
-                                    type="button" 
-                                    className="btn btn-primary" 
-                                    style={{ flex: 1, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.95rem' }}
-                                    onClick={handlePlayClick}
-                                >
-                                    {isCurrentlyPlayingThis ? (
-                                        <>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                <rect x="6" y="4" width="4" height="16"></rect>
-                                                <rect x="14" y="4" width="4" height="16"></rect>
-                                            </svg>
-                                            <span>Đang phát • Bấm để nghe lại từ đầu</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                                                <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                                            </svg>
-                                            <span>▶ Phát Thuyết Minh ({selectedLang === 'en' ? 'English' : 'Tiếng Việt'})</span>
-                                        </>
-                                    )}
-                                </button>
+                            {narration.referenceSource && (
+                                <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '12px', opacity: 0.9 }}>
+                                    📚 {narration.referenceSource}
+                                </div>
+                            )}
+
+                            {/* Play Button or Missing Audio Warning */}
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap' }}>
+                                {narration.hasAudio && narration.audioSrc ? (
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        style={{ flex: 1, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', fontSize: '0.95rem' }}
+                                        onClick={handlePlayClick}
+                                    >
+                                        {isCurrentlyPlayingThis ? (
+                                            <>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                    <rect x="6" y="4" width="4" height="16"></rect>
+                                                    <rect x="14" y="4" width="4" height="16"></rect>
+                                                </svg>
+                                                <span>{t?.playingRestartBtn || 'Đang phát • Bấm để nghe lại từ đầu'}</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                                </svg>
+                                                <span>▶ {t?.playNarrationBtn || 'Phát Thuyết Minh'} ({activeLangObj?.nativeName || selectedLang.toUpperCase()})</span>
+                                            </>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <div style={{ flex: 1, padding: '10px 14px', backgroundColor: '#FEF3C7', color: '#92400E', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600 }}>
+                                        ⚠️ {t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.'}
+                                    </div>
+                                )}
 
                                 {onNavigateMap && (
-                                    <button 
-                                        type="button" 
-                                        className="btn btn-secondary" 
+                                    <button
+                                        type="button"
+                                        className="btn btn-secondary"
                                         style={{ padding: '10px 14px' }}
-                                        title="Dẫn đường tới khu vực loài này trên bản đồ"
                                         onClick={() => {
                                             onClose();
-                                            onNavigateMap(species);
+                                            onNavigateMap(constituentAnimals[0] || spDisplay);
                                         }}
                                     >
-                                        🗺 Bản đồ
+                                        🗺 {t?.viewOnMap || 'Bản đồ'}
                                     </button>
                                 )}
                             </div>
 
-                            {/* Transcript Preview */}
                             {narration.transcript && narration.transcript.length > 0 && (
                                 <div>
                                     <h5 style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        📜 Lời thoại thuyết minh:
+                                        📜 {t?.transcriptBtn || 'Lời thoại thuyết minh'}:
                                     </h5>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
                                         {narration.transcript.map((line, idx) => (
-                                            <div 
-                                                key={idx} 
-                                                style={{ 
-                                                    display: 'flex', 
-                                                    gap: '10px', 
-                                                    fontSize: '0.8rem', 
-                                                    color: '#1E293B', 
-                                                    backgroundColor: '#FFFFFF', 
-                                                    padding: '6px 10px', 
+                                            <div
+                                                key={idx}
+                                                style={{
+                                                    display: 'flex',
+                                                    gap: '10px',
+                                                    fontSize: '0.8rem',
+                                                    color: '#1E293B',
+                                                    backgroundColor: '#FFFFFF',
+                                                    padding: '6px 10px',
                                                     borderRadius: '6px',
-                                                    border: '1px solid #E2E8F0' 
+                                                    border: '1px solid #E2E8F0'
                                                 }}
                                             >
                                                 <span style={{ fontWeight: '700', color: '#15803D', minWidth: '40px', fontFamily: 'monospace' }}>
@@ -319,29 +380,15 @@ export default function SpeciesNarrationModal({
                                 </div>
                             )}
                         </div>
-                    ) : !hasActiveSession ? (
-                        <div style={{ textAlign: 'center', padding: '24px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
-                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔒</div>
-                            <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A', margin: '0 0 6px 0' }}>
-                                Tính Năng Thuyết Minh Yêu Cầu Vé Tham Quan
-                            </h4>
-                            <p style={{ fontSize: '0.88rem', color: '#64748B', margin: '0 0 16px 0' }}>
-                                Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.
-                            </p>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    onClose();
-                                    setIsTicketModalOpen(true);
-                                }}
-                            >
-                                🎟️ Kích hoạt vé tham quan
-                            </button>
-                        </div>
                     ) : (
-                        <div style={{ textAlign: 'center', padding: '16px', color: '#EF4444' }}>
-                            Không tìm thấy nội dung thuyết minh cho loài này.
+                        <div style={{ textAlign: 'center', padding: '20px 16px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', color: '#92400E' }}>
+                            <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>🌐</div>
+                            <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 700 }}>
+                                {t?.narrationMissingTitle || 'Chưa có bản dịch / thuyết minh cho ngôn ngữ này'}
+                            </h4>
+                            <p style={{ margin: 0, fontSize: '0.84rem' }}>
+                                {narrationError || t?.narrationMissingDesc}
+                            </p>
                         </div>
                     )}
                 </div>

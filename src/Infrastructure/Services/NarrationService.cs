@@ -35,7 +35,7 @@ public class NarrationService : INarrationService
 
             if (!string.IsNullOrWhiteSpace(filter.LanguageCode))
             {
-                var lang = filter.LanguageCode.Trim().ToLower();
+                var lang = TranslationService.NormalizeLanguageCode(filter.LanguageCode);
                 query = query.Where(n => n.Language.Code.ToLower() == lang);
             }
 
@@ -60,7 +60,12 @@ public class NarrationService : INarrationService
             .OrderByDescending(n => n.UpdatedAt ?? n.CreatedAt)
             .ToListAsync();
 
-        return list.Select(MapToDto);
+        var animalTranslations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "Animal" && ct.IsPublished)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return list.Select(n => MapToDto(n, animalTranslations));
     }
 
     public async Task<NarrationResponseDto?> GetByIdAsync(int id)
@@ -73,12 +78,19 @@ public class NarrationService : INarrationService
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.NarrationId == id);
 
-        return narration == null ? null : MapToDto(narration);
+        if (narration == null) return null;
+
+        var animalTranslations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "Animal" && ct.EntityId == narration.AnimalId && ct.IsPublished)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return MapToDto(narration, animalTranslations);
     }
 
     public async Task<NarrationResponseDto?> GetByAnimalAndLanguageAsync(int animalId, string languageCode)
     {
-        var lang = languageCode.Trim().ToLower();
+        var lang = TranslationService.NormalizeLanguageCode(languageCode);
         var narration = await _context.Narrations
             .Include(n => n.Animal)
             .Include(n => n.Language)
@@ -87,35 +99,43 @@ public class NarrationService : INarrationService
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.AnimalId == animalId && n.Language.Code.ToLower() == lang && n.Status == NarrationStatus.Published);
 
-        return narration == null ? null : MapToDto(narration);
+        if (narration == null) return null;
+
+        var animalTranslations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "Animal" && ct.EntityId == animalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+            .AsNoTracking()
+            .ToListAsync();
+
+        return MapToDto(narration, animalTranslations);
     }
 
     public async Task<NarrationResponseDto?> GetBySpeciesAndLanguageAsync(int speciesId, string languageCode)
     {
-        var lang = languageCode.Trim().ToLower();
+        var lang = TranslationService.NormalizeLanguageCode(languageCode);
         var narration = await _context.Narrations
             .Include(n => n.Animal)
             .Include(n => n.Language)
             .Include(n => n.Creator)
             .Include(n => n.Audios)
             .AsNoTracking()
-            .FirstOrDefaultAsync(n => n.Animal.SpeciesId == speciesId && n.Language.Code.ToLower() == lang && n.Status == NarrationStatus.Published);
+            .FirstOrDefaultAsync(n =>
+                n.Animal.SpeciesId == speciesId &&
+                n.Animal.Status != AnimalStatus.Transferred &&
+                n.Language.Code.ToLower() == lang &&
+                n.Status == NarrationStatus.Published);
 
-        if (narration != null)
+        if (narration == null)
         {
-            return MapToDto(narration);
+            // Không âm thầm lấy bài thuyết minh ngôn ngữ khác khi thiếu bản dịch!
+            return null;
         }
 
-        // Fallback: any published narration for this species
-        var fallback = await _context.Narrations
-            .Include(n => n.Animal)
-            .Include(n => n.Language)
-            .Include(n => n.Creator)
-            .Include(n => n.Audios)
+        var animalTranslations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "Animal" && ct.EntityId == narration.AnimalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
             .AsNoTracking()
-            .FirstOrDefaultAsync(n => n.Animal.SpeciesId == speciesId && n.Status == NarrationStatus.Published);
+            .ToListAsync();
 
-        return fallback == null ? null : MapToDto(fallback);
+        return MapToDto(narration, animalTranslations);
     }
 
     public async Task<NarrationResponseDto> CreateAsync(CreateNarrationDto dto)
@@ -159,6 +179,7 @@ public class NarrationService : INarrationService
             AudioUrl = dto.AudioUrl,
             DurationSeconds = dto.DurationSeconds,
             Status = statusEnum,
+            ReferenceSource = dto.ReferenceSource,
             CreatedBy = creatorId,
             CreatedAt = DateTime.UtcNow
         };
@@ -176,6 +197,7 @@ public class NarrationService : INarrationService
                 FileName = Path.GetFileName(dto.AudioUrl) ?? "narration_audio.mp3",
                 MimeType = "audio/mpeg",
                 DurationSeconds = dto.DurationSeconds,
+                LanguageCode = language.Code,
                 Status = AudioStatus.Active,
                 CreatedAt = DateTime.UtcNow
             };
@@ -203,6 +225,10 @@ public class NarrationService : INarrationService
         if (dto.DurationSeconds.HasValue)
         {
             narration.DurationSeconds = dto.DurationSeconds.Value;
+        }
+        if (!string.IsNullOrWhiteSpace(dto.ReferenceSource))
+        {
+            narration.ReferenceSource = dto.ReferenceSource;
         }
         if (Enum.TryParse<NarrationStatus>(dto.Status, true, out var statusEnum))
         {
@@ -244,9 +270,25 @@ public class NarrationService : INarrationService
         return true;
     }
 
-    public async Task<AudioResponseDto?> AddAudioAsync(int narrationId, string fileUrl, string fileName, string mimeType, int? durationSeconds, long? fileSize)
+    public async Task<AudioResponseDto?> AddAudioAsync(
+        int narrationId,
+        string fileUrl,
+        string fileName,
+        string mimeType,
+        int? durationSeconds,
+        long? fileSize,
+        string? storageBucket = null,
+        string? objectPath = null,
+        string? publicUrl = null,
+        string? languageCode = null,
+        string? voiceName = null,
+        string? ttsProvider = null,
+        string? sha256Hash = null,
+        bool isVerified = false)
     {
-        var narration = await _context.Narrations.FindAsync(narrationId);
+        var narration = await _context.Narrations
+            .Include(n => n.Language)
+            .FirstOrDefaultAsync(n => n.NarrationId == narrationId);
         if (narration == null) return null;
 
         var audio = new Audio
@@ -255,8 +297,16 @@ public class NarrationService : INarrationService
             FileUrl = fileUrl,
             FileName = fileName,
             MimeType = mimeType,
-            DurationSeconds = durationSeconds,
+            DurationSeconds = durationSeconds ?? narration.DurationSeconds,
             FileSize = fileSize,
+            StorageBucket = storageBucket ?? "narration-audio",
+            ObjectPath = objectPath,
+            PublicUrl = publicUrl,
+            LanguageCode = languageCode ?? narration.Language?.Code,
+            VoiceName = voiceName,
+            TtsProvider = ttsProvider,
+            Sha256Hash = sha256Hash,
+            IsVerified = isVerified,
             Status = AudioStatus.Active,
             CreatedAt = DateTime.UtcNow
         };
@@ -271,24 +321,15 @@ public class NarrationService : INarrationService
 
         await _context.SaveChangesAsync();
 
-        return new AudioResponseDto
-        {
-            AudioId = audio.AudioId,
-            NarrationId = audio.NarrationId,
-            FileUrl = audio.FileUrl,
-            FileName = audio.FileName,
-            MimeType = audio.MimeType,
-            DurationSeconds = audio.DurationSeconds,
-            FileSize = audio.FileSize,
-            Status = audio.Status.ToString(),
-            CreatedAt = audio.CreatedAt
-        };
+        return MapAudioToDto(audio);
     }
 
     public async Task<IEnumerable<LanguageDto>> GetLanguagesAsync()
     {
         var languages = await _context.Languages
             .Where(l => l.IsActive)
+            .OrderBy(l => l.DisplayOrder)
+            .ThenBy(l => l.LanguageId)
             .AsNoTracking()
             .ToListAsync();
 
@@ -297,42 +338,76 @@ public class NarrationService : INarrationService
             LanguageId = l.LanguageId,
             Code = l.Code,
             Name = l.Name,
+            NativeName = string.IsNullOrWhiteSpace(l.NativeName) ? l.Name : l.NativeName,
+            Locale = l.Locale,
+            FlagIcon = l.FlagIcon,
+            TtsVoice = l.TtsVoice,
+            DisplayOrder = l.DisplayOrder,
             IsActive = l.IsActive
         });
     }
 
-    private static NarrationResponseDto MapToDto(Narration n)
+    private static NarrationResponseDto MapToDto(Narration n, List<ContentTranslation>? animalTranslations = null)
     {
+        var langCode = n.Language?.Code ?? "vi";
+        var animalTr = animalTranslations?.FirstOrDefault(ct =>
+            ct.EntityId == n.AnimalId &&
+            string.Equals(ct.LanguageCode, langCode, StringComparison.OrdinalIgnoreCase));
+
+        var orderedAudios = n.Audios?
+            .OrderByDescending(a => a.Status == AudioStatus.Active)
+            .ThenByDescending(a => a.IsVerified)
+            .ThenByDescending(a => a.CreatedAt)
+            .Select(MapAudioToDto)
+            .ToList() ?? new List<AudioResponseDto>();
+
+        var primaryAudio = orderedAudios.FirstOrDefault();
+
         return new NarrationResponseDto
         {
             NarrationId = n.NarrationId,
             AnimalId = n.AnimalId,
-            AnimalName = n.Animal?.Name ?? string.Empty,
+            AnimalName = animalTr != null && !string.IsNullOrWhiteSpace(animalTr.Title)
+                ? animalTr.Title
+                : (n.Animal?.Name ?? string.Empty),
             AnimalImageUrl = n.Animal?.ImageUrl,
             LanguageId = n.LanguageId,
-            LanguageCode = n.Language?.Code ?? string.Empty,
-            LanguageName = n.Language?.Name ?? string.Empty,
+            LanguageCode = langCode,
+            LanguageName = !string.IsNullOrWhiteSpace(n.Language?.NativeName)
+                ? n.Language.NativeName
+                : (n.Language?.Name ?? string.Empty),
             Title = n.Title,
             Content = n.Content,
-            AudioUrl = n.AudioUrl,
-            DurationSeconds = n.DurationSeconds,
+            AudioUrl = primaryAudio?.FileUrl ?? n.AudioUrl,
+            DurationSeconds = primaryAudio?.DurationSeconds ?? n.DurationSeconds,
             Status = n.Status.ToString(),
+            ReferenceSource = n.ReferenceSource,
             CreatedBy = n.CreatedBy,
             CreatorName = n.Creator?.FullName ?? "Cán bộ chuyên môn",
             CreatedAt = n.CreatedAt,
             UpdatedAt = n.UpdatedAt,
-            Audios = n.Audios?.Select(a => new AudioResponseDto
-            {
-                AudioId = a.AudioId,
-                NarrationId = a.NarrationId,
-                FileUrl = a.FileUrl,
-                FileName = a.FileName,
-                MimeType = a.MimeType,
-                DurationSeconds = a.DurationSeconds,
-                FileSize = a.FileSize,
-                Status = a.Status.ToString(),
-                CreatedAt = a.CreatedAt
-            }).ToList() ?? new List<AudioResponseDto>()
+            Audios = orderedAudios
         };
     }
+
+    private static AudioResponseDto MapAudioToDto(Audio a) => new()
+    {
+        AudioId = a.AudioId,
+        NarrationId = a.NarrationId,
+        FileUrl = a.FileUrl,
+        FileName = a.FileName,
+        MimeType = a.MimeType,
+        DurationSeconds = a.DurationSeconds,
+        FileSize = a.FileSize,
+        StorageBucket = a.StorageBucket,
+        ObjectPath = a.ObjectPath,
+        PublicUrl = a.PublicUrl,
+        LanguageCode = a.LanguageCode,
+        VoiceName = a.VoiceName,
+        TtsProvider = a.TtsProvider,
+        Sha256Hash = a.Sha256Hash,
+        IsVerified = a.IsVerified,
+        Status = a.Status.ToString(),
+        CreatedAt = a.CreatedAt
+    };
 }

@@ -17,6 +17,14 @@ public class Audio
     public string MimeType { get; set; } = "audio/mpeg";
     public int? DurationSeconds { get; set; }
     public long? FileSize { get; set; }
+    public string? StorageBucket { get; set; } = "narration-audio";
+    public string? ObjectPath { get; set; }
+    public string? PublicUrl { get; set; }
+    public string? LanguageCode { get; set; }
+    public string? VoiceName { get; set; }
+    public string? TtsProvider { get; set; }
+    public string? Sha256Hash { get; set; }
+    public bool IsVerified { get; set; }
     public AudioStatus Status { get; set; } = AudioStatus.Active;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

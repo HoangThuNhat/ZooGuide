@@ -32,4 +32,27 @@ public class DashboardController : ControllerBase
         var stats = await _dashboardService.GetStatsAsync(fromDate, toDate);
         return Ok(ApiResponse<DashboardStatsDto>.Ok(stats));
     }
+
+    /// <summary>
+    /// Lưu bản ghi kiểm tra sức khỏe thú y thực tế vào cơ sở dữ liệu Supabase
+    /// </summary>
+    [HttpPost("health-logs")]
+    [ProducesResponseType(typeof(ApiResponse<DashboardHealthLogDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<DashboardHealthLogDto>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<DashboardHealthLogDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RecordHealthCheck([FromBody] UpdateAnimalHealthDto dto)
+    {
+        if (dto.AnimalId <= 0)
+        {
+            return BadRequest(ApiResponse<DashboardHealthLogDto>.Fail("Vui lòng chọn cá thể động vật hợp lệ."));
+        }
+
+        var result = await _dashboardService.RecordHealthCheckAsync(dto);
+        if (result == null)
+        {
+            return NotFound(ApiResponse<DashboardHealthLogDto>.Fail($"Không tìm thấy cá thể động vật ID = {dto.AnimalId}."));
+        }
+
+        return Ok(ApiResponse<DashboardHealthLogDto>.Ok(result, "Đã lưu hồ sơ khám sức khỏe thú y vào cơ sở dữ liệu!"));
+    }
 }

@@ -39,9 +39,9 @@ public class AnimalsController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<AnimalDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AnimalDetailDto>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetAnimalById(int id)
+    public async Task<IActionResult> GetAnimalById(int id, [FromQuery] string? lang = null)
     {
-        var animal = await _animalService.GetAnimalByIdAsync(id);
+        var animal = await _animalService.GetAnimalByIdAsync(id, lang);
         if (animal == null)
         {
             return NotFound(ApiResponse<AnimalDetailDto>.Fail($"Không tìm thấy hồ sơ động vật với mã ID = {id}."));
@@ -122,5 +122,23 @@ public class AnimalsController : ControllerBase
         }
 
         return Ok(ApiResponse<object>.Ok(new { id }, result.Message ?? "Đã xử lý xóa động vật thành công."));
+    }
+
+    /// <summary>
+    /// Cập nhật hồ sơ khám sức khỏe thú y thực tế cho cá thể động vật
+    /// </summary>
+    [HttpPatch("{id:int}/health")]
+    [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> UpdateAnimalHealth(int id, [FromBody] UpdateAnimalHealthDto dto)
+    {
+        dto.AnimalId = id;
+        var updated = await _animalService.UpdateAnimalHealthAsync(id, dto);
+        if (updated == null)
+        {
+            return NotFound(ApiResponse<AnimalResponseDto>.Fail($"Không tìm thấy hồ sơ động vật với mã ID = {id}."));
+        }
+
+        return Ok(ApiResponse<AnimalResponseDto>.Ok(updated, "Đã lưu hồ sơ kiểm tra sức khỏe thú y thành công!"));
     }
 }

@@ -55,6 +55,11 @@ public class EnclosureConfiguration : IEntityTypeConfiguration<Enclosure>
             .HasPrecision(8, 2)
             .IsRequired(false);
 
+        builder.Property(e => e.ReferenceSource)
+            .HasColumnName("ReferenceSource")
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(e => e.CreatedAt)
             .HasColumnName("CreatedAt")
             .IsRequired()

@@ -18,16 +18,17 @@ public class SpeciesController : ControllerBase
     [HttpGet]
     public async Task<ActionResult<IEnumerable<SpeciesDto>>> GetAll(
         [FromQuery] string? search = null,
-        [FromQuery] string? conservationStatus = null)
+        [FromQuery] string? conservationStatus = null,
+        [FromQuery] string? lang = null)
     {
-        var species = await _speciesService.GetAllAsync(search, conservationStatus);
+        var species = await _speciesService.GetAllAsync(search, conservationStatus, lang);
         return Ok(species);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<SpeciesDto>> GetById(int id)
+    public async Task<ActionResult<SpeciesDto>> GetById(int id, [FromQuery] string? lang = null)
     {
-        var species = await _speciesService.GetByIdAsync(id);
+        var species = await _speciesService.GetByIdAsync(id, lang);
         if (species == null)
             return NotFound(new { message = "Species not found" });
 

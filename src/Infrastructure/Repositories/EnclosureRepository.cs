@@ -31,11 +31,28 @@ public class EnclosureRepository : IEnclosureRepository
         if (!string.IsNullOrWhiteSpace(search))
         {
             var s = search.Trim().ToLower();
+            var matchingEnclosureIds = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Enclosure" && ct.IsPublished &&
+                             ((ct.Title != null && ct.Title.ToLower().Contains(s)) ||
+                              (ct.Description != null && ct.Description.ToLower().Contains(s))))
+                .Select(ct => ct.EntityId)
+                .Distinct()
+                .ToListAsync();
+
+            var matchingAreaIds = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Area" && ct.IsPublished &&
+                             (ct.Title != null && ct.Title.ToLower().Contains(s)))
+                .Select(ct => ct.EntityId)
+                .Distinct()
+                .ToListAsync();
+
             query = query.Where(e =>
                 e.Name.ToLower().Contains(s) ||
                 (e.Code != null && e.Code.ToLower().Contains(s)) ||
                 (e.Description != null && e.Description.ToLower().Contains(s)) ||
-                (e.Area != null && e.Area.Name.ToLower().Contains(s)));
+                (e.Area != null && e.Area.Name.ToLower().Contains(s)) ||
+                matchingEnclosureIds.Contains(e.EnclosureId) ||
+                matchingAreaIds.Contains(e.AreaId));
         }
 
         if (!string.IsNullOrWhiteSpace(status) && status != "all")
@@ -104,5 +121,15 @@ public class EnclosureRepository : IEnclosureRepository
     public async Task<bool> HasAnimalsAsync(int enclosureId)
     {
         return await _context.Animals.AnyAsync(a => a.EnclosureId == enclosureId);
+    }
+
+    public async Task<List<ContentTranslation>> GetTranslationsByLanguageAsync(string languageCode)
+    {
+        var lang = (languageCode ?? "vi").Trim().ToLowerInvariant();
+        if (lang == "zh-cn" || lang == "zh_cn" || lang == "zh-hans") lang = "zh";
+        return await _context.ContentTranslations
+            .Where(ct => ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+            .AsNoTracking()
+            .ToListAsync();
     }
 }

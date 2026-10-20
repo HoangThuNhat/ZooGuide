@@ -228,7 +228,7 @@ export default function AdminDashboardPage() {
         e.preventDefault();
         const selectedAnimal = animalOptions.find(a => a.code === healthForm.animalCode || a.id === Number(healthForm.animalCode));
         const newRecord = {
-            id: Date.now(),
+            animalId: selectedAnimal ? (selectedAnimal.id || selectedAnimal.animalId) : null,
             animalCode: healthForm.animalCode,
             animalName: selectedAnimal ? (selectedAnimal.nameVi || selectedAnimal.name) : healthForm.animalCode,
             date: new Date().toISOString().slice(0, 10),
@@ -240,19 +240,24 @@ export default function AdminDashboardPage() {
             actionRequired: healthForm.actionRequired
         };
 
-        setStats(prev => ({
-            ...prev,
-            recentHealthLogs: [newRecord, ...(prev.recentHealthLogs || [])]
-        }));
-
-        showToast("Đã lưu nhật ký khám sức khỏe động vật thành công!", "success");
-        setHealthForm(prev => ({
-            ...prev,
-            weightKg: '',
-            temperatureC: '38.0',
-            notes: '',
-            actionRequired: ''
-        }));
+        try {
+            const res = await ZooApi.addHealthRecord(newRecord);
+            if (!res.success) {
+                showToast(res.error || "Không thể lưu nhật ký khám sức khỏe vào cơ sở dữ liệu", "error");
+                return;
+            }
+            showToast("Đã lưu nhật ký khám sức khỏe động vật vào cơ sở dữ liệu Supabase!", "success");
+            setHealthForm(prev => ({
+                ...prev,
+                weightKg: '',
+                temperatureC: '38.0',
+                notes: '',
+                actionRequired: ''
+            }));
+            await loadDashboardData(appliedFilter);
+        } catch (err) {
+            showToast(err.message || "Lỗi kết nối khi lưu nhật ký sức khỏe", "error");
+        }
     };
 
     return (

@@ -17,16 +17,21 @@ public class AreaService : IAreaService
         _areaRepository = areaRepository;
     }
 
-    public async Task<IEnumerable<AreaResponseDto>> GetAllAreasAsync()
+    public async Task<IEnumerable<AreaResponseDto>> GetAllAreasAsync(string? lang = null)
     {
+        var normalizedLang = NormalizeLang(lang);
         var areas = await _areaRepository.GetAllWithAnimalsAsync();
-        return areas.Select(MapToResponseDto);
+        var translations = await _areaRepository.GetTranslationsByLanguageAsync(normalizedLang);
+        return areas.Select(a => MapToResponseDto(a, normalizedLang, translations));
     }
 
-    public async Task<AreaResponseDto?> GetAreaByIdAsync(int areaId)
+    public async Task<AreaResponseDto?> GetAreaByIdAsync(int areaId, string? lang = null)
     {
+        var normalizedLang = NormalizeLang(lang);
         var area = await _areaRepository.GetByIdWithAnimalsAsync(areaId);
-        return area == null ? null : MapToResponseDto(area);
+        if (area == null) return null;
+        var translations = await _areaRepository.GetTranslationsByLanguageAsync(normalizedLang);
+        return MapToResponseDto(area, normalizedLang, translations);
     }
 
     public async Task<AreaResponseDto> CreateAreaAsync(CreateAreaDto dto)
@@ -150,61 +155,114 @@ public class AreaService : IAreaService
 
     #region Helper Math & Mapping Methods
 
-    private static AreaResponseDto MapToResponseDto(Area a)
+    private static string NormalizeLang(string? code)
     {
-        // Tạo mã phân khu: Ưu tiên a.Code hoặc A, B, C... dựa vào AreaId
+        if (string.IsNullOrWhiteSpace(code)) return "vi";
+        var c = code.Trim().ToLowerInvariant();
+        return (c == "zh-cn" || c == "zh_cn" || c == "zh-hans") ? "zh" : c;
+    }
+
+    private static AreaResponseDto MapToResponseDto(Area a, string lang = "vi", List<ContentTranslation>? translations = null)
+    {
+        bool isDefaultVi = lang == "vi";
+        var areaTr = translations?.FirstOrDefault(ct => ct.EntityType == "Area" && ct.EntityId == a.AreaId);
+        bool hasAreaTr = isDefaultVi || (areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title));
+        string areaDisplayName = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title) ? areaTr.Title : a.Name;
+        string? areaDisplayDesc = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Description) ? areaTr.Description : (hasAreaTr ? a.Description : null);
+
         string code = !string.IsNullOrWhiteSpace(a.Code) 
             ? a.Code 
             : (a.AreaId > 0 && a.AreaId <= 26 
                 ? ((char)('A' + a.AreaId - 1)).ToString() 
                 : $"Z{a.AreaId}");
 
-        var enclosures = a.Enclosures?.Select(e => new EnclosureResponse
+        var enclosures = a.Enclosures?.Select(e =>
         {
-            EnclosureId = e.EnclosureId,
-            AreaId = e.AreaId,
-            AreaName = a.Name,
-            AreaCode = code,
-            Code = e.Code ?? $"ENC-{e.EnclosureId:D3}",
-            Name = e.Name,
-            Description = e.Description,
-            ImageUrl = e.ImageUrl,
-            Status = e.Status,
-            MapX = e.MapX,
-            MapY = e.MapY,
-            AnimalCount = e.Animals?.Count ?? 0,
-            CreatedAt = e.CreatedAt,
-            UpdatedAt = e.UpdatedAt,
-            Animals = e.Animals?.Select(an => new AnimalResponseDto
+            var encTr = translations?.FirstOrDefault(ct => ct.EntityType == "Enclosure" && ct.EntityId == e.EnclosureId);
+            bool hasEncTr = isDefaultVi || (encTr != null && !string.IsNullOrWhiteSpace(encTr.Title));
+            string encDisplayName = encTr != null && !string.IsNullOrWhiteSpace(encTr.Title) ? encTr.Title : e.Name;
+            string? encDisplayDesc = encTr != null && !string.IsNullOrWhiteSpace(encTr.Description) ? encTr.Description : (hasEncTr ? e.Description : null);
+
+            var activeAnimals = e.Animals?.Where(an => an.Status == AnimalStatus.Active || an.Status == AnimalStatus.UnderTreatment).ToList()
+                                ?? new List<Animal>();
+
+            return new EnclosureResponse
             {
-                AnimalId = an.AnimalId,
-                SpeciesId = an.SpeciesId,
-                SpeciesName = an.Species?.Name ?? string.Empty,
-                AreaId = an.AreaId,
-                AreaName = a.Name,
-                EnclosureId = an.EnclosureId,
-                EnclosureName = e.Name,
-                EnclosureCode = e.Code,
-                Name = an.Name,
-                Description = an.Description,
-                Gender = an.Gender.ToString(),
-                DateOfBirth = an.DateOfBirth,
-                Origin = an.Origin,
-                HealthStatus = an.HealthStatus,
-                ConservationNote = an.ConservationNote,
-                ImageUrl = an.ImageUrl,
-                Status = an.Status.ToString(),
-                CreatedAt = an.CreatedAt,
-                UpdatedAt = an.UpdatedAt
-            }).ToList() ?? new List<AnimalResponseDto>()
+                EnclosureId = e.EnclosureId,
+                AreaId = e.AreaId,
+                AreaName = areaDisplayName,
+                AreaCode = code,
+                Code = e.Code ?? $"ENC-{e.EnclosureId:D3}",
+                OriginalName = e.Name,
+                Name = encDisplayName,
+                Description = encDisplayDesc,
+                LanguageCode = lang,
+                HasTranslation = hasEncTr,
+                ReferenceSource = encTr?.SourceReference ?? e.ReferenceSource,
+                ImageUrl = e.ImageUrl,
+                Status = e.Status,
+                MapX = e.MapX,
+                MapY = e.MapY,
+                AnimalCount = activeAnimals.Count,
+                CreatedAt = e.CreatedAt,
+                UpdatedAt = e.UpdatedAt,
+                Animals = activeAnimals.Select(an =>
+                {
+                    var anTr = translations?.FirstOrDefault(ct => ct.EntityType == "Animal" && ct.EntityId == an.AnimalId);
+                    var spTr = an.Species != null ? translations?.FirstOrDefault(ct => ct.EntityType == "Species" && ct.EntityId == an.SpeciesId) : null;
+                    bool hasAnTr = isDefaultVi || (anTr != null && !string.IsNullOrWhiteSpace(anTr.Title));
+                    return new AnimalResponseDto
+                    {
+                        AnimalId = an.AnimalId,
+                        SpeciesId = an.SpeciesId,
+                        SpeciesName = spTr != null && !string.IsNullOrWhiteSpace(spTr.Title) ? spTr.Title : (an.Species?.Name ?? string.Empty),
+                        ScientificName = an.Species?.ScientificName,
+                        ConservationStatus = an.Species?.ConservationStatus,
+                        AreaId = an.AreaId,
+                        AreaName = areaDisplayName,
+                        EnclosureId = an.EnclosureId,
+                        EnclosureName = encDisplayName,
+                        EnclosureCode = e.Code,
+                        OriginalName = an.Name,
+                        Name = anTr != null && !string.IsNullOrWhiteSpace(anTr.Title) ? anTr.Title : an.Name,
+                        Description = anTr != null && !string.IsNullOrWhiteSpace(anTr.Description) ? anTr.Description : (hasAnTr ? an.Description : null),
+                        LanguageCode = lang,
+                        HasTranslation = hasAnTr,
+                        ReferenceSource = anTr?.SourceReference ?? an.ReferenceSource,
+                        Gender = an.Gender.ToString(),
+                        DateOfBirth = an.DateOfBirth,
+                        Origin = an.Origin,
+                        HealthStatus = an.HealthStatus,
+                        ConservationNote = an.ConservationNote,
+                        ImageUrl = an.ImageUrl,
+                        WeightKg = an.WeightKg,
+                        TemperatureC = an.TemperatureC,
+                        VeterinarianName = an.VeterinarianName,
+                        HealthActionRequired = an.HealthActionRequired,
+                        LastHealthCheckAt = an.LastHealthCheckAt,
+                        Habitat = an.Species?.Habitat,
+                        Diet = an.Species?.Diet,
+                        Lifespan = an.Species?.Lifespan,
+                        Status = an.Status.ToString(),
+                        CreatedAt = an.CreatedAt,
+                        UpdatedAt = an.UpdatedAt
+                    };
+                }).ToList()
+            };
         }).ToList() ?? new List<EnclosureResponse>();
+
+        var activeAreaAnimalsCount = a.Animals?.Count(an => an.Status == AnimalStatus.Active || an.Status == AnimalStatus.UnderTreatment) ?? 0;
 
         return new AreaResponseDto
         {
             AreaId = a.AreaId,
             Code = code,
-            Name = a.Name,
-            Description = a.Description,
+            OriginalName = a.Name,
+            Name = areaDisplayName,
+            Description = areaDisplayDesc,
+            LanguageCode = lang,
+            HasTranslation = hasAreaTr,
+            ReferenceSource = areaTr?.SourceReference ?? a.ReferenceSource,
             Latitude = a.Latitude,
             Longitude = a.Longitude,
             RadiusMeters = a.RadiusMeters,
@@ -213,7 +271,7 @@ public class AreaService : IAreaService
             MapY = a.MapY,
             Status = a.Status.ToString(),
             EnclosureCount = enclosures.Count,
-            AnimalCount = a.Animals?.Count ?? 0,
+            AnimalCount = activeAreaAnimalsCount,
             CreatedAt = a.CreatedAt,
             UpdatedAt = a.UpdatedAt,
             Enclosures = enclosures

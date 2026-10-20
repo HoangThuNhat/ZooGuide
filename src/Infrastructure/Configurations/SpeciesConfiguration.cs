@@ -36,6 +36,22 @@ public class SpeciesConfiguration : IEntityTypeConfiguration<Species>
             .HasMaxLength(500)
             .IsRequired(false);
 
+        builder.Property(s => s.Habitat)
+            .HasMaxLength(300)
+            .IsRequired(false);
+
+        builder.Property(s => s.Diet)
+            .HasMaxLength(300)
+            .IsRequired(false);
+
+        builder.Property(s => s.Lifespan)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(s => s.ReferenceSource)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(s => s.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("now()");

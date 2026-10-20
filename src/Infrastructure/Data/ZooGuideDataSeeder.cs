@@ -62,13 +62,21 @@ public static class ZooGuideDataSeeder
         context.Users.AddRange(adminUser, staffUser, visitorUser);
         await context.SaveChangesAsync();
 
-        // 2. Seed LANGUAGES
-        var langVi = new Language { Code = "vi", Name = "Tiếng Việt", IsActive = true };
-        var langEn = new Language { Code = "en", Name = "English", IsActive = true };
-        var langZh = new Language { Code = "zh", Name = "中文 (Chinese)", IsActive = true };
-        var langJa = new Language { Code = "ja", Name = "日本語 (Japanese)", IsActive = true };
+        // 2. Seed LANGUAGES (12 Supported Languages)
+        var langVi = new Language { Code = "vi", Name = "Tiếng Việt", NativeName = "Tiếng Việt", FlagIcon = "🇻🇳", TtsVoice = "vi-VN-HoaiMyNeural", DisplayOrder = 1, IsActive = true };
+        var langEn = new Language { Code = "en", Name = "English", NativeName = "English", FlagIcon = "🇬🇧", TtsVoice = "en-US-JennyNeural", DisplayOrder = 2, IsActive = true };
+        var langZh = new Language { Code = "zh", Name = "Chinese", NativeName = "简体中文", FlagIcon = "🇨🇳", TtsVoice = "zh-CN-XiaoxiaoNeural", DisplayOrder = 3, IsActive = true };
+        var langJa = new Language { Code = "ja", Name = "Japanese", NativeName = "日本語", FlagIcon = "🇯🇵", TtsVoice = "ja-JP-NanamiNeural", DisplayOrder = 4, IsActive = true };
+        var langKo = new Language { Code = "ko", Name = "Korean", NativeName = "한국어", FlagIcon = "🇰🇷", TtsVoice = "ko-KR-SunHiNeural", DisplayOrder = 5, IsActive = true };
+        var langTh = new Language { Code = "th", Name = "Thai", NativeName = "ภาษาไทย", FlagIcon = "🇹🇭", TtsVoice = "th-TH-NiwatNeural", DisplayOrder = 6, IsActive = true };
+        var langFr = new Language { Code = "fr", Name = "French", NativeName = "Français", FlagIcon = "🇫🇷", TtsVoice = "fr-FR-DeniseNeural", DisplayOrder = 7, IsActive = true };
+        var langEs = new Language { Code = "es", Name = "Spanish", NativeName = "Español", FlagIcon = "🇪🇸", TtsVoice = "es-ES-ElviraNeural", DisplayOrder = 8, IsActive = true };
+        var langDe = new Language { Code = "de", Name = "German", NativeName = "Deutsch", FlagIcon = "🇩🇪", TtsVoice = "de-DE-KatjaNeural", DisplayOrder = 9, IsActive = true };
+        var langRu = new Language { Code = "ru", Name = "Russian", NativeName = "Русский", FlagIcon = "🇷🇺", TtsVoice = "ru-RU-SvetlanaNeural", DisplayOrder = 10, IsActive = true };
+        var langPt = new Language { Code = "pt", Name = "Portuguese", NativeName = "Português", FlagIcon = "🇵🇹", TtsVoice = "pt-BR-FranciscaNeural", DisplayOrder = 11, IsActive = true };
+        var langId = new Language { Code = "id", Name = "Indonesian", NativeName = "Bahasa Indonesia", FlagIcon = "🇮🇩", TtsVoice = "id-ID-GadisNeural", DisplayOrder = 12, IsActive = true };
 
-        context.Languages.AddRange(langVi, langEn, langZh, langJa);
+        context.Languages.AddRange(langVi, langEn, langZh, langJa, langKo, langTh, langFr, langEs, langDe, langRu, langPt, langId);
         await context.SaveChangesAsync();
 
         // 3. Seed TICKET_TYPES

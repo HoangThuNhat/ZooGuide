@@ -15,33 +15,48 @@ public class TicketTypeService : ITicketTypeService
         _context = context;
     }
 
-    public async Task<IEnumerable<TicketTypeDto>> GetAllAsync()
+    public async Task<IEnumerable<TicketTypeDto>> GetAllAsync(string? lang = null)
     {
-        return await _context.TicketTypes
-            .Select(tt => new TicketTypeDto
-            {
-                TicketTypeId = tt.TicketTypeId,
-                Name = tt.Name,
-                Description = tt.Description,
-                Price = tt.Price,
-                DurationMinutes = tt.DurationMinutes,
-                IsActive = tt.IsActive,
-                CreatedAt = tt.CreatedAt,
-                UpdatedAt = tt.UpdatedAt
-            })
+        var normalizedLang = TranslationService.NormalizeLanguageCode(lang);
+        var items = await _context.TicketTypes
+            .OrderBy(tt => tt.TicketTypeId)
+            .AsNoTracking()
             .ToListAsync();
+
+        var translations = await _context.ContentTranslations
+            .Where(ct => ct.EntityType == "TicketType" && ct.LanguageCode.ToLower() == normalizedLang && ct.IsPublished)
+            .AsNoTracking()
+            .ToDictionaryAsync(ct => ct.EntityId, ct => ct);
+
+        return items.Select(tt => MapToDto(tt, normalizedLang, translations.TryGetValue(tt.TicketTypeId, out var tr) ? tr : null));
     }
 
-    public async Task<TicketTypeDto?> GetByIdAsync(int id)
+    public async Task<TicketTypeDto?> GetByIdAsync(int id, string? lang = null)
     {
+        var normalizedLang = TranslationService.NormalizeLanguageCode(lang);
         var tt = await _context.TicketTypes.FindAsync(id);
         if (tt == null) return null;
+
+        var tr = await _context.ContentTranslations
+            .AsNoTracking()
+            .FirstOrDefaultAsync(ct => ct.EntityType == "TicketType" && ct.EntityId == id && ct.LanguageCode.ToLower() == normalizedLang && ct.IsPublished);
+
+        return MapToDto(tt, normalizedLang, tr);
+    }
+
+    private static TicketTypeDto MapToDto(TicketType tt, string lang, ContentTranslation? tr)
+    {
+        bool isDefaultVi = lang == "vi";
+        bool hasTr = isDefaultVi || (tr != null && !string.IsNullOrWhiteSpace(tr.Title));
 
         return new TicketTypeDto
         {
             TicketTypeId = tt.TicketTypeId,
-            Name = tt.Name,
-            Description = tt.Description,
+            OriginalName = tt.Name,
+            Name = tr != null && !string.IsNullOrWhiteSpace(tr.Title) ? tr.Title : tt.Name,
+            Description = tr != null && !string.IsNullOrWhiteSpace(tr.Description) ? tr.Description : (hasTr ? tt.Description : null),
+            LanguageCode = lang,
+            HasTranslation = hasTr,
             Price = tt.Price,
             DurationMinutes = tt.DurationMinutes,
             IsActive = tt.IsActive,

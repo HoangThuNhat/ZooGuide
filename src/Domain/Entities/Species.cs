@@ -13,6 +13,10 @@ public class Species
     public string? Description { get; set; }
     public string? ConservationStatus { get; set; }
     public string? ImageUrl { get; set; }
+    public string? Habitat { get; set; }
+    public string? Diet { get; set; }
+    public string? Lifespan { get; set; }
+    public string? ReferenceSource { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

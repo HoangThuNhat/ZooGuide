@@ -7,8 +7,8 @@ namespace ZooGuide.Application.Interfaces;
 /// </summary>
 public interface IAreaService
 {
-    Task<IEnumerable<AreaResponseDto>> GetAllAreasAsync();
-    Task<AreaResponseDto?> GetAreaByIdAsync(int areaId);
+    Task<IEnumerable<AreaResponseDto>> GetAllAreasAsync(string? lang = null);
+    Task<AreaResponseDto?> GetAreaByIdAsync(int areaId, string? lang = null);
     Task<AreaResponseDto> CreateAreaAsync(CreateAreaDto dto);
     Task<AreaResponseDto?> UpdateAreaAsync(int areaId, UpdateAreaDto dto);
     Task<(bool Success, bool HasConflict, string? Message)> DeleteAreaAsync(int areaId);

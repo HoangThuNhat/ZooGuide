@@ -24,6 +24,7 @@ public class ZooGuideDbContext : DbContext
     public virtual DbSet<Enclosure> Enclosures => Set<Enclosure>();
     public virtual DbSet<Animal> Animals => Set<Animal>();
     public virtual DbSet<Language> Languages => Set<Language>();
+    public virtual DbSet<ContentTranslation> ContentTranslations => Set<ContentTranslation>();
     public virtual DbSet<Narration> Narrations => Set<Narration>();
     public virtual DbSet<Audio> Audios => Set<Audio>();
     public virtual DbSet<VisitHistory> VisitHistories => Set<VisitHistory>();

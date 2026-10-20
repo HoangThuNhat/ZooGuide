@@ -17,6 +17,7 @@ public class Enclosure
     /// <summary>Tọa độ chuồng trên bản đồ sở thú (hệ tọa độ bản đồ 2D của frontend).</summary>
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+    public string? ReferenceSource { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

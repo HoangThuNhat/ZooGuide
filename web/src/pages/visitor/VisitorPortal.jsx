@@ -1,6 +1,6 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ZooApi, MOCK_DB } from '../../services/api';
+import { ZooApi } from '../../services/api';
 
 // Layout & Global Components
 import Header from '../../components/layout/Header';
@@ -20,73 +20,130 @@ import SpeciesNarrationModal from '../../components/species/SpeciesNarrationModa
 import TranscriptModal from '../../components/audio/TranscriptModal';
 import AudioPlayerBar from '../../components/audio/AudioPlayerBar';
 import Chatbot from '../../components/chat/Chatbot';
+import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function VisitorPortal() {
-    const { 
-        currentTab, 
+    const {
+        currentTab,
         switchTab,
-        currentLang, 
-        hasActiveSession, 
+        currentLang,
+        hasActiveSession,
         currentSession,
         clearSession,
-        setIsTicketModalOpen, 
-        setSelectedAnimalForDetail, 
+        setIsTicketModalOpen,
+        setSelectedAnimalForDetail,
+        setNavTargetAnimal,
         showToast,
-        audioState, 
+        audioState,
         setAudioState,
-        validateTicketCode
+        t
     } = useApp();
 
     const [selectedSpeciesForNarration, setSelectedSpeciesForNarration] = useState(null);
-
-    const audioTimerRef = useRef(null);
-    const synthRef = useRef(typeof window !== 'undefined' ? window.speechSynthesis : null);
-    const speechUtteranceRef = useRef(null);
     const audioElementRef = useRef(null);
 
-    // Audio Engine Functions - strictly Species-bound narration
-    const playSpeciesAudio = async (speciesId, startAutoplay = true, lang = currentLang) => {
-        // 1. Kiểm tra phiên vé hợp lệ bắt buộc
+    const pauseAudioPlayback = useCallback(() => {
+        if (audioElementRef.current) {
+            audioElementRef.current.pause();
+        }
+        setAudioState(prev => ({ ...prev, isPlaying: false }));
+    }, [setAudioState]);
+
+    const startAudioPlayback = useCallback((narration, rate = 1.0) => {
+        if (!narration || !narration.audioSrc) {
+            showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
+            setAudioState(prev => ({ ...prev, isPlaying: false }));
+            return;
+        }
+
+        try {
+            if (!audioElementRef.current) {
+                audioElementRef.current = new Audio();
+            }
+            const audio = audioElementRef.current;
+            audio.pause();
+
+            audio.onloadedmetadata = () => {
+                if (audio.duration && Number.isFinite(audio.duration)) {
+                    const realSec = Math.round(audio.duration);
+                    setAudioState(prev => ({
+                        ...prev,
+                        duration: realSec > 0 ? realSec : prev.duration
+                    }));
+                }
+            };
+
+            audio.ontimeupdate = () => {
+                setAudioState(prev => ({
+                    ...prev,
+                    currentTime: Math.floor(audio.currentTime || 0)
+                }));
+            };
+
+            audio.onended = () => {
+                setAudioState(prev => ({
+                    ...prev,
+                    isPlaying: false,
+                    currentTime: prev.duration
+                }));
+            };
+
+            audio.onerror = () => {
+                showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh.', 'error');
+                pauseAudioPlayback();
+            };
+
+            audio.src = narration.audioSrc;
+            audio.playbackRate = rate;
+            audio.currentTime = 0;
+            audio.play().catch(err => {
+                console.warn('Audio playback blocked or failed:', err.message);
+                setAudioState(prev => ({ ...prev, isPlaying: false }));
+            });
+        } catch (err) {
+            console.warn('Audio setup error:', err);
+            pauseAudioPlayback();
+        }
+    }, [pauseAudioPlayback, setAudioState, showToast, t]);
+
+    const playSpeciesAudio = useCallback(async (speciesId, startAutoplay = true, lang = currentLang) => {
         if (!hasActiveSession || !currentSession?.sessionId) {
-            showToast("Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.", "error");
+            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
             pauseAudioPlayback();
             setIsTicketModalOpen(true);
             return;
         }
 
-        // 2. Gọi API lấy thuyết minh có kèm sessionId để backend xác thực
         const res = await ZooApi.getSpeciesNarration(speciesId, lang, currentSession.sessionId);
         if (!res.success) {
             if (res.unauthorized) {
-                showToast(res.message || "Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé.", "error");
+                showToast(res.message || 'Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé.', 'error');
                 clearSession();
                 pauseAudioPlayback();
                 setIsTicketModalOpen(true);
             } else {
-                showToast(res.message || "Không tìm thấy dữ liệu thuyết minh", "error");
+                pauseAudioPlayback();
+                showToast(res.message || t?.narrationMissingTitle || 'Chưa có bài thuyết minh cho ngôn ngữ này.', 'error');
             }
             return;
         }
 
-        const speciesList = await ZooApi.getSpecies();
-        const species = speciesList?.data?.find(s => s.id === parseInt(speciesId) || s.id === speciesId);
-        const residentAnimals = MOCK_DB.animals.filter(a => a.speciesId === parseInt(speciesId));
-
         const animalObj = {
             id: speciesId,
             speciesId: parseInt(speciesId),
-            nameVi: res.data.title,
-            nameEn: res.data.title,
-            scientificName: species?.scientificName || res.data.scientificName || "",
-            imageUrl: res.data.imageUrl || species?.imageUrl || (residentAnimals[0]?.imageUrl) || "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=800",
-            residentCount: residentAnimals.length
+            name: res.data.speciesName || res.data.animalName || res.data.title,
+            nameVi: res.data.speciesName || res.data.animalName || res.data.title,
+            nameEn: res.data.speciesName || res.data.title,
+            scientificName: res.data.scientificName || '',
+            imageUrl: res.data.imageUrl || ''
         };
-        const duration = res.data.durationSec || 90;
+        const duration = res.data.durationSec || 60;
+        const canAutoPlay = Boolean(startAutoplay && res.data.hasAudio && res.data.audioSrc);
 
         setAudioState({
             animal: animalObj,
             narration: res.data,
-            isPlaying: startAutoplay,
+            isPlaying: canAutoPlay,
             currentTime: 0,
             duration,
             playbackRate: 1.0,
@@ -94,119 +151,67 @@ export default function VisitorPortal() {
         });
 
         if (startAutoplay) {
-            startAudioPlayback(res.data, duration, 1.0, lang);
-        }
-    };
-
-    const playAnimalAudio = async (animalId, startAutoplay = true) => {
-        const animal = MOCK_DB.animals.find(a => a.id === parseInt(animalId));
-        if (animal && animal.speciesId) {
-            // Animals strictly delegate to Species narration
-            return playSpeciesAudio(animal.speciesId, startAutoplay, currentLang);
-        }
-        return playSpeciesAudio(animalId, startAutoplay, currentLang);
-    };
-
-    const startAudioPlayback = (narration, duration, rate, lang = currentLang) => {
-        // 1. Play real audio track
-        if (narration && narration.audioSrc) {
-            try {
-                if (!audioElementRef.current) {
-                    audioElementRef.current = new Audio();
-                }
-                audioElementRef.current.onerror = (e) => {
-                    console.warn("Audio element playback error:", e);
-                    showToast("Luồng âm thanh bị từ chối hoặc phiên vé đã hết hạn. Đã dừng phát.", "error");
-                    pauseAudioPlayback();
-                };
-                audioElementRef.current.src = narration.audioSrc;
-                audioElementRef.current.playbackRate = rate;
-                audioElementRef.current.currentTime = 0;
-                audioElementRef.current.play().catch(err => {
-                    console.info("Audio track playback note:", err.message);
-                });
-            } catch (err) {
-                console.warn("Audio element setup error:", err);
+            if (res.data.hasAudio && res.data.audioSrc) {
+                startAudioPlayback(res.data, 1.0);
+            } else {
+                showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
             }
         }
+    }, [
+        clearSession,
+        currentLang,
+        currentSession,
+        hasActiveSession,
+        pauseAudioPlayback,
+        setAudioState,
+        setIsTicketModalOpen,
+        showToast,
+        startAudioPlayback,
+        t
+    ]);
 
-        // 2. Play Web Speech Synthesis narration
-        if (synthRef.current && narration && narration.transcript) {
-            try {
-                synthRef.current.cancel();
-                synthRef.current.resume();
-
-                const fullText = narration.transcript.map(t => t.text).join(' ');
-                const utterance = new SpeechSynthesisUtterance(fullText);
-                utterance.rate = rate;
-                const effectiveLang = lang || narration.language || currentLang;
-                utterance.lang = effectiveLang === 'en' ? 'en-US' : 'vi-VN';
-
-                const voices = synthRef.current.getVoices();
-                const targetLang = effectiveLang === 'en' ? 'en' : 'vi';
-                const matchedVoice = voices.find(v => v.lang.toLowerCase().startsWith(targetLang));
-                if (matchedVoice) {
-                    utterance.voice = matchedVoice;
-                }
-
-                utterance.onend = () => {
-                    pauseAudioPlayback();
-                };
-                utterance.onerror = (e) => {
-                    if (e.error !== 'interrupted' && e.error !== 'canceled') {
-                        console.warn("SpeechSynthesis notice:", e.error);
-                    }
-                };
-
-                speechUtteranceRef.current = utterance;
-                setTimeout(() => {
-                    if (synthRef.current) {
-                        synthRef.current.resume();
-                        synthRef.current.speak(utterance);
-                    }
-                }, 40);
-            } catch (err) {
-                console.warn("SpeechSynthesis error:", err);
-            }
+    const playAnimalAudio = useCallback(async (animalOrId, startAutoplay = true) => {
+        if (animalOrId && typeof animalOrId === 'object' && animalOrId.speciesId) {
+            return playSpeciesAudio(animalOrId.speciesId, startAutoplay, currentLang);
         }
-
-        clearInterval(audioTimerRef.current);
-        audioTimerRef.current = setInterval(() => {
-            // Keep Chrome speech synthesis awake
-            if (synthRef.current && synthRef.current.paused) {
-                synthRef.current.resume();
-            }
-
-            setAudioState(prev => {
-                if (prev.currentTime >= prev.duration) {
-                    clearInterval(audioTimerRef.current);
-                    return { ...prev, isPlaying: false, currentTime: prev.duration };
-                }
-                return { ...prev, currentTime: prev.currentTime + 1 };
-            });
-        }, 1000 / rate);
-    };
-
-    const pauseAudioPlayback = () => {
-        clearInterval(audioTimerRef.current);
-        if (audioElementRef.current) {
-            audioElementRef.current.pause();
+        const id = parseInt(animalOrId);
+        const animalRes = await ZooApi.getAnimalById(id, currentLang);
+        if (animalRes.success && animalRes.data?.speciesId) {
+            return playSpeciesAudio(animalRes.data.speciesId, startAutoplay, currentLang);
         }
-        if (synthRef.current) {
-            synthRef.current.pause();
+        return playSpeciesAudio(id, startAutoplay, currentLang);
+    }, [currentLang, playSpeciesAudio]);
+
+    // Automatically reload active narration in AudioPlayerBar when language switches
+    useEffect(() => {
+        if (
+            audioState.isVisible &&
+            audioState.narration &&
+            audioState.narration.speciesId &&
+            audioState.narration.languageCode &&
+            audioState.narration.languageCode !== currentLang &&
+            hasActiveSession &&
+            currentSession?.sessionId
+        ) {
+            playSpeciesAudio(audioState.narration.speciesId, audioState.isPlaying, currentLang);
         }
-        setAudioState(prev => ({ ...prev, isPlaying: false }));
-    };
+    }, [currentLang]);
 
     const resumeAudioPlayback = () => {
-        if (audioElementRef.current) {
-            audioElementRef.current.play().catch(() => {});
+        if (!audioState.narration?.audioSrc) {
+            showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
+            return;
         }
-        if (synthRef.current) {
-            synthRef.current.resume();
+        if (audioElementRef.current && audioElementRef.current.src) {
+            audioElementRef.current.play().then(() => {
+                setAudioState(prev => ({ ...prev, isPlaying: true }));
+            }).catch(() => {
+                startAudioPlayback(audioState.narration, audioState.playbackRate);
+            });
+        } else {
+            startAudioPlayback(audioState.narration, audioState.playbackRate);
+            setAudioState(prev => ({ ...prev, isPlaying: true }));
         }
-        startAudioPlayback(audioState.narration, audioState.duration, audioState.playbackRate);
-        setAudioState(prev => ({ ...prev, isPlaying: true }));
     };
 
     const handleTogglePlay = () => {
@@ -239,101 +244,87 @@ export default function VisitorPortal() {
         if (audioElementRef.current) {
             audioElementRef.current.playbackRate = speed;
         }
-        if (audioState.isPlaying) {
-            startAudioPlayback(audioState.narration, audioState.duration, speed);
-        }
     };
 
     useEffect(() => {
         audioElementRef.current = new Audio();
         return () => {
-            clearInterval(audioTimerRef.current);
-            if (synthRef.current) synthRef.current.cancel();
             if (audioElementRef.current) {
                 audioElementRef.current.pause();
-                audioElementRef.current.src = "";
+                audioElementRef.current.src = '';
             }
         };
     }, []);
 
-    const handleLocateMap = (animal) => {
+    const handleLocateMap = (entity) => {
+        if (entity) {
+            setNavTargetAnimal(entity);
+        }
         switchTab('map');
     };
 
     return (
         <div className="zooguide-app">
-            {/* Header */}
             <Header />
 
-            {/* Main Container */}
             <main className="app-main" role="main">
-                {/* Hero Banner */}
                 <HeroBanner />
 
                 <div className="container">
-                    {/* Map Tab */}
-                    {currentTab === 'map' && (
-                        <MapTab 
-                            onPlayAudio={playAnimalAudio}
-                            onOpenSpeciesNarration={(species) => setSelectedSpeciesForNarration(species)}
-                            onOpenDetail={(animal) => setSelectedAnimalForDetail(animal)}
-                        />
-                    )}
+                    <ErrorBoundary title="Lỗi hiển thị nội dung phân hệ du khách">
+                        {currentTab === 'map' && (
+                            <MapTab
+                                onPlayAudio={playAnimalAudio}
+                                onOpenSpeciesNarration={(species) => setSelectedSpeciesForNarration(species)}
+                                onOpenDetail={(animal) => setSelectedAnimalForDetail(animal)}
+                            />
+                        )}
 
-                    {/* Species Narration Tab ("Thuyết minh các loài") */}
-                    {currentTab === 'species-audio' && (
-                        <SpeciesAudioTab 
-                            onSelectSpecies={(species) => setSelectedSpeciesForNarration(species)}
-                            onPlaySpeciesAudio={(speciesId, startAutoplay, lang) => playSpeciesAudio(speciesId, startAutoplay, lang)}
-                            onLocateMap={() => switchTab('map')}
-                        />
-                    )}
+                        {currentTab === 'species-audio' && (
+                            <SpeciesAudioTab
+                                onSelectSpecies={(species) => setSelectedSpeciesForNarration(species)}
+                                onPlaySpeciesAudio={(speciesId, startAutoplay, lang) => playSpeciesAudio(speciesId, startAutoplay, lang)}
+                                onLocateMap={(sp) => handleLocateMap(sp)}
+                            />
+                        )}
 
-                    {/* Animals Tab */}
-                    {currentTab === 'animals' && (
-                        <AnimalsTab 
-                            onPlayAudio={playAnimalAudio}
-                            onLocateMap={handleLocateMap}
-                        />
-                    )}
+                        {currentTab === 'animals' && (
+                            <AnimalsTab
+                                onPlayAudio={playAnimalAudio}
+                                onLocateMap={handleLocateMap}
+                            />
+                        )}
 
-                    {/* Tickets Tab */}
-                    {currentTab === 'tickets' && (
-                        <TicketsTab />
-                    )}
+                        {currentTab === 'tickets' && (
+                            <TicketsTab />
+                        )}
+                    </ErrorBoundary>
                 </div>
             </main>
 
-            {/* Floating Persistent Audio Player Bar */}
-            <AudioPlayerBar 
+            <AudioPlayerBar
                 onTogglePlay={handleTogglePlay}
                 onSkip={handleSkip}
                 onSeek={handleSeek}
                 onChangeSpeed={handleChangeSpeed}
             />
 
-            {/* Mobile Bottom Navigation */}
             <MobileBottomNav />
-
-            {/* AI Chatbot */}
             <Chatbot />
 
-            {/* Modals */}
             <TicketModal />
-            <AnimalDetailModal 
+            <AnimalDetailModal
                 onPlayAudio={playAnimalAudio}
-                onNavigate={(animal) => {
-                    switchTab('map');
-                }}
+                onNavigate={(animal) => handleLocateMap(animal)}
             />
-            <SpeciesNarrationModal 
+            <SpeciesNarrationModal
                 species={selectedSpeciesForNarration}
-                isOpen={!!selectedSpeciesForNarration}
+                isOpen={Boolean(selectedSpeciesForNarration)}
                 onClose={() => setSelectedSpeciesForNarration(null)}
                 onPlayAudio={playSpeciesAudio}
-                onNavigateMap={() => {
+                onNavigateMap={(sp) => {
                     setSelectedSpeciesForNarration(null);
-                    switchTab('map');
+                    handleLocateMap(sp);
                 }}
             />
             <TranscriptModal onSeek={handleSeek} />

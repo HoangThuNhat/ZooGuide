@@ -80,7 +80,7 @@ export default function AdminNarrationPage() {
                 const res = await ZooApi.updateNarration(editingId, {
                     title,
                     content,
-                    audioUrl: audioUrl || `/assets/audio/narration_${animalId}.mp3`,
+                    audioUrl: audioUrl || null,
                     durationSeconds: Number(durationSeconds) || 120,
                     status
                 });
@@ -101,7 +101,7 @@ export default function AdminNarrationPage() {
                     languageId: Number(languageId),
                     title,
                     content,
-                    audioUrl: audioUrl || `/assets/audio/narration_${animalId}.mp3`,
+                    audioUrl: audioUrl || null,
                     durationSeconds: Number(durationSeconds) || 120,
                     status
                 });

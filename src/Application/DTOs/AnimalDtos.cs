@@ -24,14 +24,26 @@ public class AnimalResponseDto
     public string ZoneId => $"zone-{(AreaId > 0 ? ((char)('a' + (AreaId - 1) % 26)).ToString() : "a")}";
     public string ZoneCode => (AreaId > 0 ? ((char)('A' + (AreaId - 1) % 26)).ToString() : "A");
     public string Name { get; set; } = string.Empty;
-    public string NameVi => Name;                           // Tương thích frontend
+    public string? OriginalName { get; set; }
+    public string NameVi => OriginalName ?? Name;           // Tương thích frontend
     public string? Description { get; set; }
+    public string LanguageCode { get; set; } = "vi";
+    public bool HasTranslation { get; set; } = true;
+    public string? ReferenceSource { get; set; }
     public string Gender { get; set; } = "Unknown";
     public DateOnly? DateOfBirth { get; set; }
     public string? Origin { get; set; }
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    public decimal? WeightKg { get; set; }
+    public decimal? TemperatureC { get; set; }
+    public string? VeterinarianName { get; set; }
+    public string? HealthActionRequired { get; set; }
+    public DateTime? LastHealthCheckAt { get; set; }
+    public string? Habitat { get; set; }
+    public string? Diet { get; set; }
+    public string? Lifespan { get; set; }
     public string Status { get; set; } = "Active";
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -54,10 +66,17 @@ public class SpeciesDetailDto
 {
     public int SpeciesId { get; set; }
     public string Name { get; set; } = string.Empty;
+    public string? OriginalName { get; set; }
     public string? ScientificName { get; set; }
     public string? Description { get; set; }
     public string? ConservationStatus { get; set; }
     public string? ImageUrl { get; set; }
+    public string? Habitat { get; set; }
+    public string? Diet { get; set; }
+    public string? Lifespan { get; set; }
+    public string? ReferenceSource { get; set; }
+    public string LanguageCode { get; set; } = "vi";
+    public bool HasTranslation { get; set; } = true;
 }
 
 /// <summary>
@@ -185,4 +204,16 @@ public class AnimalFilterDto
     public int? EnclosureId { get; set; }
     public int? SpeciesId { get; set; }
     public string? IucnStatus { get; set; }
+    public string? Lang { get; set; }
+}
+
+public class UpdateAnimalHealthDto
+{
+    public int AnimalId { get; set; }
+    public string? HealthStatus { get; set; }
+    public decimal? WeightKg { get; set; }
+    public decimal? TemperatureC { get; set; }
+    public string? VeterinarianName { get; set; }
+    public string? Notes { get; set; }
+    public string? ActionRequired { get; set; }
 }

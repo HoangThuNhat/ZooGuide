@@ -1,11 +1,31 @@
 using System;
+using System.IO;
 using Npgsql;
 
 class Program
 {
     static void Main(string[] args)
     {
-        string connStr = "Host=aws-0-ap-southeast-2.pooler.supabase.com;Port=5432;Database=postgres;Username=postgres.mqawjvhflseqjjapegfk;Password=UkAf_e#J4CNV+AE;SSL Mode=Require;Trust Server Certificate=true;";
+        string? connStr = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING");
+        if (string.IsNullOrWhiteSpace(connStr))
+        {
+            var envPath = File.Exists(".env") ? ".env" : Path.Combine("..", "..", ".env");
+            if (File.Exists(envPath))
+            {
+                foreach (var line in File.ReadAllLines(envPath))
+                {
+                    if (line.StartsWith("SUPABASE_CONNECTION_STRING="))
+                    {
+                        connStr = line.Substring("SUPABASE_CONNECTION_STRING=".Length).Trim();
+                        break;
+                    }
+                }
+            }
+        }
+        if (string.IsNullOrWhiteSpace(connStr))
+        {
+            throw new InvalidOperationException("Missing SUPABASE_CONNECTION_STRING environment variable.");
+        }
         using var conn = new NpgsqlConnection(connStr);
         conn.Open();
 

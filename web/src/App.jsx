@@ -18,6 +18,7 @@ import AdminNarrationPage from './pages/admin/AdminNarrationPage';
 // Common Global Feedback
 import ToastContainer from './components/common/ToastContainer';
 import OfflineBanner from './components/common/OfflineBanner';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 export default function App() {
     return (
@@ -25,7 +26,8 @@ export default function App() {
             {/* Global Online/Offline Banner */}
             <OfflineBanner />
 
-            <Routes>
+            <ErrorBoundary title="Đã xảy ra sự cố trong ứng dụng ZooGuide">
+                <Routes>
                 {/* Visitor Routes */}
                 <Route path="/" element={<VisitorPortal />} />
 
@@ -44,6 +46,7 @@ export default function App() {
                 {/* Catch-all redirect to Visitor */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </ErrorBoundary>
 
             {/* Global Toast Container */}
             <ToastContainer />

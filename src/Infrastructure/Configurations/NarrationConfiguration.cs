@@ -40,6 +40,10 @@ public class NarrationConfiguration : IEntityTypeConfiguration<Narration>
             .HasConversion<string>()
             .HasMaxLength(20);
 
+        builder.Property(n => n.ReferenceSource)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(n => n.CreatedBy)
             .IsRequired();
 

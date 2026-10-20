@@ -12,9 +12,13 @@ public class AreaResponseDto
     public string Id => $"zone-{Code.ToLowerInvariant()}"; // Tương thích frontend: "zone-a"
     public string Code { get; set; } = string.Empty;       // Mã phân khu: "A", "B", ...
     public string Name { get; set; } = string.Empty;
-    public string NameVi => Name;                           // Alias tiếng Việt
+    public string? OriginalName { get; set; }
+    public string NameVi => OriginalName ?? Name;           // Alias tiếng Việt gốc
     public string? Description { get; set; }
     public string? DescriptionVi => Description;            // Alias tiếng Việt
+    public string LanguageCode { get; set; } = "vi";
+    public bool HasTranslation { get; set; } = true;
+    public string? ReferenceSource { get; set; }
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
     public decimal RadiusMeters { get; set; }

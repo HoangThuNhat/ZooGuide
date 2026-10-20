@@ -22,6 +22,7 @@ public class Area
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
     public AreaStatus Status { get; set; } = AreaStatus.Active;
+    public string? ReferenceSource { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

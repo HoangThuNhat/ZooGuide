@@ -14,7 +14,9 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         setIsTicketModalOpen, 
         showToast, 
         navTargetAnimal,
-        setNavTargetAnimal
+        setNavTargetAnimal,
+        currentLang,
+        t
     } = useApp();
 
     // Core Data States from Live Database
@@ -41,14 +43,14 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 1000, height: 700 });
 
     // 1. Fetch live data from backend API (Supabase PostgreSQL via ASP.NET Core)
-    const loadMapData = async () => {
+    const loadMapData = async (lang = currentLang) => {
         setIsLoading(true);
         setLoadError(null);
         try {
             const [resAreas, resEnclosures, resAnimals] = await Promise.all([
-                ZooApi.getAreas(),
-                ZooApi.getEnclosures(),
-                ZooApi.getAnimals()
+                ZooApi.getAreas(lang),
+                ZooApi.getEnclosures({ lang }),
+                ZooApi.getAnimals({ lang })
             ]);
 
             if (!resAreas.success) {
@@ -73,8 +75,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     };
 
     useEffect(() => {
-        loadMapData();
-    }, []);
+        loadMapData(currentLang);
+    }, [currentLang]);
 
     // 2. Color helper based on Area Code
     const getAreaColor = (code, fallback = '#15803D') => {
@@ -142,7 +144,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 ...enc,
                 enclosureId: encId,
                 parentArea,
-                areaName: parentArea?.nameVi || parentArea?.name || enc.areaName || 'Khu chung',
+                areaName: parentArea?.name || parentArea?.nameVi || enc.areaName || 'Khu chung',
                 areaCode: parentArea?.code || enc.areaCode || 'Z',
                 color: parentArea?.color || '#0284C7',
                 mapX,
@@ -219,7 +221,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             }
 
             setNavTargetAnimal(null);
-            showToast(`Đã định vị chuồng cho ${navTargetAnimal.nameVi || navTargetAnimal.name}`, "info");
+            showToast(`Đã định vị chuồng cho ${navTargetAnimal.name || navTargetAnimal.nameVi}`, "info");
         }
     }, [navTargetAnimal, enrichedEnclosures, enrichedAreas]);
 
@@ -278,8 +280,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         return enrichedAreas.filter(area => {
             const matchesFilter = activeAreaFilter === 'all' || String(area.areaId) === String(activeAreaFilter);
             const matchesSearch = !searchKeyword.trim() || 
-                (area.nameVi && area.nameVi.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                 (area.name && area.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
+                (area.nameVi && area.nameVi.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                 (area.code && area.code.toLowerCase().includes(searchKeyword.toLowerCase()));
             return matchesFilter && matchesSearch;
         });
@@ -290,9 +292,10 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             const matchesArea = !selectedAreaId || enc.areaId === Number(selectedAreaId);
             const matchesFilter = activeAreaFilter === 'all' || String(enc.areaId) === String(activeAreaFilter);
             const matchesSearch = !searchKeyword.trim() || 
-                enc.name.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+                (enc.name && enc.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                 (enc.code && enc.code.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                 enc.residentAnimals.some(a => 
+                    (a.name && a.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                     (a.nameVi && a.nameVi.toLowerCase().includes(searchKeyword.toLowerCase())) ||
                     (a.species && a.species.toLowerCase().includes(searchKeyword.toLowerCase()))
                 );
@@ -330,11 +333,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ fontSize: '1.4rem' }}>🗺️</span>
                             <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0F172A' }}>
-                                Bản Đồ Tương Tác Sở Thú (ZooGuide Interactive Map)
+                                {t?.tabMap || 'Bản Đồ'} (ZooGuide Interactive Map)
                             </h3>
                         </div>
                         <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748B' }}>
-                            Khám phá theo cấu trúc: <strong>Sở thú → Phân khu → Chuồng trại → Động vật</strong>.
+                            {t?.mapSubtitle || 'Khám phá theo cấu trúc: Sở thú → Phân khu → Chuồng trại → Động vật.'}
                         </p>
                     </div>
 
@@ -342,7 +345,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         {/* Starting Point Selector */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 10px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
-                            <span style={{ fontSize: '0.85rem' }} title="Điểm xuất phát dẫn đường">📍 Xuất phát:</span>
+                            <span style={{ fontSize: '0.85rem' }} title="Điểm xuất phát dẫn đường">📍 {t?.mapStartPointLabel || 'Xuất phát'}:</span>
                             <select
                                 className="form-select"
                                 style={{ padding: '4px 8px', fontSize: '0.82rem', borderRadius: '8px', border: 'none', background: 'transparent', fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}
@@ -373,10 +376,10 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                 }
                             }}
                         >
-                            <option value="all">🌐 Toàn bộ sở thú ({enrichedAreas.length} phân khu)</option>
+                            <option value="all">🌐 {t?.filterAll || 'Tất cả'} ({enrichedAreas.length})</option>
                             {enrichedAreas.map(a => (
                                 <option key={a.areaId} value={a.areaId}>
-                                    Khu {a.code} - {a.nameVi || a.name}
+                                    {a.code} - {a.name || a.nameVi}
                                 </option>
                             ))}
                         </select>
@@ -387,7 +390,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                 type="text"
                                 className="form-input"
                                 style={{ padding: '7px 12px 7px 32px', fontSize: '0.85rem', borderRadius: '20px' }}
-                                placeholder="Tìm khu, chuồng, thú..."
+                                placeholder={t?.searchPlaceholder || 'Tìm khu, chuồng, thú...'}
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                             />
@@ -400,10 +403,10 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         <button
                             className="btn btn-sm btn-outline"
                             title="Tải lại dữ liệu trực tiếp từ máy chủ"
-                            onClick={loadMapData}
+                            onClick={() => loadMapData(currentLang)}
                             disabled={isLoading}
                         >
-                            {isLoading ? 'Đang tải...' : '🔄 Làm mới'}
+                            {isLoading ? 'Đang tải...' : `🔄 ${t?.mapRefreshBtn || 'Làm mới'}`}
                         </button>
                     </div>
                 </div>
@@ -729,7 +732,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                             fontWeight="800" 
                                             textAnchor="middle"
                                         >
-                                            Khu {area.code} • {(area.nameVi || area.name || '').replace(/^Khu\s+/i, '')}
+                                            {area.code} • {(area.name || area.nameVi || '').replace(/^Khu\s+/i, '')}
                                         </text>
                                     </g>
                                 </g>
@@ -838,7 +841,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                             <text x="0" y="5" fontSize="12" textAnchor="middle">📍</text>
                             <rect x="-65" y="22" width="130" height="20" rx="5" fill="#0F172A" />
                             <text x="0" y="36" fill="#F8FAFC" fontSize="9" fontWeight="700" textAnchor="middle">
-                                {currentStartPoint.name.split('(')[0]?.trim()}
+                                {(currentStartPoint?.name || 'Xuất phát').split('(')[0]?.trim()}
                             </text>
                         </g>
                     </svg>
@@ -953,12 +956,12 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                                 <span className="chip chip-sm font-bold" style={{ background: `${area.color}15`, color: area.color }}>
                                                     Khu {area.code}
                                                 </span>
-                                                <strong style={{ marginLeft: '6px', fontSize: '0.95rem' }}>{area.nameVi || area.name}</strong>
+                                                <strong style={{ marginLeft: '6px', fontSize: '0.95rem' }}>{area.name || area.nameVi}</strong>
                                             </div>
                                             <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>➔</span>
                                         </div>
                                         <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-                                            {area.descriptionVi || area.description || "Khu bảo tồn động vật."}
+                                            {area.description || area.descriptionVi || t?.translationUnavailable || t?.translationMissingBadge || 'Khu bảo tồn động vật.'}
                                         </p>
                                         <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '0.75rem', color: '#475569' }}>
                                             <span>🏠 <strong>{area.enclosureCount}</strong> chuồng</span>
@@ -981,7 +984,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                             Khu Vực {currentSelectedArea.code}
                                         </span>
                                         <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
-                                            {currentSelectedArea.nameVi || currentSelectedArea.name}
+                                            {currentSelectedArea.name || currentSelectedArea.nameVi}
                                         </h3>
                                     </div>
                                     <button 
@@ -993,7 +996,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                     </button>
                                 </div>
                                 <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#475569' }}>
-                                    {currentSelectedArea.descriptionVi || currentSelectedArea.description}
+                                    {currentSelectedArea.description || currentSelectedArea.descriptionVi || t?.translationUnavailable || t?.translationMissingBadge || 'Khu bảo tồn động vật.'}
                                 </p>
                                 <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem', fontWeight: 600 }}>
                                     <span>🏠 {currentSelectedArea.enclosureCount} Chuồng trại</span>
@@ -1038,7 +1041,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                                     <span className="font-mono text-xs text-muted font-bold">{enc.code}</span>
                                                 </div>
                                                 <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {enc.description || "Khuôn viên chăm sóc đạt chuẩn thế giới."}
+                                                    {enc.description || t?.translationUnavailable || t?.translationMissingBadge || 'Khuôn viên chăm sóc đạt chuẩn thế giới.'}
                                                 </p>
                                                 <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#15803D', fontWeight: 600 }}>
                                                     🐾 {residentAnimals.length} cá thể động vật sinh sống
@@ -1089,7 +1092,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                         </button>
                                     </div>
                                     <p style={{ margin: '8px 0 0 0', fontSize: '0.82rem', color: '#475569' }}>
-                                        {currentSelectedEnclosure.description || "Khuôn viên nuôi dưỡng động vật hiện đại đạt chuẩn phúc lợi động vật thế giới."}
+                                        {currentSelectedEnclosure.description || t?.translationUnavailable || t?.translationMissingBadge || 'Khuôn viên nuôi dưỡng động vật hiện đại đạt chuẩn phúc lợi động vật thế giới.'}
                                     </p>
                                     <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
                                         <span className="badge badge-success">
@@ -1123,13 +1126,13 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                     >
                                         <img 
                                             src={animal.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=400&q=80"} 
-                                            alt={animal.nameVi || animal.name}
+                                            alt={animal.name || animal.nameVi}
                                             style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
                                         />
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                 <strong style={{ fontSize: '0.95rem', color: '#0F172A' }}>
-                                                    {animal.nameVi || animal.name}
+                                                    {animal.name || animal.nameVi}
                                                 </strong>
                                                 <span className="font-mono text-xs text-muted font-bold">{animal.code}</span>
                                             </div>

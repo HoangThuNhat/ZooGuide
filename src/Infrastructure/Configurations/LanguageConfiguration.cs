@@ -24,6 +24,26 @@ public class LanguageConfiguration : IEntityTypeConfiguration<Language>
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.Property(l => l.NativeName)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(l => l.Locale)
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(l => l.FlagIcon)
+            .HasMaxLength(20)
+            .IsRequired(false);
+
+        builder.Property(l => l.TtsVoice)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(l => l.DisplayOrder)
+            .IsRequired()
+            .HasDefaultValue(0);
+
         builder.Property(l => l.IsActive)
             .IsRequired()
             .HasDefaultValue(true);

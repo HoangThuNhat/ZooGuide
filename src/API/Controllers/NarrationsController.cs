@@ -12,11 +12,16 @@ public class NarrationsController : ControllerBase
 {
     private readonly INarrationService _narrationService;
     private readonly IAuditLogService _auditLogService;
+    private readonly ISupabaseStorageService? _storageService;
 
-    public NarrationsController(INarrationService narrationService, IAuditLogService auditLogService)
+    public NarrationsController(
+        INarrationService narrationService,
+        IAuditLogService auditLogService,
+        ISupabaseStorageService? storageService = null)
     {
         _narrationService = narrationService;
         _auditLogService = auditLogService;
+        _storageService = storageService;
     }
 
     /// <summary>
@@ -47,8 +52,7 @@ public class NarrationsController : ControllerBase
     }
 
     /// <summary>
-    /// <summary>
-    /// Lấy bài thuyết minh chính thức theo AnimalId và ngôn ngữ (vi, en, zh, ja...)
+    /// Lấy bài thuyết minh chính thức theo AnimalId và ngôn ngữ (vi, en, zh, ja, ko, th, fr, es, de, ru, pt, id...)
     /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ
     /// </summary>
     [HttpGet("animal/{animalId:int}")]
@@ -67,7 +71,7 @@ public class NarrationsController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy bài thuyết minh chính thức theo SpeciesId và ngôn ngữ (vi, en, zh, ja...)
+    /// Lấy bài thuyết minh chính thức theo SpeciesId và ngôn ngữ (vi, en, zh, ja, ko, th, fr, es, de, ru, pt, id...)
     /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ
     /// </summary>
     [HttpGet("species/{speciesId:int}")]
@@ -86,7 +90,7 @@ public class NarrationsController : ControllerBase
     }
 
     /// <summary>
-    /// Stream file âm thanh thuyết minh có kiểm soát quyền truy cập
+    /// Stream file âm thanh thuyết minh có kiểm soát quyền truy cập (Không dùng file giả dự phòng)
     /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ (?sessionId=... hoặc header)
     /// </summary>
     [HttpGet("{id:int}/stream")]
@@ -104,16 +108,25 @@ public class NarrationsController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail("Bài thuyết minh này chưa được phê duyệt xuất bản."));
         }
 
-        var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        string? resolvedFilePath = null;
-        string mimeType = "audio/mpeg";
+        var primaryAudio = narration.Audios?
+            .OrderByDescending(a => string.Equals(a.Status, "Active", StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(a => a.IsVerified)
+            .ThenByDescending(a => a.CreatedAt)
+            .FirstOrDefault();
 
-        var primaryAudio = narration.Audios?.FirstOrDefault();
         var audioUrl = primaryAudio?.FileUrl ?? narration.AudioUrl;
+        var mimeType = primaryAudio?.MimeType ?? "audio/mpeg";
+        string? resolvedFilePath = null;
 
-        if (!string.IsNullOrWhiteSpace(audioUrl))
+        if (_storageService != null)
         {
-            var cleanUrl = audioUrl.TrimStart('/');
+            resolvedFilePath = _storageService.ResolvePhysicalAudioPath(audioUrl, primaryAudio?.ObjectPath);
+        }
+
+        if (resolvedFilePath == null && !string.IsNullOrWhiteSpace(audioUrl) && !audioUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var cleanUrl = audioUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
             var candidate = Path.Combine(webRoot, cleanUrl);
             if (System.IO.File.Exists(candidate))
             {
@@ -121,18 +134,10 @@ public class NarrationsController : ControllerBase
             }
         }
 
-        if (resolvedFilePath == null)
-        {
-            var fallbackGeneric = Path.Combine(webRoot, "assets", "audio", "generic_vi.mp3");
-            if (System.IO.File.Exists(fallbackGeneric))
-            {
-                resolvedFilePath = fallbackGeneric;
-            }
-        }
-
+        // TUYỆT ĐỐI KHÔNG fallback sang generic_vi.mp3 hay file âm thanh ngôn ngữ khác!
         if (resolvedFilePath == null || !System.IO.File.Exists(resolvedFilePath))
         {
-            return NotFound(ApiResponse<object>.Fail("File âm thanh thuyết minh không tồn tại trên hệ thống lưu trữ."));
+            return NotFound(ApiResponse<object>.Fail($"File âm thanh thuyết minh cho ngôn ngữ '{narration.LanguageCode}' không tồn tại trên hệ thống lưu trữ."));
         }
 
         return PhysicalFile(resolvedFilePath, mimeType, enableRangeProcessing: true);
@@ -281,32 +286,62 @@ public class NarrationsController : ControllerBase
             return BadRequest(ApiResponse<AudioResponseDto>.Fail("Dung lượng file vượt quá giới hạn cho phép (tối đa 25MB)."));
         }
 
-        // Tạo thư mục uploads/audio trong wwwroot
-        var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-        var uploadsDir = Path.Combine(webRoot, "uploads", "audio");
-        if (!Directory.Exists(uploadsDir))
+        var narration = await _narrationService.GetByIdAsync(id);
+        if (narration == null)
         {
-            Directory.CreateDirectory(uploadsDir);
+            return NotFound(ApiResponse<AudioResponseDto>.Fail($"Không tìm thấy bài thuyết minh ID = {id}."));
         }
 
-        var safeFileName = $"{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
-        var filePath = Path.Combine(uploadsDir, safeFileName);
-
-        using (var stream = new FileStream(filePath, FileMode.Create))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        var fileUrl = $"/uploads/audio/{safeFileName}";
+        var langCode = string.IsNullOrWhiteSpace(narration.LanguageCode) ? "vi" : narration.LanguageCode.ToLowerInvariant();
+        var safeFileName = $"animal_{narration.AnimalId}_{langCode}_{DateTime.UtcNow:yyyyMMddHHmmss}_{Guid.NewGuid():N}{extension}";
+        var objectPath = $"{langCode}/{safeFileName}";
         var mimeType = file.ContentType ?? (extension == ".mp3" ? "audio/mpeg" : "audio/wav");
+
+        SupabaseStorageUploadResult uploadResult;
+        if (_storageService != null)
+        {
+            using var inputStream = file.OpenReadStream();
+            uploadResult = await _storageService.UploadAudioAsync(inputStream, objectPath, mimeType);
+        }
+        else
+        {
+            // Fallback khi chạy unit test không truyền ISupabaseStorageService
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var uploadsDir = Path.Combine(webRoot, "uploads", "audio");
+            if (!Directory.Exists(uploadsDir))
+            {
+                Directory.CreateDirectory(uploadsDir);
+            }
+            var filePath = Path.Combine(uploadsDir, safeFileName);
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+            uploadResult = new SupabaseStorageUploadResult
+            {
+                StorageBucket = "narration-audio",
+                ObjectPath = objectPath,
+                FileUrl = $"/uploads/audio/{safeFileName}",
+                PublicUrl = $"/uploads/audio/{safeFileName}",
+                SizeBytes = file.Length
+            };
+        }
 
         var audio = await _narrationService.AddAudioAsync(
             id,
-            fileUrl,
+            uploadResult.FileUrl,
             file.FileName,
             mimeType,
             null,
-            file.Length
+            file.Length,
+            uploadResult.StorageBucket,
+            uploadResult.ObjectPath,
+            uploadResult.PublicUrl,
+            langCode,
+            "Uploaded-Studio",
+            "ManualUpload",
+            uploadResult.Sha256Hash,
+            true
         );
 
         if (audio == null)
@@ -314,7 +349,7 @@ public class NarrationsController : ControllerBase
             return NotFound(ApiResponse<AudioResponseDto>.Fail($"Không tìm thấy bài thuyết minh ID = {id}."));
         }
 
-        _auditLogService.Log("UPLOAD_AUDIO", "Narration", id.ToString(), $"Upload file âm thanh thực tế: {file.FileName} ({file.Length / 1024} KB)");
+        _auditLogService.Log("UPLOAD_AUDIO", "Narration", id.ToString(), $"Upload file âm thanh thực tế: {file.FileName} ({file.Length / 1024} KB) -> {uploadResult.ObjectPath}");
         return Ok(ApiResponse<AudioResponseDto>.Ok(audio, "Tải file âm thanh lên máy chủ thành công!"));
     }
 }

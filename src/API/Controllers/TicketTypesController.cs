@@ -16,16 +16,16 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<ActionResult<IEnumerable<TicketTypeDto>>> GetAll()
+    public async Task<ActionResult<IEnumerable<TicketTypeDto>>> GetAll([FromQuery] string? lang = null)
     {
-        var ticketTypes = await _ticketTypeService.GetAllAsync();
+        var ticketTypes = await _ticketTypeService.GetAllAsync(lang);
         return Ok(ticketTypes);
     }
 
     [HttpGet("{id}")]
-    public async Task<ActionResult<TicketTypeDto>> GetById(int id)
+    public async Task<ActionResult<TicketTypeDto>> GetById(int id, [FromQuery] string? lang = null)
     {
-        var ticketType = await _ticketTypeService.GetByIdAsync(id);
+        var ticketType = await _ticketTypeService.GetByIdAsync(id, lang);
         if (ticketType == null)
             return NotFound(new { message = "Ticket type not found" });
 

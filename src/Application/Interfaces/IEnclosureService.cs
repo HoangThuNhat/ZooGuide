@@ -8,8 +8,8 @@ namespace ZooGuide.Application.Interfaces;
 public interface IEnclosureService
 {
     Task<IEnumerable<EnclosureResponse>> GetAllAsync(EnclosureFilterRequest? filter = null);
-    Task<EnclosureDetailResponse?> GetByIdAsync(int id);
-    Task<IEnumerable<EnclosureResponse>?> GetByAreaIdAsync(int areaId);
+    Task<EnclosureDetailResponse?> GetByIdAsync(int id, string? lang = null);
+    Task<IEnumerable<EnclosureResponse>?> GetByAreaIdAsync(int areaId, string? lang = null);
     Task<EnclosureResponse> CreateAsync(CreateEnclosureRequest request);
     Task<EnclosureResponse?> UpdateAsync(int id, UpdateEnclosureRequest request);
 

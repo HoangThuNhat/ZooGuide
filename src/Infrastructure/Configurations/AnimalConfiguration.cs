@@ -53,6 +53,29 @@ public class AnimalConfiguration : IEntityTypeConfiguration<Animal>
             .HasMaxLength(500)
             .IsRequired(false);
 
+        builder.Property(a => a.WeightKg)
+            .HasPrecision(8, 2)
+            .IsRequired(false);
+
+        builder.Property(a => a.TemperatureC)
+            .HasPrecision(5, 2)
+            .IsRequired(false);
+
+        builder.Property(a => a.VeterinarianName)
+            .HasMaxLength(150)
+            .IsRequired(false);
+
+        builder.Property(a => a.HealthActionRequired)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(a => a.LastHealthCheckAt)
+            .IsRequired(false);
+
+        builder.Property(a => a.ReferenceSource)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(a => a.Status)
             .IsRequired()
             .HasConversion<string>()

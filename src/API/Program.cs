@@ -5,6 +5,31 @@ using ZooGuide.Application.Services;
 using ZooGuide.Infrastructure.Data;
 using ZooGuide.Infrastructure.Repositories;
 
+// Load .env from current or parent directories if present
+var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
+while (dir != null)
+{
+    var envPath = Path.Combine(dir.FullName, ".env");
+    if (File.Exists(envPath))
+    {
+        foreach (var line in File.ReadAllLines(envPath))
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrEmpty(trimmed) || trimmed.StartsWith('#')) continue;
+            var sepIndex = trimmed.IndexOf('=');
+            if (sepIndex <= 0) continue;
+            var key = trimmed[..sepIndex].Trim();
+            var val = trimmed[(sepIndex + 1)..].Trim().Trim('"');
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable(key)))
+            {
+                Environment.SetEnvironmentVariable(key, val);
+            }
+        }
+        break;
+    }
+    dir = dir.Parent;
+}
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -16,10 +41,17 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ISpeciesService, ZooGuide.Infrastructure.Services.SpeciesService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketTypeService, ZooGuide.Infrastructure.Services.TicketTypeService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketService, ZooGuide.Infrastructure.Services.TicketService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITranslationService, ZooGuide.Infrastructure.Services.TranslationService>();
+builder.Services.AddSingleton<ZooGuide.Application.Interfaces.ISupabaseStorageService, ZooGuide.Infrastructure.Services.SupabaseStorageService>();
 
-// Configure EF Core with PostgreSQL
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
-    ?? "Host=localhost;Database=postgres;Username=postgres;Password=postgres";
+// Configure EF Core with Supabase PostgreSQL
+var envConnStr = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING");
+var cfgConnStr = builder.Configuration.GetConnectionString("DefaultConnection");
+var connectionString = !string.IsNullOrWhiteSpace(envConnStr)
+    ? envConnStr
+    : (!string.IsNullOrWhiteSpace(cfgConnStr)
+        ? cfgConnStr
+        : throw new InvalidOperationException("Missing SUPABASE_CONNECTION_STRING or ConnectionStrings:DefaultConnection."));
 
 builder.Services.AddDbContext<ZooGuideDbContext>(options =>
 {
@@ -42,7 +74,7 @@ builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
 
-// Register Services for Person 3 Responsibilities (Dashboard, Narration, Chatbot, Audit)
+// Register Services for Dashboard, Narration, Chatbot, Audit
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IAuditLogService, ZooGuide.Infrastructure.Services.AuditLogService>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IGuestChatLimiterService, ZooGuide.Infrastructure.Services.GuestChatLimiterService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDashboardService, ZooGuide.Infrastructure.Services.DashboardService>();
@@ -83,13 +115,18 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 {
     var canConnect = await dbContext.Database.CanConnectAsync();
     var userCount = canConnect ? await dbContext.Users.CountAsync() : 0;
-    var animalCount = canConnect ? await dbContext.Animals.CountAsync() : 0;
+    var animalCount = canConnect ? await dbContext.Animals.CountAsync(a => a.Status == ZooGuide.Domain.Enums.AnimalStatus.Active) : 0;
     var areaCount = canConnect ? await dbContext.Areas.CountAsync() : 0;
     var enclosureCount = canConnect ? await dbContext.Enclosures.CountAsync() : 0;
+    var languageCount = canConnect ? await dbContext.Languages.CountAsync(l => l.IsActive) : 0;
+    var speciesCount = canConnect ? await dbContext.Species.CountAsync() : 0;
+    var narrationCount = canConnect ? await dbContext.Narrations.CountAsync() : 0;
+    var audioCount = canConnect ? await dbContext.Audios.CountAsync() : 0;
+    var translationCount = canConnect ? await dbContext.ContentTranslations.CountAsync() : 0;
 
     return Results.Ok(new
     {
-        status = "Healthy",
+        status = canConnect ? "Healthy" : "Degraded",
         databaseConnected = canConnect,
         timestamp = DateTime.UtcNow,
         counts = new
@@ -97,7 +134,12 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
             users = userCount,
             animals = animalCount,
             areas = areaCount,
-            enclosures = enclosureCount
+            enclosures = enclosureCount,
+            languages = languageCount,
+            species = speciesCount,
+            narrations = narrationCount,
+            audios = audioCount,
+            contentTranslations = translationCount
         }
     });
 })

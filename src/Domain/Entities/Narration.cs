@@ -20,6 +20,7 @@ public class Narration
     public string? AudioUrl { get; set; }
     public int? DurationSeconds { get; set; }
     public NarrationStatus Status { get; set; } = NarrationStatus.Published;
+    public string? ReferenceSource { get; set; }
     public int CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }

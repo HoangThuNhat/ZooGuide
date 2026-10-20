@@ -25,19 +25,24 @@ public class EnclosureService : IEnclosureService
 
     public async Task<IEnumerable<EnclosureResponse>> GetAllAsync(EnclosureFilterRequest? filter = null)
     {
+        var normalizedLang = NormalizeLang(filter?.Lang);
         var enclosures = await _enclosureRepository.GetAllAsync(filter?.AreaId, filter?.Search, filter?.Status);
-        return enclosures.Select(e => MapToResponse(e));
+        var translations = await _enclosureRepository.GetTranslationsByLanguageAsync(normalizedLang);
+        return enclosures.Select(e => MapToResponse(e, null, null, normalizedLang, translations));
     }
 
-    public async Task<EnclosureDetailResponse?> GetByIdAsync(int id)
+    public async Task<EnclosureDetailResponse?> GetByIdAsync(int id, string? lang = null)
     {
+        var normalizedLang = NormalizeLang(lang);
         var enclosure = await _enclosureRepository.GetByIdWithDetailsAsync(id);
-        return enclosure == null ? null : MapToDetailResponse(enclosure);
+        if (enclosure == null) return null;
+        var translations = await _enclosureRepository.GetTranslationsByLanguageAsync(normalizedLang);
+        return MapToDetailResponse(enclosure, normalizedLang, translations);
     }
 
-    public async Task<IEnumerable<EnclosureResponse>?> GetByAreaIdAsync(int areaId)
+    public async Task<IEnumerable<EnclosureResponse>?> GetByAreaIdAsync(int areaId, string? lang = null)
     {
-        // Kiểm tra khu vực có tồn tại trong hệ thống không
+        var normalizedLang = NormalizeLang(lang);
         var area = await _areaRepository.GetByIdAsync(areaId);
         if (area == null)
         {
@@ -45,7 +50,8 @@ public class EnclosureService : IEnclosureService
         }
 
         var enclosures = await _enclosureRepository.GetByAreaIdAsync(areaId);
-        return enclosures.Select(e => MapToResponse(e, area.Name, area.Code));
+        var translations = await _enclosureRepository.GetTranslationsByLanguageAsync(normalizedLang);
+        return enclosures.Select(e => MapToResponse(e, area.Name, area.Code, normalizedLang, translations));
     }
 
     public async Task<EnclosureResponse> CreateAsync(CreateEnclosureRequest request)
@@ -166,26 +172,41 @@ public class EnclosureService : IEnclosureService
         return $"Đã gỡ động vật '{animal.Name}' ra khỏi chuồng (trạng thái Chưa xếp chuồng).";
     }
 
-    private static EnclosureResponse MapToResponse(Enclosure e, string? areaName = null, string? areaCode = null)
+    private static string NormalizeLang(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code)) return "vi";
+        var c = code.Trim().ToLowerInvariant();
+        return (c == "zh-cn" || c == "zh_cn" || c == "zh-hans") ? "zh" : c;
+    }
+
+    private static EnclosureResponse MapToResponse(Enclosure e, string? areaName = null, string? areaCode = null, string lang = "vi", List<ContentTranslation>? translations = null)
     {
         var response = new EnclosureResponse();
-        FillResponse(response, e, areaName, areaCode);
+        FillResponse(response, e, areaName, areaCode, lang, translations);
         return response;
     }
 
-    private static EnclosureDetailResponse MapToDetailResponse(Enclosure e)
+    private static EnclosureDetailResponse MapToDetailResponse(Enclosure e, string lang = "vi", List<ContentTranslation>? translations = null)
     {
         var response = new EnclosureDetailResponse();
-        FillResponse(response, e, null, null);
+        FillResponse(response, e, null, null, lang, translations);
 
         if (e.Area != null)
         {
+            bool isDefaultVi = lang == "vi";
+            var areaTr = translations?.FirstOrDefault(ct => ct.EntityType == "Area" && ct.EntityId == e.Area.AreaId);
+            bool hasAreaTr = isDefaultVi || (areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title));
+
             response.Area = new AreaResponseDto
             {
                 AreaId = e.Area.AreaId,
                 Code = e.Area.Code ?? "A",
-                Name = e.Area.Name,
-                Description = e.Area.Description,
+                OriginalName = e.Area.Name,
+                Name = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title) ? areaTr.Title : e.Area.Name,
+                Description = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Description) ? areaTr.Description : (hasAreaTr ? e.Area.Description : null),
+                LanguageCode = lang,
+                HasTranslation = hasAreaTr,
+                ReferenceSource = areaTr?.SourceReference ?? e.Area.ReferenceSource,
                 Latitude = e.Area.Latitude,
                 Longitude = e.Area.Longitude,
                 RadiusMeters = e.Area.RadiusMeters,
@@ -201,48 +222,81 @@ public class EnclosureService : IEnclosureService
         return response;
     }
 
-    private static void FillResponse(EnclosureResponse target, Enclosure e, string? areaName, string? areaCode)
+    private static void FillResponse(EnclosureResponse target, Enclosure e, string? areaName, string? areaCode, string lang = "vi", List<ContentTranslation>? translations = null)
     {
+        bool isDefaultVi = lang == "vi";
+        var encTr = translations?.FirstOrDefault(ct => ct.EntityType == "Enclosure" && ct.EntityId == e.EnclosureId);
+        var areaTr = translations?.FirstOrDefault(ct => ct.EntityType == "Area" && ct.EntityId == e.AreaId);
+        bool hasEncTr = isDefaultVi || (encTr != null && !string.IsNullOrWhiteSpace(encTr.Title));
+
+        var rawAreaName = areaName ?? e.Area?.Name ?? string.Empty;
+        var localizedAreaName = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title) ? areaTr.Title : rawAreaName;
+        var localizedEncName = encTr != null && !string.IsNullOrWhiteSpace(encTr.Title) ? encTr.Title : e.Name;
+        var localizedEncDesc = encTr != null && !string.IsNullOrWhiteSpace(encTr.Description) ? encTr.Description : (hasEncTr ? e.Description : null);
+
+        var activeAnimals = e.Animals?.Where(a => a.Status == ZooGuide.Domain.Enums.AnimalStatus.Active || a.Status == ZooGuide.Domain.Enums.AnimalStatus.UnderTreatment).ToList()
+                            ?? new List<Animal>();
+
         target.EnclosureId = e.EnclosureId;
         target.AreaId = e.AreaId;
-        target.AreaName = areaName ?? e.Area?.Name ?? string.Empty;
+        target.AreaName = localizedAreaName;
         target.AreaCode = areaCode ?? e.Area?.Code;
         target.Code = e.Code ?? $"ENC-{e.EnclosureId:D3}";
-        target.Name = e.Name;
-        target.Description = e.Description;
+        target.OriginalName = e.Name;
+        target.Name = localizedEncName;
+        target.Description = localizedEncDesc;
+        target.LanguageCode = lang;
+        target.HasTranslation = hasEncTr;
+        target.ReferenceSource = encTr?.SourceReference ?? e.ReferenceSource;
         target.ImageUrl = e.ImageUrl;
         target.Status = e.Status;
         target.MapX = e.MapX;
         target.MapY = e.MapY;
-        target.AnimalCount = e.Animals?.Count ?? 0;
+        target.AnimalCount = activeAnimals.Count;
         target.CreatedAt = e.CreatedAt;
         target.UpdatedAt = e.UpdatedAt;
-        target.Animals = e.Animals?.Select(a => MapAnimalToDto(a, e, target.AreaName)).ToList()
-                         ?? new List<AnimalResponseDto>();
+        target.Animals = activeAnimals.Select(a => MapAnimalToDto(a, e, localizedAreaName, localizedEncName, lang, translations)).ToList();
     }
 
-    private static AnimalResponseDto MapAnimalToDto(Animal a, Enclosure e, string areaName)
+    private static AnimalResponseDto MapAnimalToDto(Animal a, Enclosure e, string areaName, string encName, string lang, List<ContentTranslation>? translations)
     {
+        bool isDefaultVi = lang == "vi";
+        var anTr = translations?.FirstOrDefault(ct => ct.EntityType == "Animal" && ct.EntityId == a.AnimalId);
+        var spTr = a.Species != null ? translations?.FirstOrDefault(ct => ct.EntityType == "Species" && ct.EntityId == a.SpeciesId) : null;
+        bool hasAnTr = isDefaultVi || (anTr != null && !string.IsNullOrWhiteSpace(anTr.Title));
+
         return new AnimalResponseDto
         {
             AnimalId = a.AnimalId,
             SpeciesId = a.SpeciesId,
-            SpeciesName = a.Species?.Name ?? string.Empty,
+            SpeciesName = spTr != null && !string.IsNullOrWhiteSpace(spTr.Title) ? spTr.Title : (a.Species?.Name ?? string.Empty),
             ScientificName = a.Species?.ScientificName,
             ConservationStatus = a.Species?.ConservationStatus,
             AreaId = a.AreaId,
-            AreaName = a.Area?.Name ?? areaName,
+            AreaName = areaName,
             EnclosureId = a.EnclosureId,
-            EnclosureName = e.Name,
+            EnclosureName = encName,
             EnclosureCode = e.Code,
-            Name = a.Name,
-            Description = a.Description,
+            OriginalName = a.Name,
+            Name = anTr != null && !string.IsNullOrWhiteSpace(anTr.Title) ? anTr.Title : a.Name,
+            Description = anTr != null && !string.IsNullOrWhiteSpace(anTr.Description) ? anTr.Description : (hasAnTr ? a.Description : null),
+            LanguageCode = lang,
+            HasTranslation = hasAnTr,
+            ReferenceSource = anTr?.SourceReference ?? a.ReferenceSource,
             Gender = a.Gender.ToString(),
             DateOfBirth = a.DateOfBirth,
             Origin = a.Origin,
             HealthStatus = a.HealthStatus,
             ConservationNote = a.ConservationNote,
             ImageUrl = a.ImageUrl,
+            WeightKg = a.WeightKg,
+            TemperatureC = a.TemperatureC,
+            VeterinarianName = a.VeterinarianName,
+            HealthActionRequired = a.HealthActionRequired,
+            LastHealthCheckAt = a.LastHealthCheckAt,
+            Habitat = a.Species?.Habitat,
+            Diet = a.Species?.Diet,
+            Lifespan = a.Species?.Lifespan,
             Status = a.Status.ToString(),
             CreatedAt = a.CreatedAt,
             UpdatedAt = a.UpdatedAt

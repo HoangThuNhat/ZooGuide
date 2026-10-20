@@ -15,4 +15,5 @@ public interface IAreaRepository
     Task UpdateAsync(Area area);
     Task DeleteAsync(Area area);
     Task<bool> HasAnimalsAsync(int areaId);
+    Task<List<ContentTranslation>> GetTranslationsByLanguageAsync(string languageCode);
 }

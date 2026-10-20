@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_DB, ZooApi } from '../../services/api';
+import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
 export default function AdminAnimalsPage() {

@@ -17,4 +17,5 @@ public interface IAnimalRepository
     Task<bool> SpeciesExistsAsync(int speciesId);
     Task<bool> AreaExistsAsync(int areaId);
     Task<bool> EnclosureExistsAsync(int enclosureId);
+    Task<List<ContentTranslation>> GetTranslationsByLanguageAsync(string languageCode);
 }

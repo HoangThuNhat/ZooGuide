@@ -33,9 +33,9 @@ public class EnclosuresController : ControllerBase
     [HttpGet("{id:int}")]
     [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetById(int id)
+    public async Task<IActionResult> GetById(int id, [FromQuery] string? lang = null)
     {
-        var enclosure = await _enclosureService.GetByIdAsync(id);
+        var enclosure = await _enclosureService.GetByIdAsync(id, lang);
         if (enclosure == null)
         {
             return NotFound(ApiResponse<EnclosureDetailResponse>.Fail($"Không tìm thấy chuồng với mã ID = {id}."));
@@ -169,9 +169,9 @@ public class EnclosuresController : ControllerBase
     [HttpGet("/api/areas/{areaId:int}/enclosures")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> GetByAreaId(int areaId)
+    public async Task<IActionResult> GetByAreaId(int areaId, [FromQuery] string? lang = null)
     {
-        var enclosures = await _enclosureService.GetByAreaIdAsync(areaId);
+        var enclosures = await _enclosureService.GetByAreaIdAsync(areaId, lang);
         if (enclosures == null)
         {
             return NotFound(ApiResponse<IEnumerable<EnclosureResponse>>.Fail($"Không tìm thấy khu vực với mã ID = {areaId}."));

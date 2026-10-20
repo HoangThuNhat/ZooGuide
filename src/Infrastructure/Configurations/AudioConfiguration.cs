@@ -36,6 +36,39 @@ public class AudioConfiguration : IEntityTypeConfiguration<Audio>
         builder.Property(au => au.FileSize)
             .IsRequired(false);
 
+        builder.Property(au => au.StorageBucket)
+            .HasMaxLength(100)
+            .HasDefaultValue("narration-audio")
+            .IsRequired(false);
+
+        builder.Property(au => au.ObjectPath)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(au => au.PublicUrl)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
+        builder.Property(au => au.LanguageCode)
+            .HasMaxLength(10)
+            .IsRequired(false);
+
+        builder.Property(au => au.VoiceName)
+            .HasMaxLength(100)
+            .IsRequired(false);
+
+        builder.Property(au => au.TtsProvider)
+            .HasMaxLength(50)
+            .IsRequired(false);
+
+        builder.Property(au => au.Sha256Hash)
+            .HasMaxLength(64)
+            .IsRequired(false);
+
+        builder.Property(au => au.IsVerified)
+            .IsRequired()
+            .HasDefaultValue(false);
+
         builder.Property(au => au.Status)
             .IsRequired()
             .HasConversion<string>()

@@ -14,7 +14,11 @@ public class EnclosureResponse
     public string? AreaCode { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? OriginalName { get; set; }
     public string? Description { get; set; }
+    public string LanguageCode { get; set; } = "vi";
+    public bool HasTranslation { get; set; } = true;
+    public string? ReferenceSource { get; set; }
     public string? ImageUrl { get; set; }
     public string Status { get; set; } = "Active";
     public decimal? MapX { get; set; }
@@ -99,6 +103,7 @@ public class EnclosureFilterRequest
     public int? AreaId { get; set; }
     public string? Search { get; set; }
     public string? Status { get; set; }
+    public string? Lang { get; set; }
 }
 
 /// <summary>

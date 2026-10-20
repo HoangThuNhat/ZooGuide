@@ -23,6 +23,12 @@ public class Animal
     public string? HealthStatus { get; set; }
     public string? ConservationNote { get; set; }
     public string? ImageUrl { get; set; }
+    public decimal? WeightKg { get; set; }
+    public decimal? TemperatureC { get; set; }
+    public string? VeterinarianName { get; set; }
+    public string? HealthActionRequired { get; set; }
+    public DateTime? LastHealthCheckAt { get; set; }
+    public string? ReferenceSource { get; set; }
     public AnimalStatus Status { get; set; } = AnimalStatus.Active;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
