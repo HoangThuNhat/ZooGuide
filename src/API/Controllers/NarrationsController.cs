@@ -134,13 +134,21 @@ public class NarrationsController : ControllerBase
             }
         }
 
-        // TUYỆT ĐỐI KHÔNG fallback sang generic_vi.mp3 hay file âm thanh ngôn ngữ khác!
-        if (resolvedFilePath == null || !System.IO.File.Exists(resolvedFilePath))
+        if (resolvedFilePath != null && System.IO.File.Exists(resolvedFilePath))
         {
-            return NotFound(ApiResponse<object>.Fail($"File âm thanh thuyết minh cho ngôn ngữ '{narration.LanguageCode}' không tồn tại trên hệ thống lưu trữ."));
+            return PhysicalFile(resolvedFilePath, mimeType, enableRangeProcessing: true);
         }
 
-        return PhysicalFile(resolvedFilePath, mimeType, enableRangeProcessing: true);
+        var publicRedirectUrl = primaryAudio?.PublicUrl 
+            ?? (!string.IsNullOrWhiteSpace(audioUrl) && audioUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? audioUrl : null);
+
+        if (!string.IsNullOrWhiteSpace(publicRedirectUrl))
+        {
+            return Redirect(publicRedirectUrl);
+        }
+
+        // TUYỆT ĐỐI KHÔNG fallback sang generic_vi.mp3 hay file âm thanh ngôn ngữ khác!
+        return NotFound(ApiResponse<object>.Fail($"File âm thanh thuyết minh cho ngôn ngữ '{narration.LanguageCode}' không tồn tại trên hệ thống lưu trữ."));
     }
 
     /// <summary>

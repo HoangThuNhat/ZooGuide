@@ -45,3 +45,8 @@ node_modules/
 ## Build output
 dist/
 **/dist/
+
+
+## Audio files
+*.mp3
+**/*.mp3

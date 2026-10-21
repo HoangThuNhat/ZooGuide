@@ -6,8 +6,8 @@ class Program
 {
     static void Main()
     {
-        string? pgConnStr = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING");
-        if (string.IsNullOrWhiteSpace(pgConnStr) && File.Exists(".env"))
+        string? pgConnStr = null;
+        if (File.Exists(".env"))
         {
             foreach (var line in File.ReadAllLines(".env"))
             {
@@ -20,17 +20,29 @@ class Program
         }
         if (string.IsNullOrWhiteSpace(pgConnStr))
         {
-            throw new InvalidOperationException("Missing SUPABASE_CONNECTION_STRING environment variable.");
+            pgConnStr = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING");
         }
 
-        using var pgConn = new NpgsqlConnection(pgConnStr);
-        pgConn.Open();
-        
-        using var cmd = new NpgsqlCommand("SELECT \"TicketTypeId\", \"Name\", \"Price\" FROM \"TICKET_TYPES\" ORDER BY \"TicketTypeId\"", pgConn);
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
+        using var conn = new NpgsqlConnection(pgConnStr);
+        conn.Open();
+
+        using var c1 = new NpgsqlCommand("SELECT count(*) FROM \"ANIMALS\";", conn);
+        using var c2 = new NpgsqlCommand("SELECT count(*) FROM \"NARRATIONS\";", conn);
+        using var c3 = new NpgsqlCommand("SELECT count(*) FROM \"AUDIOS\";", conn);
+        using var c4 = new NpgsqlCommand("SELECT count(*) FROM \"CONTENT_TRANSLATIONS\";", conn);
+
+        Console.WriteLine($"Database Counts in Supabase:");
+        Console.WriteLine($" - ANIMALS: {c1.ExecuteScalar()}");
+        Console.WriteLine($" - NARRATIONS: {c2.ExecuteScalar()}");
+        Console.WriteLine($" - AUDIOS: {c3.ExecuteScalar()}");
+        Console.WriteLine($" - CONTENT_TRANSLATIONS: {c4.ExecuteScalar()}");
+
+        Console.WriteLine("\nSample 3 AUDIOS in Supabase:");
+        using var cmd = new NpgsqlCommand("SELECT \"AudioId\", \"NarrationId\", \"LanguageCode\", \"ObjectPath\", \"PublicUrl\" FROM \"AUDIOS\" ORDER BY \"AudioId\" LIMIT 3;", conn);
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
         {
-            Console.WriteLine($"Found in Supabase: ID={reader.GetInt32(0)}, Name={reader.GetString(1)}, Price={reader.GetDecimal(2)}");
+            Console.WriteLine($" - AudioId={r.GetInt32(0)} | NarrId={r.GetInt32(1)} | Lang={r.GetString(2)} | Path={r.GetString(3)} | Url={r.GetString(4)}");
         }
     }
 }

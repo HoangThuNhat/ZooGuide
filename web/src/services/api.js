@@ -458,10 +458,12 @@ export const ZooApi = {
                 };
             }
 
-            const hasRealAudio = Boolean(n.hasAudio || n.audioUrl);
-            const streamUrl = hasRealAudio
+            const primaryAudio = n.audios && n.audios.length > 0 ? n.audios[0] : null;
+            const publicAudioUrl = primaryAudio?.publicUrl || n.publicUrl || (primaryAudio?.fileUrl && primaryAudio.fileUrl.startsWith('http') ? primaryAudio.fileUrl : null) || (n.audioUrl && n.audioUrl.startsWith('http') ? n.audioUrl : null);
+            const hasRealAudio = Boolean(n.hasAudio || n.audioUrl || publicAudioUrl);
+            const streamUrl = publicAudioUrl || (hasRealAudio
                 ? `${API_CONFIG.BASE_URL}/narrations/${n.narrationId}/stream?sessionId=${encodeURIComponent(sessionId)}`
-                : null;
+                : null);
             const durationSec = n.durationSeconds || 0;
             const paragraphs = (n.content || '')
                 .split(/\n+/)
@@ -494,9 +496,9 @@ export const ZooApi = {
                         ? `${Math.floor(durationSec / 60).toString().padStart(2, '0')}:${(durationSec % 60).toString().padStart(2, '0')}`
                         : '--:--',
                     hasAudio: hasRealAudio,
-                    audioSrc: streamUrl,
-                    audioUrl: n.audioUrl || null,
-                    publicUrl: n.publicUrl || null,
+                    audioSrc: publicAudioUrl || streamUrl,
+                    audioUrl: publicAudioUrl || n.audioUrl || null,
+                    publicUrl: publicAudioUrl || n.publicUrl || null,
                     storageBucket: n.storageBucket || null,
                     objectPath: n.objectPath || null,
                     referenceSource: n.referenceSource || '',
