@@ -30,7 +30,7 @@ public class LanguagesController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy từ điển nhãn giao diện (UI) cho một ngôn ngữ cụ thể từ Supabase
+    /// Lấy từ điển nhãn giao diện cho một ngôn ngữ cụ thể từ Supabase
     /// </summary>
     [HttpGet("{code}/ui")]
     [ProducesResponseType(typeof(ApiResponse<Dictionary<string, string>>), StatusCodes.Status200OK)]

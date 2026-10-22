@@ -82,24 +82,7 @@ export default function TicketModal() {
 
                     {activeDbTickets.length > 0 && (
                         <div>
-                            <div className="text-xs text-muted mb-2 font-semibold">
-                                Vé hợp lệ hiện có trong cơ sở dữ liệu Supabase:
-                            </div>
-                            <div className="flex gap-2" style={{ flexWrap: 'wrap' }}>
-                                {activeDbTickets.map(tk => (
-                                    <button
-                                        key={tk.ticketId}
-                                        type="button"
-                                        className="btn btn-sm btn-secondary font-mono"
-                                        onClick={() => {
-                                            setInputCode(tk.ticketCode);
-                                            handleValidate(tk.ticketCode);
-                                        }}
-                                    >
-                                        {tk.ticketCode} ({tk.ticketTypeName})
-                                    </button>
-                                ))}
-                            </div>
+                                
                         </div>
                     )}
                 </div>
