@@ -461,9 +461,9 @@ export const ZooApi = {
             const primaryAudio = n.audios && n.audios.length > 0 ? n.audios[0] : null;
             const publicAudioUrl = primaryAudio?.publicUrl || n.publicUrl || (primaryAudio?.fileUrl && primaryAudio.fileUrl.startsWith('http') ? primaryAudio.fileUrl : null) || (n.audioUrl && n.audioUrl.startsWith('http') ? n.audioUrl : null);
             const hasRealAudio = Boolean(n.hasAudio || n.audioUrl || publicAudioUrl);
-            const streamUrl = publicAudioUrl || (hasRealAudio
+            const streamUrl = hasRealAudio
                 ? `${API_CONFIG.BASE_URL}/narrations/${n.narrationId}/stream?sessionId=${encodeURIComponent(sessionId)}`
-                : null);
+                : null;
             const durationSec = n.durationSeconds || 0;
             const paragraphs = (n.content || '')
                 .split(/\n+/)
@@ -505,7 +505,10 @@ export const ZooApi = {
                     imageUrl: n.animalImageUrl || '',
                     transcript: paragraphs.length > 0
                         ? paragraphs.map((text, idx) => ({ time: idx * stepSec, text }))
-                        : [{ time: 0, text: n.content || n.title }]
+                        : [{ time: 0, text: n.content || n.title }],
+                    isFallbackLanguage: Boolean(n.isFallbackLanguage),
+                    originalRequestedLanguage: n.originalRequestedLanguage || null,
+                    fallbackMessage: n.fallbackMessage || null,
                 }
             };
         } catch (err) {
@@ -915,74 +918,115 @@ export const ZooApi = {
         }
     },
 
-    async createTicket(data) {
+    // 11. ORDERS & REAL VIETQR PAYMENTS
+    async createOrder(data) {
         try {
             const reqData = {
                 ticketTypeId: parseInt(data.ticketTypeId),
-                ticketCode: '',
-                validFrom: new Date(data.validFrom).toISOString(),
-                validUntil: new Date(data.validUntil).toISOString(),
-                status: 1
+                quantity: parseInt(data.quantity || 1),
+                customerName: data.customerName || 'Khách Tham Quan',
+                customerEmail: data.customerEmail || 'visitor@zooguide.vn',
+                customerPhone: data.customerPhone || '0900000000'
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/orders/checkout`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
             });
-            if (!res.ok) {
-                const errData = await res.json().catch(() => ({}));
-                throw new Error(errData.message || 'Lỗi tạo vé');
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                throw new Error(json.message || `Lỗi tạo đơn hàng (HTTP ${res.status})`);
             }
-            const created = await res.json();
-            return {
-                success: true,
-                data: {
-                    id: created.ticketId,
-                    ticketId: created.ticketId,
-                    ticketCode: created.ticketCode,
-                    ticketTypeId: created.ticketTypeId || parseInt(data.ticketTypeId),
-                    status: 'Active',
-                    validFromDate: created.validFrom ? new Date(created.validFrom).toLocaleString('vi-VN') : '',
-                    validUntilDate: created.validUntil ? new Date(created.validUntil).toLocaleString('vi-VN') : '',
-                    customerName: data.customerName || 'Khách hàng',
-                    ticketType: created.ticketTypeName || 'Standard',
-                    ticketTypeName: created.ticketTypeName || 'Standard',
-                    zonesAllowed: ['ALL']
-                }
-            };
+            return { success: true, data: json.data, message: json.message };
         } catch (err) {
-            console.error(err);
-            return { success: false, error: err.message };
+            console.error('createOrder error:', err);
+            return { success: false, message: err.message };
         }
     },
 
-    async updateTicketStatus(code, status) {
+    async getOrderByCode(orderCode) {
         try {
-            const allRes = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
-            const allData = await allRes.json();
-            const ticket = allData.find(t => t.ticketCode === code);
-            if (!ticket) throw new Error('Không tìm thấy vé');
-
-            let statusCode = 1;
-            if (status === 'Used') statusCode = 2;
-            if (status === 'Expired') statusCode = 3;
-
-            const updateReq = {
-                ticketTypeId: ticket.ticketTypeId,
-                ticketCode: ticket.ticketCode,
-                validFrom: ticket.validFrom,
-                validUntil: ticket.validUntil,
-                status: statusCode
-            };
-
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${ticket.ticketId}`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(updateReq)
-            });
-            if (!res.ok) throw new Error('Lỗi cập nhật');
-            return { success: true, data: { ticketCode: code, status } };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/orders/${encodeURIComponent(orderCode)}`);
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                throw new Error(json.message || `Không thể tra cứu đơn hàng (HTTP ${res.status})`);
+            }
+            return { success: true, data: json.data };
         } catch (err) {
+            console.error('getOrderByCode error:', err);
+            return { success: false, message: err.message };
+        }
+    },
+
+    async getOrders({ search, status } = {}) {
+        try {
+            const params = new URLSearchParams();
+            if (search) params.append('search', search);
+            if (status && status !== 'all') params.append('status', status);
+
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await fetch(`${API_CONFIG.BASE_URL}/orders${qs}`);
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
+            return { success: true, data: json.data || [] };
+        } catch (err) {
+            console.error('getOrders error:', err);
+            return { success: false, data: [], message: err.message };
+        }
+    },
+
+    async simulateSandboxPayment({ orderCode, amount }) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/payments/simulate`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderCode, amount })
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+                throw new Error(json.message || `Lỗi xử lý thanh toán sandbox (HTTP ${res.status})`);
+            }
+            return { success: true, data: json.data, message: json.message };
+        } catch (err) {
+            console.error('simulateSandboxPayment error:', err);
+            return { success: false, message: err.message };
+        }
+    },
+
+    async createTicket(data) {
+        return {
+            success: false,
+            message: 'Chức năng phát hành vé thủ công đã bị vô hiệu hóa. Vé tham quan chỉ được phát hành tự động qua thanh toán QR.'
+        };
+    },
+
+    async updateTicketStatus(idOrCode, status) {
+        try {
+            let ticketId = typeof idOrCode === 'number' ? idOrCode : null;
+            if (!ticketId) {
+                const allRes = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
+                const allData = await allRes.json();
+                const ticket = allData.find(t => t.ticketCode === idOrCode || t.ticketId === Number(idOrCode));
+                if (!ticket) throw new Error('Không tìm thấy vé cần cập nhật');
+                ticketId = ticket.ticketId;
+            }
+
+            let targetStatus = 'Valid';
+            if (status === 'Used' || status === 2) targetStatus = 'Used';
+            if (status === 'Expired' || status === 3) targetStatus = 'Expired';
+            if (status === 'Cancelled' || status === 4) targetStatus = 'Cancelled';
+            if (status === 'Locked' || status === 5) targetStatus = 'Locked';
+
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${ticketId}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(targetStatus)
+            });
+            const json = await res.json();
+            if (!res.ok) throw new Error(json.message || 'Lỗi cập nhật trạng thái');
+            return { success: true, data: json.data, message: json.message };
+        } catch (err) {
+            console.error('updateTicketStatus error:', err);
             return { success: false, message: err.message || 'Lỗi cập nhật trạng thái vé' };
         }
     },

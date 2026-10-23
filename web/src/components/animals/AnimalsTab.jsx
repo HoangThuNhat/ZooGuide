@@ -181,8 +181,13 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                                         <h3 className="card-title">{displayName}</h3>
                                         <p className="card-latin"><em>{animal.scientificName}</em></p>
                                         {!animal.hasTranslation && currentLang !== 'vi' && (
-                                            <span style={{ display: 'inline-block', marginTop: '4px', fontSize: '0.68rem', color: '#B45309', backgroundColor: '#FEF3C7', padding: '1px 6px', borderRadius: '4px' }}>
-                                                ⚠️ {t?.translationMissingBadge || 'Chưa có bản dịch cho ngôn ngữ này'}
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '0.72rem', color: '#B45309', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                                                    <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path>
+                                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                                </svg>
+                                                <span>{t?.translationMissingBadge || 'Chưa có bản dịch cho ngôn ngữ này'}</span>
                                             </span>
                                         )}
                                     </div>

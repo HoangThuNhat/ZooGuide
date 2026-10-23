@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+﻿import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ZooApi } from '../../services/api';
 
@@ -89,6 +89,16 @@ export default function VisitorPortal() {
             };
 
             audio.onerror = () => {
+                if (narration.publicUrl && audio.src !== narration.publicUrl) {
+                    console.warn('Primary audio stream failed, falling back to publicUrl:', narration.publicUrl);
+                    audio.src = narration.publicUrl;
+                    audio.play().catch(err => {
+                        console.warn('Fallback public audio playback failed:', err.message);
+                        showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh.', 'error');
+                        pauseAudioPlayback();
+                    });
+                    return;
+                }
                 showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh.', 'error');
                 pauseAudioPlayback();
             };
@@ -150,6 +160,10 @@ export default function VisitorPortal() {
             isVisible: true
         });
 
+        if (res.data.isFallbackLanguage) {
+            showToast(res.data.fallbackMessage || ('Đang phát thuyết minh bằng ' + (res.data.languageName || res.data.languageCode) + ' (ngôn ngữ dự phòng). '), 'info');
+        }
+
         if (startAutoplay) {
             if (res.data.hasAudio && res.data.audioSrc) {
                 startAudioPlayback(res.data, 1.0);
@@ -171,8 +185,13 @@ export default function VisitorPortal() {
     ]);
 
     const playAnimalAudio = useCallback(async (animalOrId, startAutoplay = true) => {
-        if (animalOrId && typeof animalOrId === 'object' && animalOrId.speciesId) {
-            return playSpeciesAudio(animalOrId.speciesId, startAutoplay, currentLang);
+        if (animalOrId && typeof animalOrId === 'object') {
+            if (animalOrId.speciesId) {
+                return playSpeciesAudio(animalOrId.speciesId, startAutoplay, currentLang);
+            }
+            if (animalOrId.id || animalOrId.animalId) {
+                return playSpeciesAudio(animalOrId.id || animalOrId.animalId, startAutoplay, currentLang);
+            }
         }
         const id = parseInt(animalOrId);
         const animalRes = await ZooApi.getAnimalById(id, currentLang);

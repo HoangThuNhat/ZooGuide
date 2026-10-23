@@ -9,6 +9,8 @@ public interface ITicketService
     Task<TicketDto?> GetByIdAsync(int id);
     Task<TicketDto> CreateAsync(TicketCreateRequest request);
     Task<TicketDto?> UpdateAsync(int id, TicketUpdateRequest request);
+    Task<TicketDto?> UpdateStatusAsync(int id, TicketStatus status);
     Task<bool> DeleteAsync(int id);
     Task<ValidateTicketResponse> ValidateAsync(ValidateTicketRequest request);
+    Task<List<TicketDto>> IssueTicketsForOrderAsync(int orderId);
 }

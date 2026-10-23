@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs.Ticket;
 using ZooGuide.Application.Interfaces;
@@ -84,45 +85,19 @@ public class TicketService : ITicketService
         };
     }
 
-    public async Task<TicketDto> CreateAsync(TicketCreateRequest request)
+    /// <summary>
+    /// Chức năng phát hành vé thủ công đã bị vô hiệu hóa theo yêu cầu nghiệp vụ 5.1.
+    /// Vé chỉ được phát hành tự động sau khi thanh toán QR được xác thực thành công.
+    /// </summary>
+    public Task<TicketDto> CreateAsync(TicketCreateRequest request)
     {
-        var ticketType = await _context.TicketTypes.FindAsync(request.TicketTypeId);
-        if (ticketType == null)
-            throw new ArgumentException("TicketType not found");
-
-        if (string.IsNullOrWhiteSpace(request.TicketCode))
-            request.TicketCode = "ZOO-" + DateTime.UtcNow.ToString("yyyyMMdd") + "-" + Guid.NewGuid().ToString("N").Substring(0, 5).ToUpper();
-
-        if (request.ValidUntil <= request.ValidFrom)
-            throw new ArgumentException("ValidUntil must be after ValidFrom");
-
-        var exists = await _context.Tickets.AnyAsync(t => t.TicketCode == request.TicketCode);
-        if (exists)
-            throw new InvalidOperationException("TicketCode already exists");
-
-        var ticket = new Ticket
-        {
-            TicketCode = request.TicketCode,
-            TicketTypeId = request.TicketTypeId,
-            ValidFrom = request.ValidFrom,
-            ValidUntil = request.ValidUntil,
-            Status = request.Status,
-            IssuedAt = DateTime.UtcNow,
-            CreatedAt = DateTime.UtcNow
-        };
-
-        _context.Tickets.Add(ticket);
-        await _context.SaveChangesAsync();
-
-        return await GetByIdAsync(ticket.TicketId) ?? throw new Exception("Failed to retrieve created ticket");
+        throw new InvalidOperationException("Phát hành vé thủ công bằng tay đã bị vô hiệu hóa. Vé tham quan chỉ được hệ thống tự động cấp phát sau khi xác minh giao dịch thanh toán thành công.");
     }
 
     public async Task<TicketDto?> UpdateAsync(int id, TicketUpdateRequest request)
     {
         var ticket = await _context.Tickets.FindAsync(id);
         if (ticket == null) return null;
-
-        // Allowed by Admin UI to toggle status
 
         if (request.ValidUntil <= request.ValidFrom)
             throw new ArgumentException("ValidUntil must be after ValidFrom");
@@ -150,6 +125,23 @@ public class TicketService : ITicketService
         return await GetByIdAsync(ticket.TicketId);
     }
 
+    public async Task<TicketDto?> UpdateStatusAsync(int id, TicketStatus status)
+    {
+        var ticket = await _context.Tickets.FindAsync(id);
+        if (ticket == null) return null;
+
+        // Quản trị viên cập nhật trạng thái quản lý / sử dụng vé
+        ticket.Status = status;
+        if (status == TicketStatus.Used && !ticket.UsedAt.HasValue)
+        {
+            ticket.UsedAt = DateTime.UtcNow;
+        }
+        ticket.UpdatedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+        return await GetByIdAsync(ticket.TicketId);
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var ticket = await _context.Tickets
@@ -161,7 +153,7 @@ public class TicketService : ITicketService
 
         if (ticket.TicketSessions.Any() || ticket.VisitHistories.Any())
         {
-            throw new InvalidOperationException("Cannot delete ticket because it is already used in sessions or visit history.");
+            throw new InvalidOperationException("Không thể xóa vé vì vé đã có lịch sử tham quan hoặc phiên thiết bị.");
         }
 
         _context.Tickets.Remove(ticket);
@@ -228,7 +220,7 @@ public class TicketService : ITicketService
             { 
                 Valid = false, 
                 ErrorCode = "TICKET_ALREADY_USED",
-                Message = $"Vé {ticket.TicketCode} đã được quét sử dụng trước đó (lúc {ticket.UsedAt:yyyy-MM-dd HH:mm:ss})." 
+                Message = $"Vé {ticket.TicketCode} đã được kích hoạt sử dụng trước đó (lúc {ticket.UsedAt:yyyy-MM-dd HH:mm:ss})." 
             };
         }
 
@@ -277,5 +269,94 @@ public class TicketService : ITicketService
             ValidUntil = ticket.ValidUntil,
             ExpiresAt = session.ExpiredAt
         };
+    }
+
+    /// <summary>
+    /// Cấp mã vé tự động cho đơn hàng sau khi thanh toán thành công (Quy trình chuẩn 6.4)
+    /// </summary>
+    public async Task<List<TicketDto>> IssueTicketsForOrderAsync(int orderId)
+    {
+        var order = await _context.TicketOrders
+            .Include(o => o.TicketType)
+            .Include(o => o.Tickets)
+            .FirstOrDefaultAsync(o => o.OrderId == orderId);
+
+        if (order == null)
+            throw new ArgumentException("Không tìm thấy đơn hàng cần phát hành vé.");
+
+        if (order.PaymentStatus != PaymentStatus.Paid)
+            throw new InvalidOperationException("Chỉ được cấp mã vé khi đơn hàng đã thanh toán thành công.");
+
+        // Idempotency: Nếu đơn hàng này đã từng cấp vé rồi, trả về danh sách vé hiện hữu, không cấp thừa
+        if (order.Tickets != null && order.Tickets.Count >= order.Quantity)
+        {
+            return order.Tickets.Select(t => new TicketDto
+            {
+                TicketId = t.TicketId,
+                TicketCode = t.TicketCode,
+                TicketTypeId = t.TicketTypeId,
+                TicketTypeName = order.TicketType.Name,
+                IssuedAt = t.IssuedAt,
+                ValidFrom = t.ValidFrom,
+                ValidUntil = t.ValidUntil,
+                Status = t.Status,
+                UsedAt = t.UsedAt,
+                CreatedAt = t.CreatedAt,
+                UpdatedAt = t.UpdatedAt
+            }).ToList();
+        }
+
+        var durationMinutes = order.TicketType.DurationMinutes > 0 ? order.TicketType.DurationMinutes : 480;
+        var validFrom = DateTime.UtcNow;
+        var validUntil = validFrom.AddMinutes(durationMinutes);
+        var createdTickets = new List<Ticket>();
+
+        int needToCreate = order.Quantity - (order.Tickets?.Count ?? 0);
+        for (int i = 0; i < needToCreate; i++)
+        {
+            string ticketCode;
+            bool exists;
+            do
+            {
+                // Sinh mã vé an toàn ngẫu nhiên: ZG-yyyyMMdd-XXXXXXXX (crypto-secure)
+                var randomBytes = new byte[4];
+                RandomNumberGenerator.Fill(randomBytes);
+                var randomHex = Convert.ToHexString(randomBytes).ToUpper();
+                ticketCode = $"ZG-{DateTime.UtcNow:yyyyMMdd}-{randomHex}";
+                exists = await _context.Tickets.AnyAsync(t => t.TicketCode == ticketCode);
+            } while (exists);
+
+            var ticket = new Ticket
+            {
+                TicketCode = ticketCode,
+                TicketTypeId = order.TicketTypeId,
+                OrderId = order.OrderId,
+                IssuedAt = DateTime.UtcNow,
+                ValidFrom = validFrom,
+                ValidUntil = validUntil,
+                Status = TicketStatus.Valid,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.Tickets.Add(ticket);
+            createdTickets.Add(ticket);
+        }
+
+        await _context.SaveChangesAsync();
+
+        return createdTickets.Select(t => new TicketDto
+        {
+            TicketId = t.TicketId,
+            TicketCode = t.TicketCode,
+            TicketTypeId = t.TicketTypeId,
+            TicketTypeName = order.TicketType.Name,
+            IssuedAt = t.IssuedAt,
+            ValidFrom = t.ValidFrom,
+            ValidUntil = t.ValidUntil,
+            Status = t.Status,
+            UsedAt = t.UsedAt,
+            CreatedAt = t.CreatedAt,
+            UpdatedAt = t.UpdatedAt
+        }).ToList();
     }
 }

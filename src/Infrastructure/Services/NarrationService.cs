@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.Interfaces;
 using ZooGuide.Domain.Entities;
@@ -99,14 +99,28 @@ public class NarrationService : INarrationService
             .AsNoTracking()
             .FirstOrDefaultAsync(n => n.AnimalId == animalId && n.Language.Code.ToLower() == lang && n.Status == NarrationStatus.Published);
 
-        if (narration == null) return null;
+        if (narration != null)
+        {
+            bool hasAudio = !string.IsNullOrWhiteSpace(narration.AudioUrl) || (narration.Audios != null && narration.Audios.Any(a => a.Status == AudioStatus.Active));
+            if (hasAudio)
+            {
+                var animalTranslations = await _context.ContentTranslations
+                    .Where(ct => ct.EntityType == "Animal" && ct.EntityId == animalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+                    .AsNoTracking()
+                    .ToListAsync();
 
-        var animalTranslations = await _context.ContentTranslations
-            .Where(ct => ct.EntityType == "Animal" && ct.EntityId == animalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
-            .AsNoTracking()
-            .ToListAsync();
+                return MapToDto(narration, animalTranslations);
+            }
+        }
 
-        return MapToDto(narration, animalTranslations);
+        // Nếu animalId không có narration trực tiếp hoặc thiếu audio, kiểm tra theo SpeciesId của động vật đó
+        var animal = await _context.Animals.AsNoTracking().FirstOrDefaultAsync(a => a.AnimalId == animalId);
+        if (animal != null)
+        {
+            return await GetBySpeciesAndLanguageAsync(animal.SpeciesId, languageCode);
+        }
+
+        return null;
     }
 
     public async Task<NarrationResponseDto?> GetBySpeciesAndLanguageAsync(int speciesId, string languageCode)
@@ -124,18 +138,67 @@ public class NarrationService : INarrationService
                 n.Language.Code.ToLower() == lang &&
                 n.Status == NarrationStatus.Published);
 
-        if (narration == null)
+        bool hasAudio = narration != null && (!string.IsNullOrWhiteSpace(narration.AudioUrl) || (narration.Audios != null && narration.Audios.Any(a => a.Status == AudioStatus.Active)));
+
+        if (narration != null && hasAudio)
         {
-            // Không âm thầm lấy bài thuyết minh ngôn ngữ khác khi thiếu bản dịch!
-            return null;
+            var animalTranslations = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Animal" && ct.EntityId == narration.AnimalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return MapToDto(narration, animalTranslations);
         }
 
-        var animalTranslations = await _context.ContentTranslations
-            .Where(ct => ct.EntityType == "Animal" && ct.EntityId == narration.AnimalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+        // YÊU CẦU 4: Fallback sang ngôn ngữ có file âm thanh thực sự của cùng narration/động vật
+        // Ưu tiên: Tiếng Việt ('vi') -> Tiếng Anh ('en') -> bất kỳ ngôn ngữ nào có audio đã phát hành của cùng loài
+        var fallbackCandidates = await _context.Narrations
+            .Include(n => n.Animal)
+            .Include(n => n.Language)
+            .Include(n => n.Creator)
+            .Include(n => n.Audios)
             .AsNoTracking()
+            .Where(n =>
+                n.Animal.SpeciesId == speciesId &&
+                n.Animal.Status != AnimalStatus.Transferred &&
+                n.Status == NarrationStatus.Published &&
+                (!string.IsNullOrWhiteSpace(n.AudioUrl) || n.Audios.Any(a => a.Status == AudioStatus.Active)))
             .ToListAsync();
 
-        return MapToDto(narration, animalTranslations);
+        var fallbackNarration = fallbackCandidates
+            .OrderByDescending(n => n.Language.Code.ToLower() == "vi")
+            .ThenByDescending(n => n.Language.Code.ToLower() == "en")
+            .FirstOrDefault();
+
+        if (fallbackNarration != null)
+        {
+            var fallbackLang = fallbackNarration.Language?.Code?.ToLower() ?? "vi";
+            var animalTranslations = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Animal" && ct.EntityId == fallbackNarration.AnimalId && ct.LanguageCode.ToLower() == fallbackLang && ct.IsPublished)
+                .AsNoTracking()
+                .ToListAsync();
+
+            var langName = !string.IsNullOrWhiteSpace(fallbackNarration.Language?.NativeName)
+                ? fallbackNarration.Language.NativeName
+                : (fallbackNarration.Language?.Name ?? fallbackLang.ToUpper());
+
+            var message = $"Chưa có file âm thanh cho ngôn ngữ '{lang.ToUpper()}'. Hệ thống phát âm thanh dự phòng bằng {langName} ({fallbackLang.ToUpper()}) của cùng loài động vật.";
+
+            return MapToDto(fallbackNarration, animalTranslations, isFallbackLanguage: true, originalRequestedLanguage: lang, fallbackMessage: message);
+        }
+
+        // Nếu bản ghi narration gốc có văn bản nhưng hoàn toàn không ngôn ngữ nào có audio
+        if (narration != null)
+        {
+            var animalTranslations = await _context.ContentTranslations
+                .Where(ct => ct.EntityType == "Animal" && ct.EntityId == narration.AnimalId && ct.LanguageCode.ToLower() == lang && ct.IsPublished)
+                .AsNoTracking()
+                .ToListAsync();
+
+            return MapToDto(narration, animalTranslations);
+        }
+
+        return null;
     }
 
     public async Task<NarrationResponseDto> CreateAsync(CreateNarrationDto dto)
@@ -347,7 +410,12 @@ public class NarrationService : INarrationService
         });
     }
 
-    private static NarrationResponseDto MapToDto(Narration n, List<ContentTranslation>? animalTranslations = null)
+    private static NarrationResponseDto MapToDto(
+        Narration n, 
+        List<ContentTranslation>? animalTranslations = null,
+        bool isFallbackLanguage = false,
+        string? originalRequestedLanguage = null,
+        string? fallbackMessage = null)
     {
         var langCode = n.Language?.Code ?? "vi";
         var animalTr = animalTranslations?.FirstOrDefault(ct =>
@@ -386,7 +454,10 @@ public class NarrationService : INarrationService
             CreatorName = n.Creator?.FullName ?? "Cán bộ chuyên môn",
             CreatedAt = n.CreatedAt,
             UpdatedAt = n.UpdatedAt,
-            Audios = orderedAudios
+            Audios = orderedAudios,
+            IsFallbackLanguage = isFallbackLanguage,
+            OriginalRequestedLanguage = originalRequestedLanguage,
+            FallbackMessage = fallbackMessage
         };
     }
 

@@ -17,6 +17,11 @@ public class Enclosure
     /// <summary>Tọa độ chuồng trên bản đồ sở thú (hệ tọa độ bản đồ 2D của frontend).</summary>
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+
+    /// <summary>Tọa độ GPS WGS84 thực tế (Latitude, Longitude) tại Thảo Cầm Viên Sài Gòn.</summary>
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
+
     public string? ReferenceSource { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

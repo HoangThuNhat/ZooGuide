@@ -79,6 +79,8 @@ public class EnclosureService : IEnclosureService
             Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim(),
             MapX = request.MapX,
             MapY = request.MapY,
+            Latitude = request.Latitude,
+            Longitude = request.Longitude,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -113,8 +115,9 @@ public class EnclosureService : IEnclosureService
         enclosure.Status = string.IsNullOrWhiteSpace(request.Status) ? "Active" : request.Status.Trim();
         enclosure.MapX = request.MapX;
         enclosure.MapY = request.MapY;
+        enclosure.Latitude = request.Latitude;
+        enclosure.Longitude = request.Longitude;
         enclosure.UpdatedAt = DateTime.UtcNow;
-        // CreatedAt được giữ nguyên
 
         await _enclosureRepository.UpdateAsync(enclosure);
 
@@ -252,6 +255,8 @@ public class EnclosureService : IEnclosureService
         target.Status = e.Status;
         target.MapX = e.MapX;
         target.MapY = e.MapY;
+        target.Latitude = e.Latitude;
+        target.Longitude = e.Longitude;
         target.AnimalCount = activeAnimals.Count;
         target.CreatedAt = e.CreatedAt;
         target.UpdatedAt = e.UpdatedAt;

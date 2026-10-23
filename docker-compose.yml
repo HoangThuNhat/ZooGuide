@@ -1,4 +1,4 @@
-services:
+﻿services:
   api:
     build:
       context: .
@@ -14,11 +14,11 @@ services:
       - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8080/api/health"]
       interval: 15s
-      timeout: 5s
+      timeout: 15s
       retries: 5
-      start_period: 10s
+      start_period: 20s
     restart: unless-stopped
     networks:
       - zooguide-network
@@ -30,6 +30,7 @@ services:
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
         - VITE_USE_MOCK=${VITE_USE_MOCK:-false}
+        - VITE_CARTO_API_KEY=${VITE_CARTO_API_KEY}
     container_name: zooguide-frontend
     ports:
       - "${FRONTEND_PORT:-3001}:80"

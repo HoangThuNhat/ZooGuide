@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -94,6 +94,7 @@ public class NarrationsController : ControllerBase
     /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ (?sessionId=... hoặc header)
     /// </summary>
     [HttpGet("{id:int}/stream")]
+    [HttpHead("{id:int}/stream")]
     [RequireTicketSession]
     public async Task<IActionResult> StreamAudio(int id)
     {

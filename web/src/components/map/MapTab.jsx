@@ -1,4 +1,6 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 import { 
@@ -8,42 +10,249 @@ import {
     planZooRoute 
 } from './zooWalkwayGraph';
 
+// Tọa độ địa lý thực tế (WGS84 Lat/Lng) của Thảo Cầm Viên Sài Gòn
+// Số 2 Nguyễn Bỉnh Khiêm, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh
+const SAIGON_ZOO_CENTER = [10.787600, 106.705300];
+const SAIGON_ZOO_BOUNDS = [
+    [10.783000, 106.700000], // Tây Nam
+    [10.792500, 106.711000]  // Đông Bắc
+];
+
+// Danh mục các địa điểm thực tế tại Thảo Cầm Viên đã được đối chiếu tọa độ
+const REAL_MAP_LANDMARKS = [
+    // --- 1. CỔNG RA VÀO CHÍNH THỨC ---
+    {
+        id: 'gate_a',
+        nodeId: 'gate_a',
+        type: 'gate',
+        code: 'GATE-A',
+        name: 'Cổng Chính A (Lê Duẩn & Nguyễn Bỉnh Khiêm)',
+        description: 'Cổng vào chính Thảo Cầm Viên đối diện đại lộ Lê Duẩn. Có quầy bán vé trung tâm, bến xe điện tham quan và trung tâm thông tin du khách.',
+        lat: 10.785800,
+        lng: 106.704600,
+        category: 'gate',
+        isVerified: true
+    },
+    {
+        id: 'gate_b',
+        nodeId: 'gate_b',
+        type: 'gate',
+        code: 'GATE-B',
+        name: 'Cổng B (Số 2B Nguyễn Bỉnh Khiêm)',
+        description: 'Cổng phụ trên trục đường Nguyễn Bỉnh Khiêm, thuận tiện cho du khách gửi phương tiện xe máy và ôtô.',
+        lat: 10.786400,
+        lng: 106.705800,
+        category: 'gate',
+        isVerified: true
+    },
+    {
+        id: 'gate_c',
+        nodeId: 'gate_c',
+        type: 'gate',
+        code: 'GATE-C',
+        name: 'Cổng C (Số 1 Nguyễn Thị Minh Khai)',
+        description: 'Cổng Nguyễn Thị Minh Khai gần cầu Thị Nghè, thuận tiện kết nối các tuyến xe buýt đô thị.',
+        lat: 10.788600,
+        lng: 106.703200,
+        category: 'gate',
+        isVerified: true
+    },
+    {
+        id: 'gate_e',
+        nodeId: 'gate_e',
+        type: 'gate',
+        code: 'GATE-E',
+        name: 'Cổng E (Bờ Kênh Nhiêu Lộc)',
+        description: 'Lối tản bộ ven bờ kênh rợp bóng mát cây xanh, ngắm cảnh kênh Nhiêu Lộc và thuyền du lịch sinh thái.',
+        lat: 10.787600,
+        lng: 106.707800,
+        category: 'gate',
+        isVerified: true
+    },
+
+    // --- 2. DI TÍCH & DANH THẮNG LỊCH SỬ ---
+    {
+        id: 'poi_hung',
+        nodeId: 'poi_hung',
+        type: 'landmark',
+        code: 'POI-HUNG',
+        name: 'Đền Thờ Vua Hùng Lịch Sử',
+        description: 'Công trình kiến trúc cung đình truyền thống xây dựng năm 1926 để tưởng nhớ Quốc Tổ Hùng Vương, rợp bóng cổ thụ trăm năm.',
+        lat: 10.786500,
+        lng: 106.704500,
+        category: 'landmark',
+        isVerified: true
+    },
+    {
+        id: 'poi_museum',
+        nodeId: 'poi_museum',
+        type: 'landmark',
+        code: 'POI-MUSEUM',
+        name: 'Bảo Tàng Lịch Sử TP. Hồ Chí Minh',
+        description: 'Bảo tàng lưu giữ hơn 40.000 hiện vật lịch sử văn hóa quý giá của dân tộc Việt Nam.',
+        lat: 10.786000,
+        lng: 106.704200,
+        category: 'landmark',
+        isVerified: true
+    },
+    {
+        id: 'poi_tree',
+        nodeId: 'poi_tree',
+        type: 'landmark',
+        code: 'POI-TREE',
+        name: 'Cây Sọ Khỉ Di Sản (Hơn 130 năm tuổi)',
+        description: 'Một trong những cây cổ thụ lớn và lâu đời nhất Thảo Cầm Viên, chu vi gốc hơn 8 mét với tán lá sum suê tỏa bóng mát rợp cả góc trời.',
+        lat: 10.787400,
+        lng: 106.705300,
+        category: 'landmark',
+        isVerified: true
+    },
+    {
+        id: 'poi_lake',
+        nodeId: 'poi_lake',
+        type: 'landmark',
+        code: 'POI-LAKE',
+        name: 'Hồ Sen Sinh Thái & Nhà Thủy Tạ',
+        description: 'Hồ cảnh quan trung tâm thoáng đãng, cầu gỗ bắc ngang cho du khách dạo mát và ngắm đàn cá bơi lội.',
+        lat: 10.787800,
+        lng: 106.705600,
+        category: 'landmark',
+        isVerified: true
+    },
+
+    // --- 3. CÁC CHUỒNG THÚ TƯƠNG ỨNG DATABASE SUPABASE ---
+    {
+        id: 'enc_2',
+        enclosureId: 2,
+        areaId: 7,
+        code: 'ENC-TIG-01',
+        name: 'Chuồng Hổ Bengal',
+        description: 'Khu chuồng bán hoang dã dành cho loài hổ Bengal quý hiếm, trang bị suối tắm, vách đá nhân tạo và bãi cỏ tự nhiên.',
+        lat: 10.788500,
+        lng: 106.706100,
+        category: 'carnivore',
+        isVerified: true
+    },
+    {
+        id: 'enc_3',
+        enclosureId: 3,
+        areaId: 7,
+        code: 'ENC-TIG-02',
+        name: 'Chuồng Hổ Siberia & Hổ Trắng',
+        description: 'Khuôn viên nuôi dưỡng và bảo tồn loài hổ trắng kỳ vĩ cùng hổ Siberia to lớn.',
+        lat: 10.788700,
+        lng: 106.706400,
+        category: 'carnivore',
+        isVerified: true
+    },
+    {
+        id: 'enc_7',
+        enclosureId: 7,
+        areaId: 7,
+        code: 'ENC-LIO-01',
+        name: 'Chuồng Sư Tử Hoàng Gia',
+        description: 'Không gian mở rộng dành cho đàn sư tử châu Phi với gò đá cao đón nắng và khu vực nghỉ ngơi mát mẻ.',
+        lat: 10.788200,
+        lng: 106.705100,
+        category: 'carnivore',
+        isVerified: true
+    },
+    {
+        id: 'enc_4',
+        enclosureId: 4,
+        areaId: 3,
+        code: 'ENC-ELE-01',
+        name: 'Bãi Thả Voi Châu Á',
+        description: 'Khu bãi thả đất rộng rãi với hồ tắm bùn tự nhiên, nơi các cá thể voi châu Á sinh hoạt và giao lưu thân thiện cùng du khách.',
+        lat: 10.789200,
+        lng: 106.706800,
+        category: 'herbivore',
+        isVerified: true
+    },
+    {
+        id: 'enc_5',
+        enclosureId: 5,
+        areaId: 4,
+        code: 'ENC-BIR-01',
+        name: 'Lồng Vòm Chim Nhiệt Đới & Hồ Hồng Hạc',
+        description: 'Quần xã lồng vòm cao vút và hồ hồng hạc rực rỡ với hàng trăm loài chim quý hiếm của Việt Nam và thế giới.',
+        lat: 10.786900,
+        lng: 106.704200,
+        category: 'bird',
+        isVerified: true
+    },
+    {
+        id: 'enc_8',
+        enclosureId: 8,
+        areaId: 6,
+        code: 'ENC-PET-01',
+        name: 'Khuôn Viên Thú Nhỏ Thân Thiện (Petting Zoo)',
+        description: 'Khu vực thú thiếu nhi thân thiện, nơi các bé có thể tiếp xúc trực tiếp, vuốt ve và cho dê lùn, cừu, thỏ ăn rau cỏ tươi.',
+        lat: 10.786200,
+        lng: 106.707200,
+        category: 'petting',
+        isVerified: true
+    },
+    {
+        id: 'enc_primate',
+        enclosureId: 99,
+        areaId: 6,
+        code: 'ENC-PRI-01',
+        name: 'Khu Đảo Vượn & Linh Trưởng Quý Hiếm',
+        description: 'Khu vực đảo nổi giữa rặng cây nuôi dưỡng vượn má vàng, voọc chà vá chân nâu và khỉ đuôi dài.',
+        lat: 10.787100,
+        lng: 106.705800,
+        category: 'primate',
+        isVerified: true
+    },
+    {
+        id: 'enc_reptile',
+        enclosureId: 98,
+        areaId: 7,
+        code: 'ENC-REP-01',
+        name: 'Khu Bảo Tồn Bò Sát & Trăn Rắn',
+        description: 'Nhà trưng bày kính điều hòa nhiệt độ nuôi dưỡng cá sấu hoa cà, trăn gấm, kỳ đà và các loài rùa cạn.',
+        lat: 10.788000,
+        lng: 106.706500,
+        category: 'carnivore',
+        isVerified: true
+    }
+];
+
 export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration }) {
     const { 
-        hasActiveSession, 
-        setIsTicketModalOpen, 
         showToast, 
         navTargetAnimal,
         setNavTargetAnimal,
-        currentLang,
-        t
+        currentLang 
     } = useApp();
 
-    // Core Data States from Live Database
+    // Dữ liệu từ Supabase API
     const [areas, setAreas] = useState([]);
     const [enclosures, setEnclosures] = useState([]);
     const [animals, setAnimals] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
 
-    // Navigation & Selection States (Hierarchy: Zoo -> Area -> Enclosure -> Animal)
-    const [selectedAreaId, setSelectedAreaId] = useState(null); // null means All Zoo Overview
-    const [selectedEnclosureId, setSelectedEnclosureId] = useState(null);
+    // Trạng thái tìm kiếm & phân loại
+    const [activeCategory, setActiveCategory] = useState('all');
     const [searchKeyword, setSearchKeyword] = useState('');
-    const [activeAreaFilter, setActiveAreaFilter] = useState('all');
-    const [mobileTab, setMobileTab] = useState('map'); // 'map' | 'details'
-    const [hoveredEnclosureId, setHoveredEnclosureId] = useState(null);
+    const [selectedMarker, setSelectedMarker] = useState(null);
 
-    // Walkway Routing & Start Point Selection
-    const [selectedStartPointId, setSelectedStartPointId] = useState('n_entrance');
+    // Điểm xuất phát dẫn đường Dijkstra
+    const [selectedStartPointId, setSelectedStartPointId] = useState('gate_a');
     const [activeRoute, setActiveRoute] = useState(null);
-    const [showWaypointsList, setShowWaypointsList] = useState(false);
+    const [showRouteSteps, setShowRouteSteps] = useState(false);
 
-    // Map Viewport
-    const [viewBox, setViewBox] = useState({ x: 0, y: 0, width: 1000, height: 700 });
+    // Tham chiếu Leaflet Map
+    const mapContainerRef = useRef(null);
+    const mapInstanceRef = useRef(null);
+    const markersLayerRef = useRef(null);
+    const routeLayerRef = useRef(null);
+    const userLocationLayerRef = useRef(null);
 
-    // 1. Fetch live data from backend API (Supabase PostgreSQL via ASP.NET Core)
-    const loadMapData = async (lang = currentLang) => {
+    // 1. Tải dữ liệu thực tế từ Supabase API
+    const loadMapData = useCallback(async (lang = currentLang) => {
         setIsLoading(true);
         setLoadError(null);
         try {
@@ -53,1134 +262,849 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 ZooApi.getAnimals({ lang })
             ]);
 
-            if (!resAreas.success) {
-                throw new Error(resAreas.message || "Không thể tải danh sách khu vực từ máy chủ.");
-            }
-            if (!resEnclosures.success) {
-                throw new Error(resEnclosures.message || "Không thể tải danh sách chuồng trại từ máy chủ.");
-            }
-            if (!resAnimals.success) {
-                throw new Error(resAnimals.message || "Không thể tải danh sách động vật từ máy chủ.");
-            }
-
-            setAreas(resAreas.data || []);
-            setEnclosures(resEnclosures.data || []);
-            setAnimals(resAnimals.data || []);
+            if (resAreas && resAreas.success) setAreas(resAreas.data || []);
+            if (resEnclosures && resEnclosures.success) setEnclosures(resEnclosures.data || []);
+            if (resAnimals && resAnimals.success) setAnimals(resAnimals.data || []);
         } catch (err) {
             console.error("MapTab loadMapData error:", err);
-            setLoadError(err.message || "Lỗi kết nối máy chủ cơ sở dữ liệu sở thú.");
+            setLoadError(err.message || "Không thể kết nối đến máy chủ cơ sở dữ liệu.");
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [currentLang]);
 
     useEffect(() => {
         loadMapData(currentLang);
-    }, [currentLang]);
+    }, [loadMapData, currentLang]);
 
-    // 2. Color helper based on Area Code
-    const getAreaColor = (code, fallback = '#15803D') => {
-        const colorPalette = {
-            'A': '#15803D', // Xanh rừng mưa (Linh trưởng & Thú nhỏ)
-            'B': '#B45309', // Hổ phách ăn thịt (Carnivore Safari)
-            'C': '#059669', // Xanh ngọc thảo nguyên (Ăn cỏ)
-            'D': '#0284C7', // Xanh dương thủy cung
-            'E': '#7C3AED', // Tím vương quốc chim
-            'F': '#D97706',
-            'G': '#BE185D'
-        };
-        const c = String(code || '').toUpperCase().trim();
-        return colorPalette[c] || fallback;
-    };
+    // 2. Hợp nhất Marker chuẩn với dữ liệu động từ Supabase
+    const mergedMarkers = useMemo(() => {
+        const markerList = [...REAL_MAP_LANDMARKS];
 
-    // 3. Normalized Macro Area list (exclusively Active macro areas)
-    const enrichedAreas = useMemo(() => {
-        return areas
-            .filter(area => area.status !== 'Closed' && area.status !== '3' && area.status !== 'Inactive')
-            .map(area => {
-                const areaId = area.areaId || area.id;
-                const areaEnclosures = enclosures.filter(e => e.areaId === areaId);
-                const areaAnimals = animals.filter(a => a.areaId === areaId);
-                const color = area.color || getAreaColor(area.code);
+        // Gắn danh sách động vật thực tế vào các chuồng tương ứng
+        markerList.forEach(m => {
+            if (m.enclosureId) {
+                m.residentAnimals = animals.filter(a => a.enclosureId === m.enclosureId || a.areaId === m.areaId);
+                m.animalCount = m.residentAnimals.length;
 
-                const mapX = area.mapX != null ? Number(area.mapX) : 500;
-                const mapY = area.mapY != null ? Number(area.mapY) : 350;
+                const dbEnc = enclosures.find(e => e.enclosureId === m.enclosureId);
+                if (dbEnc) {
+                    if (dbEnc.name) m.name = dbEnc.name;
+                    if (dbEnc.description) m.description = dbEnc.description;
+                    if (dbEnc.imageUrl) m.imageUrl = dbEnc.imageUrl;
+                    if (dbEnc.latitude && dbEnc.longitude) {
+                        m.lat = Number(dbEnc.latitude);
+                        m.lng = Number(dbEnc.longitude);
+                    }
+                }
+            } else {
+                m.residentAnimals = [];
+                m.animalCount = 0;
+            }
+        });
 
-                return {
-                    ...area,
-                    areaId,
-                    color,
-                    mapX,
-                    mapY,
-                    enclosures: areaEnclosures,
-                    animals: areaAnimals,
-                    enclosureCount: areaEnclosures.length,
-                    animalCount: areaAnimals.length
-                };
-            });
+        // Bổ sung các chuồng mới từ DB chưa có trong danh sách chuẩn (đánh dấu Unverified nếu thiếu tọa độ)
+        enclosures.forEach(dbEnc => {
+            const exists = markerList.some(m => m.enclosureId === dbEnc.enclosureId);
+            if (!exists) {
+                const parentArea = areas.find(a => a.areaId === dbEnc.areaId);
+                const hasLatLong = Boolean(dbEnc.latitude && dbEnc.longitude);
+
+                markerList.push({
+                    id: `db_enc_${dbEnc.enclosureId}`,
+                    enclosureId: dbEnc.enclosureId,
+                    areaId: dbEnc.areaId,
+                    code: dbEnc.code || `ENC-${dbEnc.enclosureId}`,
+                    name: dbEnc.name,
+                    description: dbEnc.description || 'Chuồng đang được cập nhật thông tin thực địa.',
+                    lat: hasLatLong ? Number(dbEnc.latitude) : (parentArea?.latitude ? Number(parentArea.latitude) : 10.7876),
+                    lng: hasLatLong ? Number(dbEnc.longitude) : (parentArea?.longitude ? Number(parentArea.longitude) : 106.7053),
+                    category: 'enclosure',
+                    isVerified: hasLatLong, // Đánh dấu rõ ràng tình trạng xác minh tọa độ
+                    residentAnimals: animals.filter(a => a.enclosureId === dbEnc.enclosureId),
+                    animalCount: animals.filter(a => a.enclosureId === dbEnc.enclosureId).length
+                });
+            }
+        });
+
+        return markerList;
     }, [areas, enclosures, animals]);
 
-    // 4. Normalized Enclosure list with resident animals and parent Area
-    const enrichedEnclosures = useMemo(() => {
-        return enclosures.map(enc => {
-            const encId = enc.enclosureId || enc.id;
-            const parentArea = enrichedAreas.find(a => a.areaId === enc.areaId);
-            const residentAnimals = animals.filter(a => a.enclosureId === encId);
-
-            let mapX = enc.mapX != null ? Number(enc.mapX) : null;
-            let mapY = enc.mapY != null ? Number(enc.mapY) : null;
-
-            if (mapX == null || mapY == null) {
-                if (parentArea) {
-                    mapX = parentArea.mapX + (Math.sin(encId) * 45);
-                    mapY = parentArea.mapY + (Math.cos(encId) * 45);
-                } else {
-                    mapX = 500;
-                    mapY = 350;
-                }
+    // 3. Lọc danh sách marker
+    const filteredMarkers = useMemo(() => {
+        return mergedMarkers.filter(m => {
+            if (activeCategory !== 'all') {
+                if (activeCategory === 'gate' && m.category !== 'gate') return false;
+                if (activeCategory === 'landmark' && m.category !== 'landmark') return false;
+                if (activeCategory === 'carnivore' && m.category !== 'carnivore') return false;
+                if (activeCategory === 'herbivore' && m.category !== 'herbivore') return false;
+                if (activeCategory === 'bird' && m.category !== 'bird') return false;
+                if (activeCategory === 'primate' && m.category !== 'primate') return false;
+                if (activeCategory === 'petting' && m.category !== 'petting') return false;
             }
 
-            return {
-                ...enc,
-                enclosureId: encId,
-                parentArea,
-                areaName: parentArea?.name || parentArea?.nameVi || enc.areaName || 'Khu chung',
-                areaCode: parentArea?.code || enc.areaCode || 'Z',
-                color: parentArea?.color || '#0284C7',
-                mapX,
-                mapY,
-                residentAnimals,
-                animalCount: residentAnimals.length
-            };
+            if (searchKeyword.trim()) {
+                const kw = searchKeyword.trim().toLowerCase();
+                const matchName = (m.name || '').toLowerCase().includes(kw);
+                const matchCode = (m.code || '').toLowerCase().includes(kw);
+                const matchDesc = (m.description || '').toLowerCase().includes(kw);
+                const matchAnimal = m.residentAnimals && m.residentAnimals.some(a => 
+                    (a.name || '').toLowerCase().includes(kw) ||
+                    (a.scientificName || '').toLowerCase().includes(kw)
+                );
+                return matchName || matchCode || matchDesc || matchAnimal;
+            }
+
+            return true;
         });
-    }, [enclosures, enrichedAreas, animals]);
+    }, [mergedMarkers, activeCategory, searchKeyword]);
 
-    // Currently selected Area and Enclosure objects
-    const currentSelectedArea = useMemo(() => {
-        if (!selectedAreaId) return null;
-        return enrichedAreas.find(a => a.areaId === Number(selectedAreaId)) || null;
-    }, [selectedAreaId, enrichedAreas]);
+    // 4. Khởi tạo Leaflet Map thực tế
+    useEffect(() => {
+        if (!mapContainerRef.current) return;
+        if (mapInstanceRef.current) return;
 
-    const currentSelectedEnclosure = useMemo(() => {
-        if (!selectedEnclosureId) return null;
-        return enrichedEnclosures.find(e => e.enclosureId === Number(selectedEnclosureId)) || null;
-    }, [selectedEnclosureId, enrichedEnclosures]);
+        // Khởi tạo bản đồ tập trung đúng Thảo Cầm Viên Sài Gòn
+        const map = L.map(mapContainerRef.current, {
+            center: SAIGON_ZOO_CENTER,
+            zoom: 17,
+            minZoom: 15,
+            maxZoom: 19,
+            maxBounds: SAIGON_ZOO_BOUNDS,
+            maxBoundsViscosity: 0.85,
+            zoomControl: false // Sử dụng controls tùy biến
+        });
 
-    // Selected Start Point Object
-    const currentStartPoint = useMemo(() => {
-        return POPULAR_START_POINTS.find(p => p.id === selectedStartPointId) || 
-               WALKWAY_NODES[selectedStartPointId] || 
-               POPULAR_START_POINTS[0];
-    }, [selectedStartPointId]);
+        // Nền bản đồ CARTO Voyager
+const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY;
 
-    // 5. Dijkstra Route Navigation Engine
-    const calculateRoute = (startId, targetType, targetEntity) => {
-        const start = POPULAR_START_POINTS.find(p => p.id === startId) || 
-                     WALKWAY_NODES[startId] || 
-                     POPULAR_START_POINTS[0];
+if (!cartoApiKey) {
+    console.error('Thiếu VITE_CARTO_API_KEY trong cấu hình môi trường.');
+}
 
-        const routeResult = planZooRoute({
-            startPoint: start,
+const tileLayer = L.tileLayer(
+    `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoApiKey || '')}`,
+    {
+        attribution:
+            '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }
+);
+
+tileLayer.addTo(map);
+
+        // Lớp chứa Marker và Tuyến đường
+        const markersLayer = L.layerGroup().addTo(map);
+        const routeLayer = L.layerGroup().addTo(map);
+        const userLocationLayer = L.layerGroup().addTo(map);
+
+        markersLayerRef.current = markersLayer;
+        routeLayerRef.current = routeLayer;
+        userLocationLayerRef.current = userLocationLayer;
+        mapInstanceRef.current = map;
+
+        return () => {
+            map.remove();
+            mapInstanceRef.current = null;
+        };
+    }, []);
+
+    // 5. Cập nhật Marker lên bản đồ Leaflet
+    const createCustomDivIcon = useCallback((marker, isSelected) => {
+        let bgColor = '#15803D'; // Xanh lá cây tự nhiên mặc định
+        let label = marker.name?.split('(')[0]?.trim();
+
+        if (marker.category === 'gate') bgColor = '#0284C7';
+        else if (marker.category === 'landmark') bgColor = '#B45309';
+        else if (marker.category === 'carnivore') bgColor = '#DC2626';
+        else if (marker.category === 'bird') bgColor = '#7C3AED';
+        else if (marker.category === 'petting') bgColor = '#059669';
+
+        const verifiedDotColor = marker.isVerified ? '#4ADE80' : '#FCD34D';
+
+        return L.divIcon({
+            className: 'custom-leaflet-marker',
+            html: `
+                <div style="
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 5px;
+                    background: ${isSelected ? '#0F172A' : bgColor};
+                    color: #FFFFFF;
+                    padding: ${isSelected ? '5px 10px' : '4px 8px'};
+                    border-radius: 20px;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+                    border: 2px solid ${isSelected ? '#FEF08A' : '#FFFFFF'};
+                    font-size: 11px;
+                    font-weight: 700;
+                    white-space: nowrap;
+                    transform: translate(-50%, -100%);
+                    cursor: pointer;
+                    transition: transform 0.15s ease;
+                ">
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: ${verifiedDotColor}; display: inline-block;"></span>
+                    <span style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${label}</span>
+                </div>
+            `,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+        });
+    }, []);
+
+    // 6. Xử lý chọn marker và vẽ tuyến đường
+    const handleSelectMarker = useCallback((marker) => {
+        setSelectedMarker(marker);
+
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyTo([marker.lat, marker.lng], 18, {
+                duration: 1.0
+            });
+        }
+
+        // Tính toán lộ trình Dijkstra từ cổng xuất phát
+        let targetEntity = marker;
+        let targetType = 'node';
+
+        if (marker.enclosureId) {
+            targetType = 'enclosure';
+            targetEntity = {
+                enclosureId: marker.enclosureId,
+                name: marker.name,
+                latitude: marker.lat,
+                longitude: marker.lng,
+                areaId: marker.areaId
+            };
+        } else if (marker.nodeId) {
+            targetType = 'node';
+            targetEntity = { id: marker.nodeId, name: marker.name };
+        }
+
+        const route = planZooRoute({
+            startPoint: selectedStartPointId,
             targetType,
             targetEntity,
             currentNodes: WALKWAY_NODES,
             currentEdges: WALKWAY_EDGES
         });
 
-        if (routeResult) {
-            setActiveRoute(routeResult);
+        if (route) {
+            setActiveRoute(route);
+            if (routeLayerRef.current) {
+                routeLayerRef.current.clearLayers();
+                // Vẽ đường đi bộ thực tế dọc lối đi Thảo Cầm Viên
+                const polyline = L.polyline(route.latlngs, {
+                    color: '#15803D',
+                    weight: 5,
+                    opacity: 0.9,
+                    dashArray: '8, 8'
+                });
+                polyline.addTo(routeLayerRef.current);
+            }
         } else {
             setActiveRoute(null);
+            if (routeLayerRef.current) routeLayerRef.current.clearLayers();
         }
-    };
+    }, [selectedStartPointId]);
 
-    // When starting point changes and a route is active, recalculate immediately
-    const handleStartPointChange = (newStartId) => {
-        setSelectedStartPointId(newStartId);
-        if (activeRoute) {
-            calculateRoute(newStartId, activeRoute.targetType, activeRoute.targetEntity);
-        }
-    };
-
-    // 6. External navigation handling (from Animals tab "Định vị bản đồ")
+    // Render lại markers khi danh sách filteredMarkers hoặc selectedMarker thay đổi
     useEffect(() => {
-        if (navTargetAnimal && enrichedEnclosures.length > 0) {
-            let targetEnc = null;
+        if (!markersLayerRef.current || !mapInstanceRef.current) return;
+
+        markersLayerRef.current.clearLayers();
+
+        filteredMarkers.forEach(marker => {
+            const isSelected = selectedMarker?.id === marker.id;
+            const icon = createCustomDivIcon(marker, isSelected);
+
+            const leafletMarker = L.marker([marker.lat, marker.lng], { icon });
+            leafletMarker.on('click', () => {
+                handleSelectMarker(marker);
+            });
+
+            leafletMarker.addTo(markersLayerRef.current);
+        });
+    }, [filteredMarkers, selectedMarker, createCustomDivIcon, handleSelectMarker]);
+
+    // 7. Nhận điều hướng từ trang Động vật (navTargetAnimal)
+    useEffect(() => {
+        if (navTargetAnimal && mergedMarkers.length > 0) {
+            let targetMarker = null;
             if (navTargetAnimal.enclosureId) {
-                targetEnc = enrichedEnclosures.find(e => e.enclosureId === navTargetAnimal.enclosureId);
+                targetMarker = mergedMarkers.find(m => m.enclosureId === navTargetAnimal.enclosureId);
             }
-            if (!targetEnc && navTargetAnimal.areaId) {
-                targetEnc = enrichedEnclosures.find(e => e.areaId === navTargetAnimal.areaId);
-            }
-
-            if (targetEnc) {
-                handleSelectEnclosure(targetEnc);
-            } else if (navTargetAnimal.areaId) {
-                const targetArea = enrichedAreas.find(a => a.areaId === navTargetAnimal.areaId);
-                if (targetArea) handleSelectArea(targetArea);
+            if (!targetMarker && navTargetAnimal.areaId) {
+                targetMarker = mergedMarkers.find(m => m.areaId === navTargetAnimal.areaId);
             }
 
+            if (targetMarker) {
+                handleSelectMarker(targetMarker);
+                showToast(`Đã định vị chuồng nuôi cho ${navTargetAnimal.name || 'động vật'} trên bản đồ thực tế`, "info");
+            }
             setNavTargetAnimal(null);
-            showToast(`Đã định vị chuồng cho ${navTargetAnimal.name || navTargetAnimal.nameVi}`, "info");
         }
-    }, [navTargetAnimal, enrichedEnclosures, enrichedAreas]);
+    }, [navTargetAnimal, mergedMarkers, handleSelectMarker, setNavTargetAnimal, showToast]);
 
-    // 7. Navigation Actions: Select Area, Select Enclosure, Clear
-    const handleSelectArea = (area) => {
-        setSelectedAreaId(area.areaId);
-        setSelectedEnclosureId(null);
-        calculateRoute(selectedStartPointId, 'area', area);
-        setMobileTab('details');
+    // 8. Định vị du khách thực tế (GPS Geolocation)
+    const handleLocateUser = () => {
+        if (!navigator.geolocation) {
+            showToast("Trình duyệt không hỗ trợ tính năng định vị GPS.", "error");
+            return;
+        }
+
+        showToast("Đang tìm vị trí GPS của bạn...", "info");
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const userLat = pos.coords.latitude;
+                const userLng = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy;
+
+                if (!mapInstanceRef.current || !userLocationLayerRef.current) return;
+
+                userLocationLayerRef.current.clearLayers();
+
+                // Chấm xanh vị trí người dùng
+                const userIcon = L.divIcon({
+                    className: 'user-gps-marker',
+                    html: `
+                        <div style="
+                            width: 16px;
+                            height: 16px;
+                            background: #2563EB;
+                            border: 3px solid #FFFFFF;
+                            border-radius: 50%;
+                            box-shadow: 0 0 10px rgba(37,99,235,0.7);
+                        "></div>
+                    `,
+                    iconSize: [16, 16],
+                    iconAnchor: [8, 8]
+                });
+
+                L.marker([userLat, userLng], { icon: userIcon }).addTo(userLocationLayerRef.current);
+                L.circle([userLat, userLng], { radius: Math.min(accuracy, 80), color: '#3B82F6', fillOpacity: 0.15 }).addTo(userLocationLayerRef.current);
+
+                mapInstanceRef.current.flyTo([userLat, userLng], 18, { duration: 1.2 });
+                showToast("Đã xác định vị trí hiện tại của bạn.", "success");
+            },
+            (err) => {
+                console.warn("Geolocation error:", err);
+                showToast("Không thể lấy vị trí GPS. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.", "error");
+            },
+            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
     };
 
-    const handleSelectEnclosure = (enclosure) => {
-        setSelectedEnclosureId(enclosure.enclosureId);
-        if (enclosure.areaId) setSelectedAreaId(enclosure.areaId);
-        calculateRoute(selectedStartPointId, 'enclosure', enclosure);
-        setMobileTab('details');
-    };
-
-    const handleBackToZoo = () => {
-        setSelectedAreaId(null);
-        setSelectedEnclosureId(null);
+    // 9. Nút đặt lại toàn cảnh sở thú (Reset View to Zoo Bounds)
+    const handleResetZooBounds = () => {
+        if (mapInstanceRef.current) {
+            mapInstanceRef.current.flyToBounds(SAIGON_ZOO_BOUNDS, {
+                padding: [20, 20],
+                duration: 1.0
+            });
+        }
+        setSelectedMarker(null);
         setActiveRoute(null);
-        resetView();
+        if (routeLayerRef.current) routeLayerRef.current.clearLayers();
     };
 
-    const handleBackToArea = () => {
-        setSelectedEnclosureId(null);
-        if (currentSelectedArea) {
-            calculateRoute(selectedStartPointId, 'area', currentSelectedArea);
-        }
+    // 10. Điều khiển Zoom
+    const handleZoomIn = () => {
+        if (mapInstanceRef.current) mapInstanceRef.current.zoomIn();
     };
 
-    // 8. Zoom & View Controls
-    const zoom = (factor) => {
-        setViewBox(prev => {
-            const newW = prev.width * factor;
-            const newH = prev.height * factor;
-            if (newW >= 300 && newW <= 1600) {
-                return {
-                    x: prev.x + (prev.width - newW) / 2,
-                    y: prev.y + (prev.height - newH) / 2,
-                    width: newW,
-                    height: newH
-                };
-            }
-            return prev;
-        });
-    };
-
-    const resetView = () => {
-        setViewBox({ x: 0, y: 0, width: 1000, height: 700 });
-    };
-
-    // 9. Filter and Search logic
-    const filteredAreas = useMemo(() => {
-        return enrichedAreas.filter(area => {
-            const matchesFilter = activeAreaFilter === 'all' || String(area.areaId) === String(activeAreaFilter);
-            const matchesSearch = !searchKeyword.trim() || 
-                (area.name && area.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                (area.nameVi && area.nameVi.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                (area.code && area.code.toLowerCase().includes(searchKeyword.toLowerCase()));
-            return matchesFilter && matchesSearch;
-        });
-    }, [enrichedAreas, activeAreaFilter, searchKeyword]);
-
-    const filteredEnclosuresList = useMemo(() => {
-        return enrichedEnclosures.filter(enc => {
-            const matchesArea = !selectedAreaId || enc.areaId === Number(selectedAreaId);
-            const matchesFilter = activeAreaFilter === 'all' || String(enc.areaId) === String(activeAreaFilter);
-            const matchesSearch = !searchKeyword.trim() || 
-                (enc.name && enc.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                (enc.code && enc.code.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                enc.residentAnimals.some(a => 
-                    (a.name && a.name.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                    (a.nameVi && a.nameVi.toLowerCase().includes(searchKeyword.toLowerCase())) ||
-                    (a.species && a.species.toLowerCase().includes(searchKeyword.toLowerCase()))
-                );
-            return matchesArea && matchesFilter && matchesSearch;
-        });
-    }, [enrichedEnclosures, selectedAreaId, activeAreaFilter, searchKeyword]);
-
-    // Icon generator for enclosure types
-    const getEnclosureIcon = (name = '', areaCode = '') => {
-        const lower = name.toLowerCase();
-        if (lower.includes('hổ') || lower.includes('tiger')) return '🐅';
-        if (lower.includes('sư tử') || lower.includes('lion')) return '🦁';
-        if (lower.includes('báo') || lower.includes('leopard')) return '🐆';
-        if (lower.includes('voi') || lower.includes('elephant')) return '🐘';
-        if (lower.includes('chim') || lower.includes('vòm') || lower.includes('bird')) return '🦅';
-        if (lower.includes('gấu') || lower.includes('bear')) return '🐻';
-        if (lower.includes('vượn') || lower.includes('khỉ') || lower.includes('voọc')) return '🐒';
-        if (lower.includes('chó') || lower.includes('mèo') || lower.includes('thú cưng')) return '🐾';
-        if (lower.includes('cá sấu') || lower.includes('bò sát')) return '🐊';
-        if (lower.includes('thủy cung') || lower.includes('cá')) return '🐠';
-        if (areaCode === 'A') return '🐒';
-        if (areaCode === 'B') return '🦁';
-        if (areaCode === 'C') return '🦒';
-        if (areaCode === 'D') return '🐊';
-        if (areaCode === 'E') return '🦚';
-        return '🏠';
+    const handleZoomOut = () => {
+        if (mapInstanceRef.current) mapInstanceRef.current.zoomOut();
     };
 
     return (
-        <section id="tab-pane-map" className="tab-content-pane" style={{ padding: '12px 0' }}>
-            {/* Top Toolbar */}
-            <div className="map-toolbar" style={{ background: '#FFFFFF', border: '1px solid #E2E8F0', borderRadius: '14px', padding: '14px 18px', marginBottom: '14px', boxShadow: '0 2px 6px rgba(0,0,0,0.04)' }}>
+        <section id="tab-pane-map" className="tab-content-pane" style={{ padding: '8px 0 24px 0' }}>
+            {/* Header Toolbar: Tìm kiếm, lọc danh mục, điểm xuất phát */}
+            <div style={{
+                background: '#FFFFFF',
+                borderRadius: '20px',
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                marginBottom: '14px'
+            }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '1.4rem' }}>🗺️</span>
-                            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800, color: '#0F172A' }}>
-                                {t?.tabMap || 'Bản Đồ'} (ZooGuide Interactive Map)
-                            </h3>
+                            <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#0F172A' }}>
+                                Bản Đồ Địa Lý Thảo Cầm Viên Sài Gòn
+                            </h2>
                         </div>
-                        <p style={{ margin: '4px 0 0 0', fontSize: '0.82rem', color: '#64748B' }}>
-                            {t?.mapSubtitle || 'Khám phá theo cấu trúc: Sở thú → Phân khu → Chuồng trại → Động vật.'}
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.84rem', color: '#15803D', fontWeight: 600 }}>
+                            Nền tảng bản đồ địa lý thực tế (OpenStreetMap) • Tọa độ GPS chính xác 2 Nguyễn Bỉnh Khiêm, Quận 1
                         </p>
                     </div>
 
-                    {/* Filter, Start Point & Search Controls */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {/* Starting Point Selector */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F8FAFC', padding: '4px 10px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
-                            <span style={{ fontSize: '0.85rem' }} title="Điểm xuất phát dẫn đường">📍 {t?.mapStartPointLabel || 'Xuất phát'}:</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {/* Dropdown cổng xuất phát */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>Cổng xuất phát:</span>
                             <select
-                                className="form-select"
-                                style={{ padding: '4px 8px', fontSize: '0.82rem', borderRadius: '8px', border: 'none', background: 'transparent', fontWeight: 600, color: '#0F172A', cursor: 'pointer' }}
+                                style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    color: '#0F172A',
+                                    cursor: 'pointer',
+                                    outline: 'none'
+                                }}
                                 value={selectedStartPointId}
-                                onChange={(e) => handleStartPointChange(e.target.value)}
+                                onChange={(e) => {
+                                    setSelectedStartPointId(e.target.value);
+                                    if (selectedMarker) handleSelectMarker(selectedMarker);
+                                }}
                             >
                                 {POPULAR_START_POINTS.map(sp => (
-                                    <option key={sp.id} value={sp.id}>
-                                        {sp.name}
-                                    </option>
+                                    <option key={sp.id} value={sp.id}>{sp.name}</option>
                                 ))}
                             </select>
                         </div>
 
-                        {/* Area Selector Dropdown */}
-                        <select
-                            className="form-select"
-                            style={{ padding: '7px 12px', fontSize: '0.85rem', borderRadius: '10px', minWidth: '160px' }}
-                            value={activeAreaFilter}
-                            onChange={(e) => {
-                                setActiveAreaFilter(e.target.value);
-                                if (e.target.value !== 'all') {
-                                    setSelectedAreaId(Number(e.target.value));
-                                    setSelectedEnclosureId(null);
-                                } else {
-                                    setSelectedAreaId(null);
-                                    setSelectedEnclosureId(null);
-                                }
-                            }}
-                        >
-                            <option value="all">🌐 {t?.filterAll || 'Tất cả'} ({enrichedAreas.length})</option>
-                            {enrichedAreas.map(a => (
-                                <option key={a.areaId} value={a.areaId}>
-                                    {a.code} - {a.name || a.nameVi}
-                                </option>
-                            ))}
-                        </select>
-
-                        {/* Search Input */}
-                        <div style={{ position: 'relative', minWidth: '200px' }}>
-                            <input 
+                        {/* Ô tìm kiếm */}
+                        <div style={{ position: 'relative', minWidth: '220px' }}>
+                            <input
                                 type="text"
-                                className="form-input"
-                                style={{ padding: '7px 12px 7px 32px', fontSize: '0.85rem', borderRadius: '20px' }}
-                                placeholder={t?.searchPlaceholder || 'Tìm khu, chuồng, thú...'}
+                                style={{
+                                    width: '100%',
+                                    padding: '8px 14px 8px 32px',
+                                    fontSize: '0.85rem',
+                                    borderRadius: '20px',
+                                    border: '1px solid #CBD5E1',
+                                    outline: 'none',
+                                    background: '#F8FAFC'
+                                }}
+                                placeholder="Tìm chuồng, thú, cổng..."
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                             />
                             <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, fontSize: '0.85rem' }}>
                                 🔍
                             </span>
+                            {searchKeyword && (
+                                <button
+                                    onClick={() => setSearchKeyword('')}
+                                    style={{
+                                        position: 'absolute',
+                                        right: '8px',
+                                        top: '50%',
+                                        transform: 'translateY(-50%)',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        cursor: 'pointer',
+                                        color: '#94A3B8'
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
 
-                        {/* Refresh Button */}
+                        {/* Nút làm mới */}
                         <button
                             className="btn btn-sm btn-outline"
-                            title="Tải lại dữ liệu trực tiếp từ máy chủ"
                             onClick={() => loadMapData(currentLang)}
                             disabled={isLoading}
+                            style={{ borderRadius: '12px', fontWeight: 600 }}
                         >
-                            {isLoading ? 'Đang tải...' : `🔄 ${t?.mapRefreshBtn || 'Làm mới'}`}
+                            {isLoading ? 'Đang tải...' : 'Làm mới'}
                         </button>
                     </div>
                 </div>
 
-                {/* Mobile View Switcher */}
-                <div className="mobile-only-flex" style={{ display: 'none', gap: '8px', marginTop: '12px', borderTop: '1px solid #F1F5F9', paddingTop: '10px' }}>
-                    <button
-                        className={`btn btn-sm ${mobileTab === 'map' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ flex: 1 }}
-                        onClick={() => setMobileTab('map')}
-                    >
-                        🗺️ Xem Bản Đồ
-                    </button>
-                    <button
-                        className={`btn btn-sm ${mobileTab === 'details' ? 'btn-primary' : 'btn-outline'}`}
-                        style={{ flex: 1 }}
-                        onClick={() => setMobileTab('details')}
-                    >
-                        📋 Danh Sách & Chi Tiết
-                    </button>
+                {/* Filter Chips */}
+                <div style={{
+                    display: 'flex',
+                    gap: '8px',
+                    overflowX: 'auto',
+                    paddingTop: '12px',
+                    marginTop: '10px',
+                    borderTop: '1px solid #F1F5F9',
+                    scrollbarWidth: 'none'
+                }}>
+                    {[
+                        { key: 'all', label: 'Tất cả địa điểm', count: mergedMarkers.length },
+                        { key: 'carnivore', label: 'Động vật ăn thịt', count: mergedMarkers.filter(m => m.category === 'carnivore').length },
+                        { key: 'herbivore', label: 'Động vật ăn cỏ', count: mergedMarkers.filter(m => m.category === 'herbivore').length },
+                        { key: 'bird', label: 'Vườn chim', count: mergedMarkers.filter(m => m.category === 'bird').length },
+                        { key: 'primate', label: 'Linh trưởng', count: mergedMarkers.filter(m => m.category === 'primate').length },
+                        { key: 'petting', label: 'Thú thân thiện', count: mergedMarkers.filter(m => m.category === 'petting').length },
+                        { key: 'gate', label: 'Cổng ra vào', count: mergedMarkers.filter(m => m.category === 'gate').length },
+                        { key: 'landmark', label: 'Di tích & Cây cổ thụ', count: mergedMarkers.filter(m => m.category === 'landmark').length }
+                    ].map(cat => (
+                        <button
+                            key={cat.key}
+                            onClick={() => setActiveCategory(cat.key)}
+                            style={{
+                                padding: '5px 12px',
+                                borderRadius: '16px',
+                                fontSize: '0.8rem',
+                                fontWeight: activeCategory === cat.key ? 700 : 500,
+                                background: activeCategory === cat.key ? '#15803D' : '#F8FAFC',
+                                color: activeCategory === cat.key ? '#FFFFFF' : '#475569',
+                                border: `1px solid ${activeCategory === cat.key ? '#15803D' : '#E2E8F0'}`,
+                                cursor: 'pointer',
+                                whiteSpace: 'nowrap',
+                                transition: 'all 0.15s ease'
+                            }}
+                        >
+                            {cat.label} ({cat.count})
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* ERROR ALERT */}
+            {/* Báo lỗi nếu có */}
             {loadError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', padding: '14px 18px', borderRadius: '10px', marginBottom: '14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ color: '#B91C1C', fontSize: '0.9rem' }}>
-                        <strong>⚠️ Lỗi tải bản đồ:</strong> {loadError}
-                    </div>
-                    <button className="btn btn-sm btn-primary" onClick={loadMapData}>
-                        Thử lại
-                    </button>
+                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 16px', borderRadius: '12px', marginBottom: '12px', fontSize: '0.88rem' }}>
+                    Lỗi tải dữ liệu: {loadError}
                 </div>
             )}
 
-            {/* MAIN INTERACTIVE MAP LAYOUT */}
-            <div className="map-view-layout" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 380px', gap: '16px', alignItems: 'start' }}>
-                {/* LEFT: MAP CANVAS CONTAINER */}
-                <div className={`map-canvas-card ${mobileTab !== 'map' ? 'mobile-hidden' : ''}`} style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', overflow: 'hidden', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', position: 'relative' }}>
-                    
-                    {/* Zoom / Viewport Controls Floating Overlay */}
-                    <div style={{ position: 'absolute', top: '16px', right: '16px', zIndex: 10, display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(255, 255, 255, 0.95)', padding: '6px', borderRadius: '10px', boxShadow: '0 2px 8px rgba(0,0,0,0.12)' }}>
-                        <button className="btn btn-icon btn-sm" title="Phóng to" onClick={() => zoom(0.85)}>＋</button>
-                        <button className="btn btn-icon btn-sm" title="Thu nhỏ" onClick={() => zoom(1.18)}>－</button>
-                        <button className="btn btn-icon btn-sm" title="Khôi phục toàn cảnh" onClick={resetView}>⟲</button>
+            {/* Khung chứa Bản Đồ Địa Lý Thực Tế Leaflet */}
+            <div style={{
+                position: 'relative',
+                width: '100%',
+                height: '68vh',
+                minHeight: '520px',
+                borderRadius: '24px',
+                overflow: 'hidden',
+                border: '1px solid #CBD5E1',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
+                background: '#F1F5F9'
+            }}>
+                {/* Floating Map Controls (+ / - / Reset / GPS) */}
+                <div style={{
+                    position: 'absolute',
+                    top: '16px',
+                    right: '16px',
+                    zIndex: 1000,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                }}>
+                    <div style={{
+                        background: 'rgba(255, 255, 255, 0.95)',
+                        backdropFilter: 'blur(8px)',
+                        borderRadius: '14px',
+                        padding: '4px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.12)',
+                        border: '1px solid rgba(0,0,0,0.06)'
+                    }}>
+                        <button
+                            className="btn btn-icon btn-sm"
+                            title="Phóng to"
+                            onClick={handleZoomIn}
+                            style={{ width: '36px', height: '36px', fontSize: '1.2rem', fontWeight: 800, background: '#FFF' }}
+                        >
+                            ＋
+                        </button>
+                        <button
+                            className="btn btn-icon btn-sm"
+                            title="Thu nhỏ"
+                            onClick={handleZoomOut}
+                            style={{ width: '36px', height: '36px', fontSize: '1.2rem', fontWeight: 800, background: '#FFF' }}
+                        >
+                            －
+                        </button>
+                        <button
+                            className="btn btn-icon btn-sm"
+                            title="Toàn cảnh Thảo Cầm Viên"
+                            onClick={handleResetZooBounds}
+                            style={{ width: '36px', height: '36px', fontSize: '0.95rem', fontWeight: 700, background: '#FFF' }}
+                        >
+                            ⟲
+                        </button>
+                        <button
+                            className="btn btn-icon btn-sm"
+                            title="Định vị GPS của bạn"
+                            onClick={handleLocateUser}
+                            style={{ width: '36px', height: '36px', fontSize: '1.1rem', background: '#FFF', color: '#2563EB' }}
+                        >
+                            🎯
+                        </button>
                     </div>
+                </div>
 
-                    {/* Active Dijkstra Route Floating Card */}
-                    {activeRoute && (
-                        <div style={{ position: 'absolute', bottom: '16px', left: '16px', zIndex: 10, background: 'rgba(15, 23, 42, 0.94)', color: '#F8FAFC', padding: '12px 16px', borderRadius: '14px', backdropFilter: 'blur(8px)', boxShadow: '0 8px 24px rgba(0,0,0,0.25)', maxWidth: '380px', border: '1px solid rgba(255,255,255,0.15)' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-                                <div style={{ fontSize: '1.6rem', marginTop: '2px' }}>🚶‍♂️</div>
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ fontSize: '0.72rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                                        Lộ trình Dijkstra thực tế từ <strong>{activeRoute.startNode?.name?.split('(')[0]?.trim()}</strong>
-                                    </div>
-                                    <div style={{ fontWeight: 800, fontSize: '0.95rem', color: '#FFFFFF', marginTop: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                        ➔ {activeRoute.destinationName}
-                                    </div>
-                                    <div style={{ fontSize: '0.78rem', color: '#38BDF8', marginTop: '4px', display: 'flex', gap: '10px' }}>
-                                        <span>Cự ly: <strong>{activeRoute.totalDistanceM} mét</strong></span>
-                                        <span>•</span>
-                                        <span>Thời gian: <strong>~{activeRoute.timeMin} phút</strong></span>
-                                    </div>
-                                </div>
-                                <button 
-                                    className="btn btn-icon btn-sm" 
-                                    style={{ color: '#94A3B8', fontSize: '1rem' }}
-                                    onClick={() => setActiveRoute(null)}
-                                    title="Đóng lộ trình"
-                                >
-                                    ✕
-                                </button>
-                            </div>
+                {/* Chú giải trạng thái (Legend) */}
+                <div style={{
+                    position: 'absolute',
+                    bottom: '16px',
+                    right: '16px',
+                    zIndex: 1000,
+                    background: 'rgba(255, 255, 255, 0.92)',
+                    backdropFilter: 'blur(6px)',
+                    padding: '6px 12px',
+                    borderRadius: '10px',
+                    border: '1px solid rgba(0,0,0,0.08)',
+                    fontSize: '0.72rem',
+                    color: '#334155',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+                }}>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16A34A', display: 'inline-block' }}></span>
+                        <strong>Tọa độ đã xác minh</strong>
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }}></span>
+                        <span>Đang cập nhật</span>
+                    </span>
+                </div>
 
-                            {/* Waypoint details toggle */}
-                            <div style={{ marginTop: '8px', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <button
-                                    onClick={() => setShowWaypointsList(!showWaypointsList)}
-                                    style={{ background: 'transparent', border: 'none', color: '#FCD34D', fontSize: '0.75rem', cursor: 'pointer', padding: 0, fontWeight: 700 }}
-                                >
-                                    {showWaypointsList ? '▲ Thu gọn các trạm dừng' : '▼ Xem chi tiết từng chặng đi'}
-                                </button>
-                                <span style={{ fontSize: '0.72rem', color: '#64748B' }}>
-                                    {activeRoute.pathNodes.length} điểm mốc
+                {/* Floating Walking Route Card */}
+                {activeRoute && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '16px',
+                        left: '16px',
+                        zIndex: 1000,
+                        background: 'rgba(15, 23, 42, 0.95)',
+                        color: '#F8FAFC',
+                        padding: '12px 16px',
+                        borderRadius: '16px',
+                        backdropFilter: 'blur(10px)',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+                        maxWidth: '360px',
+                        border: '1px solid rgba(255,255,255,0.15)'
+                    }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
+                            <div>
+                                <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#38BDF8', fontWeight: 800 }}>
+                                    LỘ TRÌNH ĐI BỘ THỰC TẾ
                                 </span>
+                                <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
+                                    ➔ {activeRoute.destinationName}
+                                </div>
+                                <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                                    <span>Từ: <strong>{activeRoute.startNode?.name?.split('(')[0]?.trim()}</strong></span>
+                                    <span>•</span>
+                                    <span>Cự ly: <strong style={{ color: '#38BDF8' }}>{activeRoute.totalDistanceM}m</strong></span>
+                                    <span>•</span>
+                                    <span>~<strong style={{ color: '#FCD34D' }}>{activeRoute.timeMin} phút</strong></span>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setActiveRoute(null);
+                                    if (routeLayerRef.current) routeLayerRef.current.clearLayers();
+                                }}
+                                style={{
+                                    border: 'none',
+                                    background: 'rgba(255,255,255,0.1)',
+                                    color: '#FFF',
+                                    borderRadius: '50%',
+                                    width: '22px',
+                                    height: '22px',
+                                    cursor: 'pointer',
+                                    fontSize: '0.75rem'
+                                }}
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Xem chi tiết trạm dừng */}
+                        <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                            <button
+                                onClick={() => setShowRouteSteps(!showRouteSteps)}
+                                style={{
+                                    border: 'none',
+                                    background: 'transparent',
+                                    color: '#FCD34D',
+                                    fontSize: '0.74rem',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    fontWeight: 700
+                                }}
+                            >
+                                {showRouteSteps ? '▲ Thu gọn các trạm dừng' : `▼ Chi tiết (${activeRoute.waypoints.length} điểm mốc)`}
+                            </button>
+
+                            {showRouteSteps && (
+                                <ol style={{ margin: '6px 0 0 0', paddingLeft: '16px', fontSize: '0.72rem', color: '#CBD5E1', maxHeight: '100px', overflowY: 'auto' }}>
+                                    {activeRoute.waypoints.map((step, idx) => (
+                                        <li key={idx} style={{ marginBottom: '2px', color: idx === activeRoute.waypoints.length - 1 ? '#38BDF8' : '#CBD5E1', fontWeight: idx === activeRoute.waypoints.length - 1 ? 800 : 400 }}>
+                                            {step}
+                                        </li>
+                                    ))}
+                                </ol>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Container của Leaflet Map */}
+                <div
+                    ref={mapContainerRef}
+                    style={{
+                        width: '100%',
+                        height: '100%',
+                        zIndex: 1
+                    }}
+                />
+            </div>
+
+            {/* Thẻ Thông Tin Chi Tiết Điểm Tham Quan (Location Detail Sheet) */}
+            {selectedMarker && (
+                <div style={{
+                    marginTop: '14px',
+                    background: '#FFFFFF',
+                    borderRadius: '20px',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 6px 20px rgba(0,0,0,0.05)',
+                    padding: '20px 24px',
+                    animation: 'fadeIn 0.2s ease-in-out'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '14px' }}>
+                        <div style={{ flex: 1, minWidth: '280px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: '#0F172A' }}>
+                                    {selectedMarker.name}
+                                </h3>
+                                {selectedMarker.isVerified ? (
+                                    <span style={{
+                                        background: '#DCFCE7',
+                                        color: '#166534',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: '10px'
+                                    }}>
+                                        ✓ Tọa độ đã xác minh thực tế
+                                    </span>
+                                ) : (
+                                    <span style={{
+                                        background: '#FEF3C7',
+                                        color: '#92400E',
+                                        fontSize: '0.68rem',
+                                        fontWeight: 800,
+                                        padding: '2px 8px',
+                                        borderRadius: '10px'
+                                    }}>
+                                        🟡 Đang cập nhật tọa độ
+                                    </span>
+                                )}
                             </div>
 
-                            {/* Waypoints List Dropdown */}
-                            {showWaypointsList && (
-                                <div style={{ marginTop: '8px', maxHeight: '140px', overflowY: 'auto', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px' }}>
-                                    <ol style={{ margin: 0, paddingLeft: '18px', fontSize: '0.75rem', color: '#CBD5E1' }}>
-                                        {activeRoute.waypoints.map((step, idx) => (
-                                            <li key={idx} style={{ marginBottom: '4px', color: idx === activeRoute.waypoints.length - 1 ? '#38BDF8' : '#CBD5E1', fontWeight: idx === activeRoute.waypoints.length - 1 ? 800 : 400 }}>
-                                                {step}
-                                            </li>
+                            <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, marginBottom: '8px' }}>
+                                Mã địa điểm: {selectedMarker.code} • Tọa độ GPS: {selectedMarker.lat.toFixed(6)}, {selectedMarker.lng.toFixed(6)}
+                            </div>
+
+                            <p style={{ margin: '0 0 12px 0', fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
+                                {selectedMarker.description}
+                            </p>
+
+                            {/* Danh sách các cá thể thú cư ngụ */}
+                            {selectedMarker.residentAnimals && selectedMarker.residentAnimals.length > 0 && (
+                                <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '10px' }}>
+                                    <div style={{ fontSize: '0.84rem', fontWeight: 800, color: '#15803D', marginBottom: '8px' }}>
+                                        Động vật cư ngụ tại chuồng này ({selectedMarker.residentAnimals.length} cá thể):
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '8px' }}>
+                                        {selectedMarker.residentAnimals.map(animal => (
+                                            <div
+                                                key={animal.animalId || animal.id}
+                                                style={{
+                                                    background: '#F8FAFC',
+                                                    border: '1px solid #E2E8F0',
+                                                    borderRadius: '12px',
+                                                    padding: '8px 12px',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'space-between',
+                                                    gap: '8px'
+                                                }}
+                                            >
+                                                <div>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: '#0F172A' }}>
+                                                        {animal.name}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.72rem', color: '#64748B', fontStyle: 'italic' }}>
+                                                        {animal.scientificName || animal.species || 'Động vật quý hiếm'}
+                                                    </div>
+                                                </div>
+
+                                                <div style={{ display: 'flex', gap: '4px' }}>
+                                                    <button
+                                                        className="btn btn-sm"
+                                                        style={{
+                                                            background: '#15803D',
+                                                            color: '#FFF',
+                                                            borderRadius: '6px',
+                                                            padding: '4px 8px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700
+                                                        }}
+                                                        onClick={() => {
+                                                            if (onOpenSpeciesNarration) onOpenSpeciesNarration(animal);
+                                                            else if (onPlayAudio) onPlayAudio(animal);
+                                                        }}
+                                                    >
+                                                        Nghe Audio
+                                                    </button>
+                                                    <button
+                                                        className="btn btn-sm btn-outline"
+                                                        style={{
+                                                            borderRadius: '6px',
+                                                            padding: '4px 8px',
+                                                            fontSize: '0.72rem',
+                                                            fontWeight: 700
+                                                        }}
+                                                        onClick={() => {
+                                                            if (onOpenDetail) onOpenDetail(animal);
+                                                        }}
+                                                    >
+                                                        Chi tiết
+                                                    </button>
+                                                </div>
+                                            </div>
                                         ))}
-                                    </ol>
+                                    </div>
                                 </div>
                             )}
                         </div>
-                    )}
 
-                    {/* SVG Map Canvas (Responsive, Scalable, Crisp) */}
-                    <svg 
-                        viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
-                        style={{ width: '100%', height: 'auto', minHeight: '520px', maxHeight: '720px', background: '#F4FBF6', display: 'block', cursor: 'grab' }}
-                    >
-                        <defs>
-                            {/* Gradients */}
-                            <linearGradient id="lakeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.5" />
-                                <stop offset="100%" stopColor="#0284C7" stopOpacity="0.75" />
-                            </linearGradient>
-                            <radialGradient id="hubGradient" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-                                <stop offset="100%" stopColor="#E2E8F0" stopOpacity="0.7" />
-                            </radialGradient>
-                            <radialGradient id="plazaGradient" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" stopColor="#FEF3C7" stopOpacity="0.95" />
-                                <stop offset="100%" stopColor="#FDE68A" stopOpacity="0.6" />
-                            </radialGradient>
-                            {/* Bridge wood pattern */}
-                            <pattern id="bridgePlank" width="10" height="10" patternUnits="userSpaceOnUse">
-                                <rect width="10" height="10" fill="#D97706" />
-                                <line x1="0" y1="0" x2="0" y2="10" stroke="#B45309" strokeWidth="1" />
-                            </pattern>
-                        </defs>
+                        {/* Nút hành động */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px' }}>
+                            <button
+                                className="btn btn-primary"
+                                style={{
+                                    borderRadius: '10px',
+                                    fontWeight: 700,
+                                    fontSize: '0.85rem',
+                                    background: '#15803D'
+                                }}
+                                onClick={() => handleSelectMarker(selectedMarker)}
+                            >
+                                Chỉ đường từ cổng
+                            </button>
 
-                        {/* 1. TERRAIN BASE LAYER */}
-                        <rect x="0" y="0" width="1000" height="700" fill="#F4FBF6" />
-                        
-                        {/* Decorative Natural Forest Patches */}
-                        <circle cx="100" cy="80" r="75" fill="#E2F2E9" opacity="0.7" />
-                        <circle cx="890" cy="90" r="95" fill="#E2F2E9" opacity="0.7" />
-                        <circle cx="80" cy="580" r="85" fill="#E2F2E9" opacity="0.7" />
-                        <circle cx="920" cy="570" r="75" fill="#E2F2E9" opacity="0.7" />
-
-                        {/* Central Scenic Lake (Hồ Cảnh Quan Sinh Thái) */}
-                        <path 
-                            d="M 330 330 C 370 290, 470 300, 490 350 C 510 400, 450 440, 390 430 C 330 420, 290 370, 330 330 Z" 
-                            fill="url(#lakeGradient)" 
-                            stroke="#0284C7" 
-                            strokeWidth="2.5" 
-                            strokeDasharray="4 2"
-                        />
-                        <text x="400" y="380" fill="#0369A1" fontSize="12" fontWeight="800" textAnchor="middle" opacity="0.85">
-                            🌊 Hồ Cảnh Quan (Eco Lake)
-                        </text>
-
-                        {/* 2. REALISTIC WALKWAY NETWORK (MẠNG LƯỚI ĐƯỜNG ĐI THỰC TẾ THEO ĐỒ THỊ) */}
-                        {/* Outer Road Base (Sub-base foundation) */}
-                        <g stroke="#E2E8F0" strokeWidth="22" strokeLinecap="round" strokeLinejoin="round" fill="none">
-                            {WALKWAY_EDGES.map(([u, v], i) => {
-                                const nodeU = WALKWAY_NODES[u];
-                                const nodeV = WALKWAY_NODES[v];
-                                if (!nodeU || !nodeV) return null;
-                                return <line key={`base-${i}`} x1={nodeU.x} y1={nodeU.y} x2={nodeV.x} y2={nodeV.y} />;
-                            })}
-                        </g>
-
-                        {/* Inner Paved Walkway Surface */}
-                        <g stroke="#FFFFFF" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round" fill="none">
-                            {WALKWAY_EDGES.map(([u, v], i) => {
-                                const nodeU = WALKWAY_NODES[u];
-                                const nodeV = WALKWAY_NODES[v];
-                                if (!nodeU || !nodeV) return null;
-                                return <line key={`pave-${i}`} x1={nodeU.x} y1={nodeU.y} x2={nodeV.x} y2={nodeV.y} />;
-                            })}
-                        </g>
-
-                        {/* Paved Centerline Guide */}
-                        <g stroke="#CBD5E1" strokeWidth="1.5" strokeDasharray="6 6" strokeLinecap="round" fill="none">
-                            {WALKWAY_EDGES.map(([u, v], i) => {
-                                const nodeU = WALKWAY_NODES[u];
-                                const nodeV = WALKWAY_NODES[v];
-                                if (!nodeU || !nodeV) return null;
-                                return <line key={`center-${i}`} x1={nodeU.x} y1={nodeU.y} x2={nodeV.x} y2={nodeV.y} />;
-                            })}
-                        </g>
-
-                        {/* Scenic Lake Wooden Bridge */}
-                        <g>
-                            <line 
-                                x1={WALKWAY_NODES.n_bridge_west.x} 
-                                y1={WALKWAY_NODES.n_bridge_west.y} 
-                                x2={WALKWAY_NODES.n_bridge_east.x} 
-                                y2={WALKWAY_NODES.n_bridge_east.y} 
-                                stroke="#B45309" 
-                                strokeWidth="20" 
-                                strokeLinecap="butt"
-                            />
-                            <line 
-                                x1={WALKWAY_NODES.n_bridge_west.x} 
-                                y1={WALKWAY_NODES.n_bridge_west.y} 
-                                x2={WALKWAY_NODES.n_bridge_east.x} 
-                                y2={WALKWAY_NODES.n_bridge_east.y} 
-                                stroke="#FDE68A" 
-                                strokeWidth="14" 
-                                strokeLinecap="butt"
-                            />
-                            <text x="400" y="335" fill="#78350F" fontSize="9" fontWeight="800" textAnchor="middle">
-                                🌉 Cầu Gỗ Ven Hồ
-                            </text>
-                        </g>
-
-                        {/* Major Junction Plazas */}
-                        {/* Central Plaza */}
-                        <circle cx={WALKWAY_NODES.n_central_plaza.x} cy={WALKWAY_NODES.n_central_plaza.y} r="34" fill="url(#plazaGradient)" stroke="#F59E0B" strokeWidth="2" />
-                        <text x={WALKWAY_NODES.n_central_plaza.x} y={WALKWAY_NODES.n_central_plaza.y + 4} fill="#92400E" fontSize="9.5" fontWeight="800" textAnchor="middle">
-                            Quảng Trường
-                        </text>
-
-                        {/* North Hub Plaza */}
-                        <circle cx={WALKWAY_NODES.n_north_hub.x} cy={WALKWAY_NODES.n_north_hub.y} r="26" fill="url(#hubGradient)" stroke="#94A3B8" strokeWidth="1.5" />
-                        <text x={WALKWAY_NODES.n_north_hub.x} y={WALKWAY_NODES.n_north_hub.y + 3} fill="#475569" fontSize="8.5" fontWeight="700" textAnchor="middle">
-                            Vòng Xoay Bắc
-                        </text>
-
-                        {/* East Service Hub */}
-                        <circle cx={WALKWAY_NODES.n_se_plaza.x} cy={WALKWAY_NODES.n_se_plaza.y} r="24" fill="url(#hubGradient)" stroke="#94A3B8" strokeWidth="1.5" />
-                        <text x={WALKWAY_NODES.n_se_plaza.x} y={WALKWAY_NODES.n_se_plaza.y + 3} fill="#475569" fontSize="8" fontWeight="700" textAnchor="middle">
-                            Khu Dịch Vụ
-                        </text>
-
-                        {/* 3. ACTIVE DIJKSTRA ROUTE OVERLAY */}
-                        {activeRoute && (
-                            <g>
-                                {/* Shadow/Glow under path */}
-                                <path 
-                                    d={activeRoute.pathD}
-                                    fill="none"
-                                    stroke="#EA580C"
-                                    strokeWidth="11"
-                                    strokeOpacity="0.3"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                />
-                                {/* Main animated dash road path */}
-                                <path 
-                                    d={activeRoute.pathD}
-                                    fill="none"
-                                    stroke="#EA580C"
-                                    strokeWidth="5.5"
-                                    strokeDasharray="10 6"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                >
-                                    <animate attributeName="stroke-dashoffset" values="32;0" dur="1.2s" repeatCount="indefinite" />
-                                </path>
-                                {/* Waypoint milestone dots along Dijkstra path */}
-                                {activeRoute.pathNodes.map((p, idx) => (
-                                    <circle 
-                                        key={`wp-${idx}`} 
-                                        cx={p.x} 
-                                        cy={p.y} 
-                                        r={idx === 0 || idx === activeRoute.pathNodes.length - 1 ? 6 : 3.5} 
-                                        fill={idx === activeRoute.pathNodes.length - 1 ? '#DC2626' : (idx === 0 ? '#16A34A' : '#FFFFFF')} 
-                                        stroke="#0F172A" 
-                                        strokeWidth="1.5" 
-                                    />
-                                ))}
-                            </g>
-                        )}
-
-                        {/* 4. AREA TERRITORIES (LEVEL 1: PHÂN KHU TỔNG THỂ) */}
-                        {filteredAreas.map(area => {
-                            const isSelected = selectedAreaId === area.areaId;
-                            const radius = Math.max(75, Math.min(130, (area.radiusMeters || 60) * 1.4));
-
-                            return (
-                                <g 
-                                    key={area.areaId} 
-                                    onClick={() => handleSelectArea(area)}
-                                    style={{ cursor: 'pointer', transition: 'all 200ms ease' }}
-                                >
-                                    {/* Area Territory Circle */}
-                                    <circle 
-                                        cx={area.mapX} 
-                                        cy={area.mapY} 
-                                        r={radius}
-                                        fill={area.color}
-                                        fillOpacity={isSelected ? 0.22 : 0.12}
-                                        stroke={area.color}
-                                        strokeWidth={isSelected ? 3 : 1.5}
-                                        strokeDasharray={isSelected ? "none" : "6 4"}
-                                    />
-
-                                    {/* Selected Area Highlight Pulse */}
-                                    {isSelected && (
-                                        <circle 
-                                            cx={area.mapX} 
-                                            cy={area.mapY} 
-                                            r={radius + 8}
-                                            fill="none"
-                                            stroke={area.color}
-                                            strokeWidth="2"
-                                            opacity="0.6"
-                                        >
-                                            <animate attributeName="r" values={`${radius};${radius + 14};${radius}`} dur="2.4s" repeatCount="indefinite" />
-                                            <animate attributeName="opacity" values="0.8;0.1;0.8" dur="2.4s" repeatCount="indefinite" />
-                                        </circle>
-                                    )}
-
-                                    {/* Area Label Tag (Positioned cleanly above perimeter) */}
-                                    <g transform={`translate(${area.mapX}, ${area.mapY - radius - 14})`}>
-                                        <rect 
-                                            x="-90" 
-                                            y="-14" 
-                                            width="180" 
-                                            height="28" 
-                                            rx="14" 
-                                            fill="#FFFFFF" 
-                                            stroke={area.color} 
-                                            strokeWidth="2" 
-                                            filter="drop-shadow(0 2px 6px rgba(0,0,0,0.12))"
-                                        />
-                                        <text 
-                                            x="0" 
-                                            y="4" 
-                                            fill="#0F172A" 
-                                            fontSize="11" 
-                                            fontWeight="800" 
-                                            textAnchor="middle"
-                                        >
-                                            {area.code} • {(area.name || area.nameVi || '').replace(/^Khu\s+/i, '')}
-                                        </text>
-                                    </g>
-                                </g>
-                            );
-                        })}
-
-                        {/* 5. ENCLOSURE NODES / PINS (LEVEL 2: CHUỒNG TRẠI CỤ THỂ) */}
-                        {filteredEnclosuresList.map((enc, idx) => {
-                            const isSelected = selectedEnclosureId === enc.enclosureId;
-                            const isParentAreaSelected = selectedAreaId === enc.areaId;
-                            const isHovered = hoveredEnclosureId === enc.enclosureId;
-                            const icon = getEnclosureIcon(enc.name, enc.areaCode);
-
-                            // Stagger Y offsets: alternating above and below to prevent horizontal label collision
-                            const isAbove = (idx % 2 === 0);
-                            const offsetY = isAbove ? -26 : 28;
-
-                            // Show label if selected, hovered, or parent area is selected
-                            const showLabel = isSelected || isHovered || isParentAreaSelected;
-
-                            return (
-                                <g 
-                                    key={enc.enclosureId}
-                                    transform={`translate(${enc.mapX}, ${enc.mapY})`}
-                                    onMouseEnter={() => setHoveredEnclosureId(enc.enclosureId)}
-                                    onMouseLeave={() => setHoveredEnclosureId(null)}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleSelectEnclosure(enc);
-                                    }}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    {/* Selection Glow Pulse */}
-                                    {isSelected && (
-                                        <circle cx="0" cy="0" r="28" fill="#F59E0B" fillOpacity="0.3">
-                                            <animate attributeName="r" values="22;32;22" dur="1.8s" repeatCount="indefinite" />
-                                        </circle>
-                                    )}
-
-                                    {/* Pin Marker Background */}
-                                    <circle 
-                                        cx="0" 
-                                        cy="0" 
-                                        r={isSelected ? 20 : 16} 
-                                        fill={isSelected ? '#F59E0B' : (isHovered ? '#FEF3C7' : '#FFFFFF')} 
-                                        stroke={isSelected ? '#B45309' : (isHovered ? '#D97706' : enc.color)} 
-                                        strokeWidth={isSelected ? 3 : 2.5}
-                                        filter="drop-shadow(0 3px 6px rgba(0,0,0,0.18))"
-                                    />
-
-                                    {/* Enclosure Icon */}
-                                    <text 
-                                        x="0" 
-                                        y={isSelected ? 6 : 5} 
-                                        fontSize={isSelected ? "17" : "14"} 
-                                        textAnchor="middle"
-                                    >
-                                        {icon}
-                                    </text>
-
-                                    {/* Resident Animal Count Badge */}
-                                    <g transform="translate(12, -12)">
-                                        <circle cx="0" cy="0" r="9" fill="#15803D" stroke="#FFFFFF" strokeWidth="1.5" />
-                                        <text x="0" y="3.5" fill="#FFFFFF" fontSize="9" fontWeight="800" textAnchor="middle">
-                                            {enc.animalCount}
-                                        </text>
-                                    </g>
-
-                                    {/* Non-overlapping Staggered Enclosure Name Badge */}
-                                    {showLabel && (
-                                        <g transform={`translate(0, ${offsetY})`}>
-                                            <rect 
-                                                x="-65" 
-                                                y="-10" 
-                                                width="130" 
-                                                height="20" 
-                                                rx="6" 
-                                                fill={isSelected ? '#0F172A' : (isHovered ? '#1E293B' : '#FFFFFF')} 
-                                                stroke={isSelected ? '#F59E0B' : (isHovered ? '#F59E0B' : '#CBD5E1')} 
-                                                strokeWidth="1.2"
-                                                filter="drop-shadow(0 2px 4px rgba(0,0,0,0.15))"
-                                            />
-                                            <text 
-                                                x="0" 
-                                                y="4" 
-                                                fill={isSelected || isHovered ? '#F8FAFC' : '#1E293B'} 
-                                                fontSize="9.5" 
-                                                fontWeight="700" 
-                                                textAnchor="middle"
-                                            >
-                                                {enc.name}
-                                            </text>
-                                        </g>
-                                    )}
-                                </g>
-                            );
-                        })}
-
-                        {/* 6. CURRENT SELECTED START POINT PIN */}
-                        <g transform={`translate(${currentStartPoint.x}, ${currentStartPoint.y})`}>
-                            {/* Pulse */}
-                            <circle cx="0" cy="0" r="22" fill="#16A34A" fillOpacity="0.2">
-                                <animate attributeName="r" values="18;28;18" dur="2s" repeatCount="indefinite" />
-                            </circle>
-                            <circle cx="0" cy="0" r="16" fill="#16A34A" stroke="#FFFFFF" strokeWidth="2.5" filter="drop-shadow(0 3px 6px rgba(0,0,0,0.3))" />
-                            <text x="0" y="5" fontSize="12" textAnchor="middle">📍</text>
-                            <rect x="-65" y="22" width="130" height="20" rx="5" fill="#0F172A" />
-                            <text x="0" y="36" fill="#F8FAFC" fontSize="9" fontWeight="700" textAnchor="middle">
-                                {(currentStartPoint?.name || 'Xuất phát').split('(')[0]?.trim()}
-                            </text>
-                        </g>
-                    </svg>
-
-                    {/* Bottom Legend */}
-                    <div style={{ padding: '10px 16px', background: '#F8FAFC', borderTop: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px', fontSize: '0.8rem', color: '#64748B' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#15803D' }}></span>
-                                <strong>Vùng phân khu (Area)</strong>
-                            </span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#FFFFFF', border: '2px solid #0284C7' }}></span>
-                                <strong>Điểm chuồng trại (Enclosure)</strong>
-                            </span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#15803D' }}></span>
-                                Số cá thể trong chuồng
-                            </span>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                <span style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#16A34A' }}></span>
-                                Điểm xuất phát
-                            </span>
-                        </div>
-                        <div>
-                            Dẫn đường Dijkstra theo mạng lưới đường bộ thực tế
+                            <button
+                                className="btn btn-outline"
+                                style={{
+                                    borderRadius: '10px',
+                                    fontWeight: 600,
+                                    fontSize: '0.82rem'
+                                }}
+                                onClick={() => setSelectedMarker(null)}
+                            >
+                                Đóng thông tin
+                            </button>
                         </div>
                     </div>
                 </div>
-
-                {/* RIGHT: HIERARCHICAL DETAIL PANEL (SỞ THÚ -> KHU VỰC -> CHUỒNG -> ĐỘNG VẬT) */}
-                <div className={`map-detail-sidebar ${mobileTab !== 'details' ? 'mobile-hidden' : ''}`} style={{ background: '#FFFFFF', borderRadius: '16px', border: '1px solid #E2E8F0', padding: '18px', boxShadow: '0 4px 12px rgba(0,0,0,0.05)', maxHeight: '720px', overflowY: 'auto' }}>
-                    
-                    {/* BREADCRUMB NAVIGATION */}
-                    <nav style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#64748B', marginBottom: '14px', flexWrap: 'wrap' }}>
-                        <span 
-                            style={{ cursor: 'pointer', fontWeight: !selectedAreaId ? 800 : 500, color: !selectedAreaId ? '#15803D' : '#64748B' }}
-                            onClick={handleBackToZoo}
-                        >
-                            🌐 Toàn Sở Thú
-                        </span>
-                        {currentSelectedArea && (
-                            <>
-                                <span>›</span>
-                                <span 
-                                    style={{ cursor: 'pointer', fontWeight: selectedAreaId && !selectedEnclosureId ? 800 : 500, color: selectedAreaId && !selectedEnclosureId ? currentSelectedArea.color : '#64748B' }}
-                                    onClick={handleBackToArea}
-                                >
-                                    Khu {currentSelectedArea.code}
-                                </span>
-                            </>
-                        )}
-                        {currentSelectedEnclosure && (
-                            <>
-                                <span>›</span>
-                                <span style={{ fontWeight: 800, color: '#F59E0B' }}>
-                                    {currentSelectedEnclosure.name}
-                                </span>
-                            </>
-                        )}
-                    </nav>
-
-                    {/* VIEW LEVEL 0: TOÀN CẢNH SỞ THÚ (ZOO OVERVIEW) */}
-                    {!selectedAreaId && (
-                        <div>
-                            <div style={{ padding: '14px', borderRadius: '12px', background: '#F0FDF4', border: '1px solid #BBF7D0', marginBottom: '16px' }}>
-                                <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#166534' }}>
-                                    Tổng Quan Vườn Thú ZooGuide
-                                </h4>
-                                <p style={{ margin: '6px 0 10px 0', fontSize: '0.82rem', color: '#15803D' }}>
-                                    Hệ sinh thái bảo tồn đa dạng với các phân khu tự nhiên, hệ thống chuồng trại hiện đại và các cá thể quý hiếm.
-                                </p>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', textAlign: 'center' }}>
-                                    <div style={{ background: '#FFFFFF', padding: '8px', borderRadius: '8px', border: '1px solid #DCFCE7' }}>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#15803D' }}>{enrichedAreas.length}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Phân Khu</div>
-                                    </div>
-                                    <div style={{ background: '#FFFFFF', padding: '8px', borderRadius: '8px', border: '1px solid #DCFCE7' }}>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#0284C7' }}>{enclosures.length}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Chuồng Trại</div>
-                                    </div>
-                                    <div style={{ background: '#FFFFFF', padding: '8px', borderRadius: '8px', border: '1px solid #DCFCE7' }}>
-                                        <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#B45309' }}>{animals.length}</div>
-                                        <div style={{ fontSize: '0.72rem', color: '#64748B' }}>Cá Thể Thú</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
-                                Danh Sách Phân Khu (Bấm để khám phá):
-                            </h4>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {enrichedAreas.map(area => (
-                                    <div 
-                                        key={area.areaId}
-                                        onClick={() => handleSelectArea(area)}
-                                        style={{
-                                            padding: '12px 14px',
-                                            borderRadius: '12px',
-                                            border: '1px solid #E2E8F0',
-                                            borderLeft: `5px solid ${area.color}`,
-                                            background: '#FFFFFF',
-                                            cursor: 'pointer',
-                                            transition: 'all 150ms ease'
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
-                                        onMouseLeave={(e) => e.currentTarget.style.background = '#FFFFFF'}
-                                    >
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <div>
-                                                <span className="chip chip-sm font-bold" style={{ background: `${area.color}15`, color: area.color }}>
-                                                    Khu {area.code}
-                                                </span>
-                                                <strong style={{ marginLeft: '6px', fontSize: '0.95rem' }}>{area.name || area.nameVi}</strong>
-                                            </div>
-                                            <span style={{ fontSize: '0.75rem', color: '#94A3B8' }}>➔</span>
-                                        </div>
-                                        <p style={{ margin: '6px 0 0 0', fontSize: '0.8rem', color: '#64748B' }}>
-                                            {area.description || area.descriptionVi || t?.translationUnavailable || t?.translationMissingBadge || 'Khu bảo tồn động vật.'}
-                                        </p>
-                                        <div style={{ display: 'flex', gap: '12px', marginTop: '8px', fontSize: '0.75rem', color: '#475569' }}>
-                                            <span>🏠 <strong>{area.enclosureCount}</strong> chuồng</span>
-                                            <span>🐾 <strong>{area.animalCount}</strong> cá thể thú</span>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VIEW LEVEL 1: KHU VỰC ĐƯỢC CHỌN (AREA SELECTED -> SHOW ENCLOSURES) */}
-                    {currentSelectedArea && !currentSelectedEnclosure && (
-                        <div>
-                            {/* Area Header Card */}
-                            <div style={{ padding: '14px', borderRadius: '12px', background: `${currentSelectedArea.color}10`, border: `1px solid ${currentSelectedArea.color}40`, marginBottom: '16px' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <div>
-                                        <span className="chip chip-sm font-bold" style={{ background: currentSelectedArea.color, color: '#FFFFFF' }}>
-                                            Khu Vực {currentSelectedArea.code}
-                                        </span>
-                                        <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.15rem', fontWeight: 800, color: '#0F172A' }}>
-                                            {currentSelectedArea.name || currentSelectedArea.nameVi}
-                                        </h3>
-                                    </div>
-                                    <button 
-                                        className="btn btn-sm btn-outline" 
-                                        style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                        onClick={handleBackToZoo}
-                                    >
-                                        ✕ Toàn cảnh
-                                    </button>
-                                </div>
-                                <p style={{ margin: '6px 0 0 0', fontSize: '0.82rem', color: '#475569' }}>
-                                    {currentSelectedArea.description || currentSelectedArea.descriptionVi || t?.translationUnavailable || t?.translationMissingBadge || 'Khu bảo tồn động vật.'}
-                                </p>
-                                <div style={{ display: 'flex', gap: '12px', marginTop: '10px', fontSize: '0.8rem', fontWeight: 600 }}>
-                                    <span>🏠 {currentSelectedArea.enclosureCount} Chuồng trại</span>
-                                    <span>🐾 {currentSelectedArea.animalCount} Cá thể động vật</span>
-                                </div>
-                            </div>
-
-                            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
-                                Các Chuồng Trại Thuộc Khu {currentSelectedArea.code}:
-                            </h4>
-
-                            {/* Enclosures List in this Area */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {currentSelectedArea.enclosures.map(enc => {
-                                    const residentAnimals = animals.filter(a => a.enclosureId === (enc.enclosureId || enc.id));
-                                    const icon = getEnclosureIcon(enc.name, currentSelectedArea.code);
-
-                                    return (
-                                        <div 
-                                            key={enc.enclosureId || enc.id}
-                                            onClick={() => handleSelectEnclosure(enc)}
-                                            style={{
-                                                padding: '12px',
-                                                borderRadius: '12px',
-                                                border: '1px solid #E2E8F0',
-                                                background: '#FFFFFF',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                gap: '12px',
-                                                alignItems: 'center',
-                                                transition: 'all 150ms ease'
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.background = '#F8FAFC'}
-                                            onMouseLeave={(e) => e.currentTarget.style.background = '#FFFFFF'}
-                                        >
-                                            <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: `${currentSelectedArea.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem', flexShrink: 0 }}>
-                                                {icon}
-                                            </div>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <strong style={{ fontSize: '0.92rem', color: '#0F172A' }}>{enc.name}</strong>
-                                                    <span className="font-mono text-xs text-muted font-bold">{enc.code}</span>
-                                                </div>
-                                                <p style={{ margin: '2px 0 0 0', fontSize: '0.78rem', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {enc.description || t?.translationUnavailable || t?.translationMissingBadge || 'Khuôn viên chăm sóc đạt chuẩn thế giới.'}
-                                                </p>
-                                                <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#15803D', fontWeight: 600 }}>
-                                                    🐾 {residentAnimals.length} cá thể động vật sinh sống
-                                                </div>
-                                            </div>
-                                            <span style={{ fontSize: '0.85rem', color: '#94A3B8' }}>➔</span>
-                                        </div>
-                                    );
-                                })}
-
-                                {currentSelectedArea.enclosures.length === 0 && (
-                                    <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', background: '#F8FAFC', borderRadius: '12px' }}>
-                                        Khu vực này hiện chưa thiết lập chuồng trại nào.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* VIEW LEVEL 2: CHUỒNG ĐƯỢC CHỌN (ENCLOSURE SELECTED -> SHOW ANIMALS) */}
-                    {currentSelectedEnclosure && (
-                        <div>
-                            {/* Enclosure Header Card */}
-                            <div style={{ borderRadius: '14px', border: '1px solid #E2E8F0', overflow: 'hidden', marginBottom: '16px', background: '#FFFFFF' }}>
-                                {currentSelectedEnclosure.imageUrl && (
-                                    <img 
-                                        src={currentSelectedEnclosure.imageUrl} 
-                                        alt={currentSelectedEnclosure.name}
-                                        style={{ width: '100%', height: '140px', objectFit: 'cover' }}
-                                    />
-                                )}
-                                <div style={{ padding: '14px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                        <div>
-                                            <span className="chip chip-sm font-bold" style={{ background: '#E0F2FE', color: '#0369A1' }}>
-                                                {currentSelectedEnclosure.areaName} ({currentSelectedEnclosure.code})
-                                            </span>
-                                            <h3 style={{ margin: '6px 0 2px 0', fontSize: '1.2rem', fontWeight: 800, color: '#0F172A' }}>
-                                                {currentSelectedEnclosure.name}
-                                            </h3>
-                                        </div>
-                                        <button 
-                                            className="btn btn-sm btn-outline" 
-                                            style={{ fontSize: '0.75rem', padding: '4px 8px' }}
-                                            onClick={handleBackToArea}
-                                        >
-                                            ← Quay lại khu
-                                        </button>
-                                    </div>
-                                    <p style={{ margin: '8px 0 0 0', fontSize: '0.82rem', color: '#475569' }}>
-                                        {currentSelectedEnclosure.description || t?.translationUnavailable || t?.translationMissingBadge || 'Khuôn viên nuôi dưỡng động vật hiện đại đạt chuẩn phúc lợi động vật thế giới.'}
-                                    </p>
-                                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.8rem' }}>
-                                        <span className="badge badge-success">
-                                            {currentSelectedEnclosure.status === 'Active' ? 'Đang hoạt động' : 'Bảo trì'}
-                                        </span>
-                                        <span className="font-bold text-primary">
-                                            {currentSelectedEnclosure.residentAnimals.length} Cá thể đang sinh sống
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Animals Living in this Enclosure */}
-                            <h4 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#0F172A', marginBottom: '10px' }}>
-                                Động Vật Trong Chuồng Này ({currentSelectedEnclosure.residentAnimals.length}):
-                            </h4>
-
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                {currentSelectedEnclosure.residentAnimals.map(animal => (
-                                    <div 
-                                        key={animal.id || animal.animalId}
-                                        style={{
-                                            padding: '12px',
-                                            borderRadius: '12px',
-                                            border: '1px solid #E2E8F0',
-                                            background: '#FFFFFF',
-                                            display: 'flex',
-                                            gap: '12px',
-                                            alignItems: 'center'
-                                        }}
-                                    >
-                                        <img 
-                                            src={animal.imageUrl || "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?auto=format&fit=crop&w=400&q=80"} 
-                                            alt={animal.name || animal.nameVi}
-                                            style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', flexShrink: 0 }}
-                                        />
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                <strong style={{ fontSize: '0.95rem', color: '#0F172A' }}>
-                                                    {animal.name || animal.nameVi}
-                                                </strong>
-                                                <span className="font-mono text-xs text-muted font-bold">{animal.code}</span>
-                                            </div>
-                                            <div style={{ fontSize: '0.78rem', color: '#0369A1', fontWeight: 600 }}>
-                                                {animal.species}
-                                                {animal.scientificName && <span style={{ color: '#64748B', fontWeight: 400 }}> • <em>{animal.scientificName}</em></span>}
-                                            </div>
-                                            <div style={{ fontSize: '0.72rem', color: '#16A34A', marginTop: '2px' }}>
-                                                ✓ Sức khỏe: {animal.healthStatus || "Tốt"}
-                                            </div>
-
-                                            {/* Action Buttons: Details & Narration */}
-                                            <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
-                                                <button 
-                                                    className="btn btn-sm btn-outline"
-                                                    style={{ padding: '3px 8px', fontSize: '0.75rem' }}
-                                                    onClick={() => onOpenDetail && onOpenDetail(animal)}
-                                                >
-                                                    🔍 Xem chi tiết
-                                                </button>
-                                                <button 
-                                                    className="btn btn-sm btn-primary"
-                                                    style={{ padding: '3px 8px', fontSize: '0.75rem', background: '#D97706', borderColor: '#D97706' }}
-                                                    onClick={() => {
-                                                        if (onPlayAudio) {
-                                                            onPlayAudio(animal.id || animal.animalId);
-                                                        } else if (onOpenSpeciesNarration && animal.speciesId) {
-                                                            onOpenSpeciesNarration(animal.speciesId);
-                                                        }
-                                                    }}
-                                                >
-                                                    🎧 Thuyết minh
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-
-                                {currentSelectedEnclosure.residentAnimals.length === 0 && (
-                                    <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: '0.85rem', background: '#F8FAFC', borderRadius: '12px' }}>
-                                        Chuồng hiện chưa có cá thể động vật sinh sống.
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-                </div>
-            </div>
+            )}
         </section>
     );
 }

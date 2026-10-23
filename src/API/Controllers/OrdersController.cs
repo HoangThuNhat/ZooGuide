@@ -1,0 +1,77 @@
+using Microsoft.AspNetCore.Mvc;
+using ZooGuide.Application.DTOs.Common;
+using ZooGuide.Application.DTOs.Order;
+using ZooGuide.Application.Interfaces;
+using ZooGuide.Domain.Enums;
+
+namespace ZooGuide.API.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class OrdersController : ControllerBase
+{
+    private readonly IOrderService _orderService;
+
+    public OrdersController(IOrderService orderService)
+    {
+        _orderService = orderService;
+    }
+
+    /// <summary>
+    /// Khởi tạo đơn hàng mua vé trực tuyến và tạo mã thanh toán VietQR
+    /// </summary>
+    [HttpPost("checkout")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Checkout([FromBody] CreateOrderRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ApiResponse<object>.Fail("Dữ liệu đơn hàng không hợp lệ. Vui lòng kiểm tra lại thông tin."));
+        }
+
+        try
+        {
+            var order = await _orderService.CreateOrderAsync(request);
+            return Ok(ApiResponse<OrderDto>.Ok(order, "Đã khởi tạo đơn hàng và mã thanh toán QR thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<object>.Fail($"Lỗi tạo đơn hàng: {ex.Message}"));
+        }
+    }
+
+    /// <summary>
+    /// Tra cứu chi tiết và trạng thái xác thực thanh toán thời gian thực theo mã đơn hàng
+    /// </summary>
+    [HttpGet("{orderCode}")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> GetByOrderCode(string orderCode)
+    {
+        var order = await _orderService.GetByOrderCodeAsync(orderCode);
+        if (order == null)
+        {
+            return NotFound(ApiResponse<object>.Fail($"Không tìm thấy đơn hàng với mã '{orderCode}'."));
+        }
+
+        return Ok(ApiResponse<OrderDto>.Ok(order));
+    }
+
+    /// <summary>
+    /// Danh sách tất cả đơn hàng (Dành cho trang Quản trị Admin / Đối soát tài chính)
+    /// </summary>
+    [HttpGet]
+    [ProducesResponseType(typeof(ApiResponse<IEnumerable<OrderDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? search = null,
+        [FromQuery] PaymentStatus? status = null)
+    {
+        var orders = await _orderService.GetAllOrdersAsync(search, status);
+        return Ok(ApiResponse<IEnumerable<OrderDto>>.Ok(orders));
+    }
+}

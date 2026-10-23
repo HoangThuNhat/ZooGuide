@@ -4,6 +4,7 @@ using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.DTOs.Ticket;
 using ZooGuide.Application.Interfaces;
+using ZooGuide.Domain.Enums;
 
 namespace ZooGuide.API.Controllers;
 
@@ -26,7 +27,7 @@ public class TicketsController : ControllerBase
     public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll(
         [FromQuery] string? search = null,
         [FromQuery] int? ticketTypeId = null,
-        [FromQuery] ZooGuide.Domain.Enums.TicketStatus? status = null)
+        [FromQuery] TicketStatus? status = null)
     {
         var tickets = await _ticketService.GetAllAsync(search, ticketTypeId, status);
         return Ok(tickets);
@@ -42,24 +43,21 @@ public class TicketsController : ControllerBase
         return Ok(ticket);
     }
 
+    /// <summary>
+    /// Vô hiệu hóa phát hành vé thủ công (Nghiệp vụ 5.1).
+    /// Vé tham quan chỉ được phát hành tự động sau khi thanh toán QR thành công.
+    /// </summary>
     [HttpPost]
-    public async Task<ActionResult<TicketDto>> Create([FromBody] TicketCreateRequest request)
+    public IActionResult CreateDisabled()
     {
-        try
-        {
-            var created = await _ticketService.CreateAsync(request);
-            return CreatedAtAction(nameof(GetById), new { id = created.TicketId }, created);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return Conflict(new { message = ex.Message });
-        }
+        return StatusCode(StatusCodes.Status405MethodNotAllowed, ApiResponse<object>.Fail(
+            "Chức năng phát hành vé thủ công đã bị vô hiệu hóa hoàn toàn theo quy định nghiệp vụ mới. " +
+            "Vé tham quan chỉ được hệ thống tự động cấp phát sau khi backend xác thực giao dịch thanh toán QR thành công."));
     }
 
+    /// <summary>
+    /// Cập nhật thông tin vé đã tồn tại (hạn dùng, loại vé)
+    /// </summary>
     [HttpPut("{id:int}")]
     public async Task<ActionResult<TicketDto>> Update(int id, [FromBody] TicketUpdateRequest request)
     {
@@ -81,6 +79,29 @@ public class TicketsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Admin cập nhật trạng thái quản lý / sử dụng của vé (Valid, Used, Expired, Cancelled, Locked) (Nghiệp vụ 5.2 & 5.3)
+    /// </summary>
+    [HttpPatch("{id:int}/status")]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] TicketStatus status)
+    {
+        try
+        {
+            var updated = await _ticketService.UpdateStatusAsync(id, status);
+            if (updated == null)
+                return NotFound(ApiResponse<object>.Fail("Không tìm thấy vé cần cập nhật trạng thái."));
+
+            return Ok(ApiResponse<TicketDto>.Ok(updated, $"Đã cập nhật trạng thái vé sang: {status}"));
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+    }
+
+    /// <summary>
+    /// Xóa hoặc thu hồi vé khi chưa được sử dụng
+    /// </summary>
     [HttpDelete("{id:int}")]
     public async Task<ActionResult> Delete(int id)
     {

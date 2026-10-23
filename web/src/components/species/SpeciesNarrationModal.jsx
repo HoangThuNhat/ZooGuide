@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
@@ -131,7 +131,7 @@ export default function SpeciesNarrationModal({
             return;
         }
         if (onPlayAudio) {
-            onPlayAudio(species.id, true, selectedLang);
+            onPlayAudio(species.id, true, narration?.languageCode || selectedLang);
         }
     };
 
@@ -193,7 +193,7 @@ export default function SpeciesNarrationModal({
                         {spDisplay.description}
                         {spDisplay.referenceSource && (
                             <div style={{ marginTop: '6px', fontSize: '0.74rem', color: '#64748B' }}>
-                                📚 <strong>{t?.animalReferenceLabel || 'Nguồn tham khảo'}:</strong> {spDisplay.referenceSource}
+                                <strong>{t?.animalReferenceLabel || 'Nguồn tham khảo'}:</strong> {spDisplay.referenceSource}
                             </div>
                         )}
                     </div>
@@ -201,7 +201,7 @@ export default function SpeciesNarrationModal({
                     {constituentAnimals.length > 0 && (
                         <div style={{ marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                             <span style={{ fontSize: '0.8rem', fontWeight: '700', color: '#475569' }}>
-                                🐾 {t?.individualsCount || 'Cá thể'}:
+                                {t?.individualsCount || 'Cá thể'}:
                             </span>
                             {constituentAnimals.map(a => (
                                 <span
@@ -225,7 +225,7 @@ export default function SpeciesNarrationModal({
                     <div style={{ borderTop: '1px solid #E2E8F0', paddingTop: '12px', marginBottom: '14px' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '4px' }}>
                             <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#1E293B' }}>
-                                🌐 {t?.languageLabel || 'Ngôn ngữ thuyết minh'} ({supportedLanguages.length}):
+                                {t?.languageLabel || 'Ngôn ngữ thuyết minh'} ({supportedLanguages.length}):
                             </label>
                         </div>
 
@@ -254,7 +254,12 @@ export default function SpeciesNarrationModal({
                         </div>
                     ) : !hasActiveSession ? (
                         <div style={{ textAlign: 'center', padding: '24px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>
-                            <div style={{ fontSize: '2rem', marginBottom: '8px' }}>🔒</div>
+                            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '8px', color: '#64748B' }}>
+         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+         </svg>
+     </div>
                             <h4 style={{ fontSize: '1rem', fontWeight: '700', color: '#0F172A', margin: '0 0 6px 0' }}>
                                 {t?.ticketLockedTitle || 'Tính Năng Thuyết Minh Yêu Cầu Vé Tham Quan'}
                             </h4>
@@ -269,7 +274,7 @@ export default function SpeciesNarrationModal({
                                     setIsTicketModalOpen(true);
                                 }}
                             >
-                                🎟️ {t?.heroScanBtn || 'Kích hoạt vé tham quan'}
+                                {t?.heroScanBtn || 'Kích hoạt vé tham quan'}
                             </button>
                         </div>
                     ) : narration ? (
@@ -280,7 +285,7 @@ export default function SpeciesNarrationModal({
                                         {narration.title}
                                     </h4>
                                     <span style={{ fontSize: '0.78rem', color: '#15803D', fontWeight: '600', backgroundColor: '#DCFCE7', padding: '2px 8px', borderRadius: '10px', whiteSpace: 'nowrap' }}>
-                                        ⏱ {narration.durationFormatted || '--:--'}
+                                        {narration.durationFormatted || '--:--'}
                                     </span>
                                 </div>
                                 <p style={{ margin: 0, fontSize: '0.78rem', color: '#15803D' }}>
@@ -299,7 +304,13 @@ export default function SpeciesNarrationModal({
 
                             {narration.referenceSource && (
                                 <div style={{ fontSize: '0.75rem', color: '#166534', marginBottom: '12px', opacity: 0.9 }}>
-                                    📚 {narration.referenceSource}
+                                    {narration.referenceSource}
+                                </div>
+                            )}
+
+                            {narration.isFallbackLanguage && (
+                                <div style={{ padding: '8px 12px', backgroundColor: '#EFF6FF', color: '#1E40AF', borderRadius: '8px', fontSize: '0.8rem', marginBottom: '12px', border: '1px solid #BFDBFE' }}>
+                                    {narration.fallbackMessage || ('Chưa có file âm thanh tiếng ' + selectedLang.toUpperCase() + '. Hệ thống chuyển sang phát âm thanh ' + (narration.languageName || narration.languageCode.toUpperCase()) + '.')}
                                 </div>
                             )}
 
@@ -325,13 +336,13 @@ export default function SpeciesNarrationModal({
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                                                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                                 </svg>
-                                                <span>▶ {t?.playNarrationBtn || 'Phát Thuyết Minh'} ({activeLangObj?.nativeName || selectedLang.toUpperCase()})</span>
+                                                <span>{t?.playNarrationBtn || 'Phát Thuyết Minh'} ({narration.isFallbackLanguage ? (narration.languageName || narration.languageCode?.toUpperCase()) : (activeLangObj?.nativeName || selectedLang.toUpperCase())})</span>
                                             </>
                                         )}
                                     </button>
                                 ) : (
                                     <div style={{ flex: 1, padding: '10px 14px', backgroundColor: '#FEF3C7', color: '#92400E', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600 }}>
-                                        ⚠️ {t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.'}
+                                        {t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.'}
                                     </div>
                                 )}
 
@@ -345,7 +356,7 @@ export default function SpeciesNarrationModal({
                                             onNavigateMap(constituentAnimals[0] || spDisplay);
                                         }}
                                     >
-                                        🗺 {t?.viewOnMap || 'Bản đồ'}
+                                        {t?.viewOnMap || 'Bản đồ'}
                                     </button>
                                 )}
                             </div>
@@ -353,7 +364,7 @@ export default function SpeciesNarrationModal({
                             {narration.transcript && narration.transcript.length > 0 && (
                                 <div>
                                     <h5 style={{ fontSize: '0.8rem', fontWeight: '700', color: '#166534', margin: '0 0 8px 0', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                                        📜 {t?.transcriptBtn || 'Lời thoại thuyết minh'}:
+                                        {t?.transcriptBtn || 'Lời thoại thuyết minh'}:
                                     </h5>
                                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
                                         {narration.transcript.map((line, idx) => (
@@ -382,7 +393,7 @@ export default function SpeciesNarrationModal({
                         </div>
                     ) : (
                         <div style={{ textAlign: 'center', padding: '20px 16px', backgroundColor: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '12px', color: '#92400E' }}>
-                            <div style={{ fontSize: '1.5rem', marginBottom: '6px' }}>🌐</div>
+                            
                             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95rem', fontWeight: 700 }}>
                                 {t?.narrationMissingTitle || 'Chưa có bản dịch / thuyết minh cho ngôn ngữ này'}
                             </h4>

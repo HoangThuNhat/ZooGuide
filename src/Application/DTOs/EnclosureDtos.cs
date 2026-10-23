@@ -23,6 +23,8 @@ public class EnclosureResponse
     public string Status { get; set; } = "Active";
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
     public int AnimalCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
@@ -64,6 +66,8 @@ public class CreateEnclosureRequest
 
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
 }
 
 /// <summary>
@@ -93,6 +97,8 @@ public class UpdateEnclosureRequest
 
     public decimal? MapX { get; set; }
     public decimal? MapY { get; set; }
+    public decimal? Latitude { get; set; }
+    public decimal? Longitude { get; set; }
 }
 
 /// <summary>

@@ -24,6 +24,9 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
         builder.Property(t => t.TicketTypeId)
             .IsRequired();
 
+        builder.Property(t => t.OrderId)
+            .IsRequired(false);
+
         builder.Property(t => t.IssuedAt)
             .IsRequired()
             .HasDefaultValueSql("now()");
@@ -55,6 +58,11 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .HasForeignKey(t => t.TicketTypeId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        builder.HasOne(t => t.Order)
+            .WithMany(o => o.Tickets)
+            .HasForeignKey(t => t.OrderId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         builder.HasMany(t => t.TicketSessions)
             .WithOne(ts => ts.Ticket)
             .HasForeignKey(ts => ts.TicketId)
@@ -65,8 +73,9 @@ public class TicketConfiguration : IEntityTypeConfiguration<Ticket>
             .HasForeignKey(vh => vh.TicketId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        // Index on TicketTypeId and Status
+        // Indexes
         builder.HasIndex(t => t.TicketTypeId).HasDatabaseName("IX_Tickets_TicketTypeId");
+        builder.HasIndex(t => t.OrderId).HasDatabaseName("IX_Tickets_OrderId");
         builder.HasIndex(t => t.Status).HasDatabaseName("IX_Tickets_Status");
     }
 }

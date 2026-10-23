@@ -25,6 +25,9 @@ public class NarrationResponseDto
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }
     public List<AudioResponseDto> Audios { get; set; } = new();
+    public bool IsFallbackLanguage { get; set; } = false;
+    public string? OriginalRequestedLanguage { get; set; }
+    public string? FallbackMessage { get; set; }
 }
 
 public class AudioResponseDto

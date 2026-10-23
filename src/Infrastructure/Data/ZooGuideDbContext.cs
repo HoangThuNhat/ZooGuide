@@ -5,7 +5,7 @@ namespace ZooGuide.Infrastructure.Data;
 
 /// <summary>
 /// ZooGuideDbContext: Central DbContext serving as the Single Source of Truth for ZooGuide.
-/// Covers Core Domain (Users, Tickets, Sessions, Animals, Narrations, Audios)
+/// Covers Core Domain (Users, Tickets, TicketOrders, Sessions, Animals, Narrations, Audios)
 /// and Extended Systems (Locations, Loyalty, Chatbot).
 /// </summary>
 public class ZooGuideDbContext : DbContext
@@ -17,6 +17,7 @@ public class ZooGuideDbContext : DbContext
     // Core Domain Sets
     public virtual DbSet<User> Users => Set<User>();
     public virtual DbSet<TicketType> TicketTypes => Set<TicketType>();
+    public virtual DbSet<TicketOrder> TicketOrders => Set<TicketOrder>();
     public virtual DbSet<Ticket> Tickets => Set<Ticket>();
     public virtual DbSet<TicketSession> TicketSessions => Set<TicketSession>();
     public virtual DbSet<Species> Species => Set<Species>();
