@@ -10,4 +10,5 @@ public interface IOrderService
     Task<IEnumerable<OrderDto>> GetAllOrdersAsync(string? search = null, PaymentStatus? status = null);
     Task<bool> ProcessPaymentWebhookAsync(PaymentWebhookPayload payload, string? signature = null);
     Task<OrderDto> SimulateSandboxPaymentAsync(SimulatePaymentRequest request);
+    Task<OrderDto> ResendTicketEmailAsync(string orderCode, string? recipientEmail = null);
 }

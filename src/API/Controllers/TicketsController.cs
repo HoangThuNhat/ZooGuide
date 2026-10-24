@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.DTOs.Ticket;
 using ZooGuide.Application.Interfaces;
 using ZooGuide.Domain.Enums;
+using ZooGuide.Infrastructure.Data;
 
 namespace ZooGuide.API.Controllers;
 
@@ -44,15 +46,28 @@ public class TicketsController : ControllerBase
     }
 
     /// <summary>
-    /// Vô hiệu hóa phát hành vé thủ công (Nghiệp vụ 5.1).
-    /// Vé tham quan chỉ được phát hành tự động sau khi thanh toán QR thành công.
+    /// Admin phát hành vé trực tiếp / vé sự kiện tại quầy
     /// </summary>
     [HttpPost]
-    public IActionResult CreateDisabled()
+    public async Task<ActionResult<ApiResponse<TicketDto>>> Create([FromBody] TicketCreateRequest request)
     {
-        return StatusCode(StatusCodes.Status405MethodNotAllowed, ApiResponse<object>.Fail(
-            "Chức năng phát hành vé thủ công đã bị vô hiệu hóa hoàn toàn theo quy định nghiệp vụ mới. " +
-            "Vé tham quan chỉ được hệ thống tự động cấp phát sau khi backend xác thực giao dịch thanh toán QR thành công."));
+        try
+        {
+            var created = await _ticketService.CreateAsync(request);
+            return CreatedAtAction(nameof(GetById), new { id = created.TicketId }, ApiResponse<TicketDto>.Ok(created, "Phát hành vé tham quan thành công."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.Fail($"Lỗi hệ thống khi phát hành vé: {ex.Message}"));
+        }
     }
 
     /// <summary>
@@ -166,7 +181,7 @@ public class TicketsController : ControllerBase
     }
 
     /// <summary>
-    /// Đóng/thu hồi phiên tham quan cưỡng bức theo SessionId (Dành cho Quản trị viên)
+    /// Đóng/thu hồi phiên tham quan theo SessionId (Dành cho Quản trị viên và Khách tham quan)
     /// </summary>
     [HttpPost("sessions/{sessionId:guid}/revoke")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
@@ -179,6 +194,58 @@ public class TicketsController : ControllerBase
             return NotFound(ApiResponse<object>.Fail($"Không tìm thấy phiên tham quan với SessionId = {sessionId}."));
         }
 
-        return Ok(ApiResponse<object>.Ok(new { sessionId }, "Đã đóng phiên tham quan của thiết bị thành công."));
+        return Ok(ApiResponse<object>.Ok(new { sessionId }, "Đã kết thúc phiên tham quan thành công."));
+    }
+
+    /// <summary>
+    /// Khách tham quan thoát phiên tham quan từ thiết bị (Nút Thoát vé bên trong thẻ điện tử)
+    /// </summary>
+    [HttpPost("sessions/exit")]
+    public async Task<IActionResult> ExitSession([FromBody] ExitSessionRequest? request)
+    {
+        Guid targetSessionId = Guid.Empty;
+        if (request != null && !string.IsNullOrWhiteSpace(request.SessionId) && Guid.TryParse(request.SessionId, out var parsed))
+        {
+            targetSessionId = parsed;
+        }
+        else if (HttpContext.Request.Headers.TryGetValue("X-Session-Id", out var headerId) && Guid.TryParse(headerId, out var parsedHeader))
+        {
+            targetSessionId = parsedHeader;
+        }
+
+        if (targetSessionId == Guid.Empty)
+        {
+            return BadRequest(ApiResponse<object>.Fail("Mã phiên tham quan (SessionId) không hợp lệ."));
+        }
+
+        bool revoked = await _ticketSessionService.RevokeSessionAsync(targetSessionId);
+        if (!revoked)
+        {
+            return NotFound(ApiResponse<object>.Fail("Phiên tham quan không tồn tại hoặc đã kết thúc trước đó."));
+        }
+
+        return Ok(ApiResponse<object>.Ok(new { sessionId = targetSessionId }, "Đã thoát phiên tham quan thành công."));
+    }
+
+    /// <summary>
+    /// Xuất ảnh mã QR dạng PNG trực tiếp từ máy chủ cho một vé tham quan
+    /// </summary>
+    [HttpGet("{ticketCode}/qr")]
+    public async Task<IActionResult> GetTicketQrImage(string ticketCode, [FromServices] ZooGuideDbContext dbContext)
+    {
+        if (string.IsNullOrWhiteSpace(ticketCode))
+            return BadRequest("Mã vé không hợp lệ.");
+
+        var trimmedCode = ticketCode.Trim().ToUpper();
+        var ticket = await dbContext.Tickets.AsNoTracking().FirstOrDefaultAsync(t => t.TicketCode.ToUpper() == trimmedCode);
+        if (ticket == null)
+            return NotFound("Không tìm thấy vé tham quan.");
+
+        using var qrGenerator = new QRCoder.QRCodeGenerator();
+        using var qrCodeData = qrGenerator.CreateQrCode(ticket.TicketCode, QRCoder.QRCodeGenerator.ECCLevel.Q);
+        using var pngQrCode = new QRCoder.PngByteQRCode(qrCodeData);
+        byte[] qrCodeBytes = pngQrCode.GetGraphic(20);
+
+        return File(qrCodeBytes, "image/png");
     }
 }

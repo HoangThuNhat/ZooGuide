@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { ZooApi } from '../../services/api';
+import * as signalR from '@microsoft/signalr';
+import { ZooApi, API_CONFIG } from '../../services/api';
 import { useApp } from '../../context/AppContext';
+import { getOrCreateInstallationId } from '../../services/deviceTracker';
 
 export default function AdminDashboardPage() {
     const { showToast } = useApp();
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
+    const [isLiveSignalR, setIsLiveSignalR] = useState(false);
 
     const [stats, setStats] = useState({
+        activeTicketBuyers: 0,
+        activeDevices: 0,
+        totalTicketBuyers: 0,
+        totalTicketsSold: 0,
+        activeBuyerConnections: 0,
+        onlineUsers: 0,
         activeDevices5Min: 0,
         totalTrackedDevices: 0,
         activeSessions: 0,
@@ -163,6 +172,105 @@ export default function AdminDashboardPage() {
 
     useEffect(() => {
         loadDashboardData(appliedFilter);
+    }, []);
+
+    // Kết nối SignalR Hub theo dõi người dùng Online thời gian thực
+    useEffect(() => {
+        let isMounted = true;
+        let hubConn = null;
+
+        const connectSignalR = async () => {
+            try {
+                const instId = getOrCreateInstallationId();
+                const hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?visitorId=${encodeURIComponent(instId)}&role=Admin`;
+
+                hubConn = new signalR.HubConnectionBuilder()
+                    .withUrl(hubUrl, {
+                        skipNegotiation: false,
+                        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+                    })
+                    .withAutomaticReconnect([0, 2000, 5000, 10000, 20000])
+                    .configureLogging(signalR.LogLevel.None)
+                    .build();
+
+                hubConn.on('ActiveBuyersUpdated', (data) => {
+                    if (isMounted && data) {
+                        setStats(prev => ({
+                            ...prev,
+                            activeTicketBuyers: Number(data.activeTicketBuyers ?? 0),
+                            activeDevices: Number(data.activeDevices ?? prev.activeDevices ?? 0),
+                            activeBuyerConnections: Number(data.activeBuyerConnections ?? 0),
+                            onlineUsers: Number(data.activeTicketBuyers ?? 0)
+                        }));
+                        setIsLiveSignalR(true);
+                    }
+                });
+
+                hubConn.on('ActiveDevicesUpdated', (data) => {
+                    if (isMounted && data) {
+                        setStats(prev => ({
+                            ...prev,
+                            activeDevices: Number(data.activeDevices ?? 0)
+                        }));
+                        setIsLiveSignalR(true);
+                    }
+                });
+
+                hubConn.on('OnlineUsersUpdated', (count) => {
+                    if (isMounted) {
+                        setStats(prev => ({
+                            ...prev,
+                            activeTicketBuyers: Number(count),
+                            onlineUsers: Number(count)
+                        }));
+                        setIsLiveSignalR(true);
+                    }
+                });
+
+                hubConn.onreconnected(() => {
+                    if (isMounted) setIsLiveSignalR(true);
+                });
+
+                hubConn.onclose(() => {
+                    if (isMounted) setIsLiveSignalR(false);
+                });
+
+                await hubConn.start();
+                if (isMounted) setIsLiveSignalR(true);
+            } catch (err) {
+                console.warn('Admin SignalR connection error, falling back to polling:', err);
+                if (isMounted) setIsLiveSignalR(false);
+            }
+        };
+
+        connectSignalR();
+
+        // Polling dự phòng mỗi 8 giây đảm bảo số liệu luôn chính xác
+        const pollInterval = setInterval(async () => {
+            if (!isMounted) return;
+            try {
+                const res = await ZooApi.getOnlineUsers();
+                if (res.success && res.data) {
+                    setStats(prev => ({
+                        ...prev,
+                        activeTicketBuyers: typeof res.data.activeTicketBuyers === 'number' ? res.data.activeTicketBuyers : prev.activeTicketBuyers,
+                        activeDevices: typeof res.data.activeDevices === 'number' ? res.data.activeDevices : prev.activeDevices,
+                        activeBuyerConnections: typeof res.data.activeBuyerConnections === 'number' ? res.data.activeBuyerConnections : prev.activeBuyerConnections,
+                        totalTicketBuyers: typeof res.data.totalTicketBuyers === 'number' ? res.data.totalTicketBuyers : prev.totalTicketBuyers,
+                        totalTicketsSold: typeof res.data.totalTicketsSold === 'number' ? res.data.totalTicketsSold : prev.totalTicketsSold,
+                        onlineUsers: typeof res.data.activeTicketBuyers === 'number' ? res.data.activeTicketBuyers : (res.data.onlineUsers ?? prev.onlineUsers)
+                    }));
+                }
+            } catch (e) {}
+        }, 8000);
+
+        return () => {
+            isMounted = false;
+            clearInterval(pollInterval);
+            if (hubConn) {
+                hubConn.stop().catch(() => {});
+            }
+        };
     }, []);
 
     const handleApplyFilter = (period = selectedPeriod) => {
@@ -387,27 +495,64 @@ export default function AdminDashboardPage() {
                 </div>
 
                 <div className="admin-metrics-grid">
-                    {/* Active Devices Heartbeat */}
+                    {/* 1. Người Mua Vé Đang Hoạt Động (Thời Gian Thực) */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #10B981' }}>
                         <div className="metric-header">
-                            <span className="metric-label">Thiết Bị Đang Hoạt Động</span>
-                            <span className="badge badge-success text-xs">5 phút qua</span>
+                            <span className="metric-label">Người Mua Vé Đang Hoạt Động</span>
+                            <span className="badge badge-success text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }}></span>
+                                {isLiveSignalR ? 'SignalR Trực Tiếp' : 'Thời gian thực'}
+                            </span>
                         </div>
-                        <div className="metric-value" style={{ color: '#059669' }}>
-                            {isLoading ? '...' : (stats.activeDevices5Min ?? 0)}
+                        <div className="metric-value" style={{ color: loadError ? '#DC2626' : '#059669' }}>
+                            {isLoading ? '...' : (loadError ? 'Lỗi' : (stats.activeTicketBuyers ?? 0))}
                         </div>
                         <div className="metric-footer">
-                            <span>Heartbeat: {stats.totalTrackedDevices || 0} thiết bị</span>
+                            <span>Khách mua vé thành công & phiên đang mở (timeout 45s)</span>
                         </div>
                     </div>
 
-                    {/* Active Sessions */}
-                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #3B82F6' }}>
+                    {/* 2. Tổng Vé Đã Bán */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #F59E0B' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Tổng Vé Đã Bán ({appliedFilter.label})</span>
+                            <span className="badge badge-warning text-xs">
+                                Đã thanh toán
+                            </span>
+                        </div>
+                        <div className="metric-value" style={{ color: '#B45309' }}>
+                            {isLoading ? '...' : (loadError ? 'Lỗi' : (stats.totalTicketsSold ?? 0))}
+                        </div>
+                        <div className="metric-footer">
+                            <span>Tổng số vé từ các đơn thanh toán thành công</span>
+                            <Link to="/admin/tickets">Quản lý vé →</Link>
+                        </div>
+                    </div>
+
+                    {/* 3. Thiết Bị / Phiên Đang Hoạt Động */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Thiết Bị / Phiên Hoạt Động</span>
+                            <span className="badge badge-primary text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8B5CF6', display: 'inline-block' }}></span>
+                                {isLiveSignalR ? 'SignalR Trực Tiếp' : 'Thời gian thực'}
+                            </span>
+                        </div>
+                        <div className="metric-value" style={{ color: '#6D28D9' }}>
+                            {isLoading ? '...' : (loadError ? 'Lỗi' : (stats.activeDevices ?? stats.activeDevices5Min ?? 0))}
+                        </div>
+                        <div className="metric-footer">
+                            <span>Phiên/thiết bị đang mở website (cả khách & người mua vé, timeout 45s)</span>
+                        </div>
+                    </div>
+
+                    {/* 5. Phiên Tham Quan Mở Khóa */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #0284C7' }}>
                         <div className="metric-header">
                             <span className="metric-label">Phiên Tham Quan Mở Khóa</span>
                             <span className="badge badge-info text-xs">Thời gian thực</span>
                         </div>
-                        <div className="metric-value" style={{ color: '#1D4ED8' }}>
+                        <div className="metric-value" style={{ color: '#0369A1' }}>
                             {isLoading ? '...' : (stats.activeSessions ?? 0)}
                         </div>
                         <div className="metric-footer">
@@ -417,8 +562,8 @@ export default function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Tickets Issued */}
-                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #F59E0B' }}>
+                    {/* 6. Vé Phát Hành */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #EAB308' }}>
                         <div className="metric-header">
                             <span className="metric-label">Vé Phát Hành ({appliedFilter.label})</span>
                             <span className="badge badge-warning text-xs">
@@ -430,12 +575,12 @@ export default function AdminDashboardPage() {
                         </div>
                         <div className="metric-footer">
                             <span>Hết hạn: {stats.expiredTickets || 0}</span>
-                            <Link to="/admin/tickets">Quản lý vé →</Link>
+                            <Link to="/admin/tickets">Chi tiết vé →</Link>
                         </div>
                     </div>
 
-                    {/* Animals & Species */}
-                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
+                    {/* 7. Động Vật & Loài */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #EC4899' }}>
                         <div className="metric-header">
                             <span className="metric-label">Động Vật & Loài</span>
                             <span className="badge badge-primary text-xs">Hiện có</span>
@@ -449,7 +594,7 @@ export default function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Total POIs */}
+                    {/* 8. Total POIs */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #059669' }}>
                         <div className="metric-header">
                             <span className="metric-label">Điểm Tham Quan (POI)</span>
@@ -466,7 +611,7 @@ export default function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Total Areas & Enclosures */}
+                    {/* 9. Total Areas & Enclosures */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #64748B' }}>
                         <div className="metric-header">
                             <span className="metric-label">Phân Khu & Chuồng Trại</span>

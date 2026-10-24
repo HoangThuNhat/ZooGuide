@@ -5,6 +5,8 @@ namespace ZooGuide.Application.DTOs;
 public class DeviceHeartbeatRequestDto
 {
     public string InstallationId { get; set; } = string.Empty;
+    public string? OrderCode { get; set; }
+    public string? BuyerEmail { get; set; }
 }
 
 public class DeviceHeartbeatResponseDto

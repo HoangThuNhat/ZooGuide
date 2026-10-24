@@ -1,7 +1,15 @@
+using System;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
+using ZooGuide.API.Hubs;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.Interfaces;
+using ZooGuide.Domain.Enums;
+using ZooGuide.Infrastructure.Data;
 
 namespace ZooGuide.API.Controllers;
 
@@ -22,7 +30,11 @@ public class DevicesController : ControllerBase
     [HttpPost("heartbeat")]
     [ProducesResponseType(typeof(ApiResponse<DeviceHeartbeatResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<DeviceHeartbeatResponseDto>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> Heartbeat([FromBody] DeviceHeartbeatRequestDto request)
+    public async Task<IActionResult> Heartbeat(
+        [FromBody] DeviceHeartbeatRequestDto request,
+        [FromServices] IOnlineUserTracker? onlineTracker = null,
+        [FromServices] ZooGuideDbContext? dbContext = null,
+        [FromServices] IHubContext<OnlineTrackerHub>? hubContext = null)
     {
         if (string.IsNullOrWhiteSpace(request.InstallationId))
         {
@@ -32,18 +44,89 @@ public class DevicesController : ControllerBase
         var userAgent = Request.Headers["User-Agent"].ToString();
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
 
+        bool isPaidBuyer = false;
+        string? verifiedEmail = null;
+
+        if (dbContext != null && (!string.IsNullOrWhiteSpace(request.OrderCode) || !string.IsNullOrWhiteSpace(request.BuyerEmail)))
+        {
+            var trimmedCode = request.OrderCode?.Trim();
+            var trimmedEmail = request.BuyerEmail?.Trim().ToLower();
+
+            var order = await dbContext.TicketOrders
+                .AsNoTracking()
+                .FirstOrDefaultAsync(o => (o.OrderCode == trimmedCode || o.CustomerEmail.ToLower() == trimmedEmail) && o.PaymentStatus == PaymentStatus.Paid);
+
+            if (order != null)
+            {
+                isPaidBuyer = true;
+                verifiedEmail = order.CustomerEmail;
+            }
+        }
+
+        if (onlineTracker != null)
+        {
+            var deviceId = request.InstallationId.Trim();
+            var buyerKey = isPaidBuyer ? (verifiedEmail ?? request.BuyerEmail ?? deviceId).ToLower().Trim() : null;
+            onlineTracker.RefreshHeartbeat(deviceId, "http-heartbeat", isPaidBuyer, buyerKey, request.OrderCode);
+        }
+
         var result = await _deviceTrackingService.RecordHeartbeatAsync(request.InstallationId, userAgent, ipAddress);
         return Ok(ApiResponse<DeviceHeartbeatResponseDto>.Ok(result));
     }
 
     /// <summary>
-    /// Thống kê số lượng thiết bị đang hoạt động thực tế (5 phút gần nhất)
+    /// Tiếp nhận thông báo ngắt kết nối (Navigator.sendBeacon khi đóng tab/trình duyệt)
+    /// </summary>
+    [HttpPost("disconnect")]
+    public async Task<IActionResult> Disconnect(
+        [FromBody] DeviceHeartbeatRequestDto request,
+        [FromServices] IOnlineUserTracker onlineTracker,
+        [FromServices] IHubContext<OnlineTrackerHub> hubContext)
+    {
+        if (!string.IsNullOrWhiteSpace(request?.InstallationId))
+        {
+            var deviceId = request.InstallationId.Trim();
+            var deviceWentOffline = onlineTracker.RemoveDeviceConnection(deviceId, "beacon");
+
+            // Backward compatibility
+            if (!string.IsNullOrWhiteSpace(request.BuyerEmail))
+            {
+                onlineTracker.RemoveConnection($"buyer:{request.BuyerEmail.ToLower().Trim()}", "beacon");
+            }
+            onlineTracker.RemoveConnection($"vis:{deviceId}", "beacon");
+
+            var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
+            var activeDevs = onlineTracker.GetActiveDevicesCount();
+            var activeConn = onlineTracker.GetActiveBuyerConnectionsCount();
+
+            await hubContext.Clients.Group("Admins").SendAsync("ActiveBuyersUpdated", new
+            {
+                activeTicketBuyers = activeBuyers,
+                activeDevices = activeDevs,
+                activeBuyerConnections = activeConn
+            });
+            await hubContext.Clients.Group("Admins").SendAsync("ActiveDevicesUpdated", new
+            {
+                activeDevices = activeDevs
+            });
+            await hubContext.Clients.Group("Admins").SendAsync("OnlineUsersUpdated", activeBuyers);
+        }
+        return Ok(ApiResponse<object?>.Ok(null, "Disconnected"));
+    }
+
+    /// <summary>
+    /// Thống kê số lượng thiết bị đang hoạt động thực tế
     /// </summary>
     [HttpGet("active-count")]
     [ProducesResponseType(typeof(ApiResponse<ActiveDevicesSummaryDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetActiveDevicesSummary()
+    public async Task<IActionResult> GetActiveDevicesSummary(
+        [FromServices] IOnlineUserTracker? onlineTracker = null)
     {
         var summary = await _deviceTrackingService.GetSummaryAsync();
+        if (onlineTracker != null)
+        {
+            summary.ActiveCount5Minutes = onlineTracker.GetActiveDevicesCount();
+        }
         return Ok(ApiResponse<ActiveDevicesSummaryDto>.Ok(summary));
     }
 }

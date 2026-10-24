@@ -12,24 +12,39 @@ public class TicketService : ITicketService
 {
     private readonly ZooGuideDbContext _context;
     private readonly ITicketSessionService _ticketSessionService;
+    private readonly IEmailService? _emailService;
 
-    public TicketService(ZooGuideDbContext context, ITicketSessionService ticketSessionService)
+    public TicketService(
+        ZooGuideDbContext context, 
+        ITicketSessionService ticketSessionService,
+        IEmailService? emailService = null)
     {
         _context = context;
         _ticketSessionService = ticketSessionService;
+        _emailService = emailService;
     }
 
     public async Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null)
     {
         var query = _context.Tickets
             .Include(t => t.TicketType)
+            .Include(t => t.Order)
             .AsNoTracking()
             .AsQueryable();
 
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();
-            query = query.Where(t => t.TicketCode.ToLower().Contains(term) || (t.TicketType != null && t.TicketType.Name.ToLower().Contains(term)));
+            query = query.Where(t => 
+                t.TicketCode.ToLower().Contains(term) || 
+                (t.TicketType != null && t.TicketType.Name.ToLower().Contains(term)) ||
+                (t.Order != null && (
+                    t.Order.CustomerName.ToLower().Contains(term) || 
+                    t.Order.OrderCode.ToLower().Contains(term) ||
+                    t.Order.CustomerEmail.ToLower().Contains(term) ||
+                    t.Order.CustomerPhone.ToLower().Contains(term)
+                ))
+            );
         }
 
         if (ticketTypeId.HasValue && ticketTypeId.Value > 0)
@@ -50,6 +65,11 @@ public class TicketService : ITicketService
                 TicketCode = t.TicketCode,
                 TicketTypeId = t.TicketTypeId,
                 TicketTypeName = t.TicketType.Name,
+                OrderId = t.OrderId,
+                OrderCode = t.Order != null ? t.Order.OrderCode : null,
+                CustomerName = t.Order != null ? t.Order.CustomerName : null,
+                CustomerEmail = t.Order != null ? t.Order.CustomerEmail : null,
+                CustomerPhone = t.Order != null ? t.Order.CustomerPhone : null,
                 IssuedAt = t.IssuedAt,
                 ValidFrom = t.ValidFrom,
                 ValidUntil = t.ValidUntil,
@@ -65,6 +85,7 @@ public class TicketService : ITicketService
     {
         var t = await _context.Tickets
             .Include(x => x.TicketType)
+            .Include(x => x.Order)
             .FirstOrDefaultAsync(x => x.TicketId == id);
             
         if (t == null) return null;
@@ -75,6 +96,11 @@ public class TicketService : ITicketService
             TicketCode = t.TicketCode,
             TicketTypeId = t.TicketTypeId,
             TicketTypeName = t.TicketType.Name,
+            OrderId = t.OrderId,
+            OrderCode = t.Order?.OrderCode,
+            CustomerName = t.Order?.CustomerName,
+            CustomerEmail = t.Order?.CustomerEmail,
+            CustomerPhone = t.Order?.CustomerPhone,
             IssuedAt = t.IssuedAt,
             ValidFrom = t.ValidFrom,
             ValidUntil = t.ValidUntil,
@@ -86,12 +112,120 @@ public class TicketService : ITicketService
     }
 
     /// <summary>
-    /// Chức năng phát hành vé thủ công đã bị vô hiệu hóa theo yêu cầu nghiệp vụ 5.1.
-    /// Vé chỉ được phát hành tự động sau khi thanh toán QR được xác thực thành công.
+    /// Phát hành vé trực tiếp / vé sự kiện do Ban Quản trị thực hiện tại quầy.
+    /// Khởi tạo kèm đơn hàng quản trị (PaymentMethod = 'AdminDirect', PaymentStatus = Paid) 
+    /// nhằm phân biệt rõ với khách mua vé trực tuyến VietQR mà vẫn bảo đảm toàn vẹn dữ liệu.
     /// </summary>
-    public Task<TicketDto> CreateAsync(TicketCreateRequest request)
+    public async Task<TicketDto> CreateAsync(TicketCreateRequest request)
     {
-        throw new InvalidOperationException("Phát hành vé thủ công bằng tay đã bị vô hiệu hóa. Vé tham quan chỉ được hệ thống tự động cấp phát sau khi xác minh giao dịch thanh toán thành công.");
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
+
+        var ticketType = await _context.TicketTypes.FindAsync(request.TicketTypeId);
+        if (ticketType == null)
+            throw new ArgumentException($"Loại vé với ID {request.TicketTypeId} không tồn tại.");
+
+        var now = DateTime.UtcNow;
+        var validFrom = request.ValidFrom ?? now;
+        var durationMinutes = ticketType.DurationMinutes > 0 ? ticketType.DurationMinutes : 1440;
+        var validUntil = request.ValidUntil ?? validFrom.AddMinutes(durationMinutes);
+        if (validUntil <= validFrom)
+        {
+            validUntil = validFrom.AddMinutes(durationMinutes);
+        }
+
+        // Sinh hoặc kiểm tra mã vé
+        string ticketCode;
+        if (!string.IsNullOrWhiteSpace(request.TicketCode))
+        {
+            ticketCode = request.TicketCode.Trim().ToUpper();
+            var exists = await _context.Tickets.AnyAsync(t => t.TicketCode == ticketCode);
+            if (exists)
+                throw new InvalidOperationException($"Mã vé '{ticketCode}' đã tồn tại trên hệ thống.");
+        }
+        else
+        {
+            bool exists;
+            do
+            {
+                var randomBytes = new byte[4];
+                RandomNumberGenerator.Fill(randomBytes);
+                var randomHex = Convert.ToHexString(randomBytes).ToUpper();
+                ticketCode = $"ZG-{DateTime.UtcNow:yyyyMMdd}-{randomHex}";
+                exists = await _context.Tickets.AnyAsync(t => t.TicketCode == ticketCode);
+            } while (exists);
+        }
+
+        // Khởi tạo TicketOrder cho giao dịch phát hành trực tiếp của Admin
+        var orderCode = $"ZG-ADM-{now:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..4].ToUpper()}";
+        var order = new TicketOrder
+        {
+            OrderCode = orderCode,
+            CustomerName = string.IsNullOrWhiteSpace(request.CustomerName) ? "Khách mua tại quầy" : request.CustomerName.Trim(),
+            CustomerEmail = request.CustomerEmail?.Trim() ?? string.Empty,
+            CustomerPhone = request.CustomerPhone?.Trim() ?? string.Empty,
+            TicketTypeId = ticketType.TicketTypeId,
+            Quantity = 1,
+            UnitPrice = ticketType.Price,
+            TotalAmount = ticketType.Price,
+            PaymentStatus = PaymentStatus.Paid,
+            PaymentMethod = "AdminDirect",
+            PaymentDescription = string.IsNullOrWhiteSpace(request.Note) ? "Phát hành vé trực tiếp bởi Quản trị viên" : request.Note.Trim(),
+            TransactionReference = $"ADM-{Guid.NewGuid():N}"[..18].ToUpper(),
+            PaidAt = now,
+            CreatedAt = now,
+            ExpiresAt = validUntil.AddDays(7)
+        };
+        _context.TicketOrders.Add(order);
+        await _context.SaveChangesAsync();
+
+        // Tạo vé tham quan
+        var ticket = new Ticket
+        {
+            TicketCode = ticketCode,
+            TicketTypeId = ticketType.TicketTypeId,
+            OrderId = order.OrderId,
+            IssuedAt = now,
+            ValidFrom = validFrom,
+            ValidUntil = validUntil,
+            Status = request.Status,
+            CreatedAt = now
+        };
+        _context.Tickets.Add(ticket);
+        await _context.SaveChangesAsync();
+
+        // Gửi email vé điện tử nếu có email khách hàng hợp lệ
+        if (_emailService != null && !string.IsNullOrWhiteSpace(order.CustomerEmail))
+        {
+            try
+            {
+                await _emailService.SendTicketConfirmationEmailAsync(order, new List<Ticket> { ticket });
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"TicketService: Gửi email vé thủ công không thành công (vé vẫn hợp lệ): {ex.Message}");
+            }
+        }
+
+        return new TicketDto
+        {
+            TicketId = ticket.TicketId,
+            TicketCode = ticket.TicketCode,
+            TicketTypeId = ticket.TicketTypeId,
+            TicketTypeName = ticketType.Name,
+            OrderId = order.OrderId,
+            OrderCode = order.OrderCode,
+            CustomerName = order.CustomerName,
+            CustomerEmail = order.CustomerEmail,
+            CustomerPhone = order.CustomerPhone,
+            IssuedAt = ticket.IssuedAt,
+            ValidFrom = ticket.ValidFrom,
+            ValidUntil = ticket.ValidUntil,
+            Status = ticket.Status,
+            UsedAt = ticket.UsedAt,
+            CreatedAt = ticket.CreatedAt,
+            UpdatedAt = ticket.UpdatedAt
+        };
     }
 
     public async Task<TicketDto?> UpdateAsync(int id, TicketUpdateRequest request)
@@ -145,12 +279,26 @@ public class TicketService : ITicketService
     public async Task<bool> DeleteAsync(int id)
     {
         var ticket = await _context.Tickets
+            .Include(t => t.Order)
             .Include(t => t.TicketSessions)
             .Include(t => t.VisitHistories)
             .FirstOrDefaultAsync(t => t.TicketId == id);
             
         if (ticket == null) return false;
 
+        // 1. Kiểm tra vé đã sử dụng hoặc check-in
+        if (ticket.Status == TicketStatus.Used || ticket.UsedAt.HasValue)
+        {
+            throw new InvalidOperationException("Không thể xóa vé đã check-in hoặc đã qua sử dụng.");
+        }
+
+        // 2. Kiểm tra vé đã thanh toán và phát hành chính thức gắn với giao dịch cần bảo toàn
+        if (ticket.OrderId.HasValue && ticket.Order != null && ticket.Order.PaymentStatus == PaymentStatus.Paid)
+        {
+            throw new InvalidOperationException("Không thể xóa cứng vé đã thanh toán và phát hành chính thức trong hệ thống giao dịch. Vui lòng sử dụng tính năng Hủy vé để bảo toàn dữ liệu tài chính.");
+        }
+
+        // 3. Kiểm tra ràng buộc dữ liệu phiên tham quan hoặc lịch sử
         if (ticket.TicketSessions.Any() || ticket.VisitHistories.Any())
         {
             throw new InvalidOperationException("Không thể xóa vé vì vé đã có lịch sử tham quan hoặc phiên thiết bị.");

@@ -15,6 +15,7 @@ import TicketsTab from '../../components/tickets/TicketsTab';
 
 // Modals & Floating Features
 import TicketModal from '../../components/tickets/TicketModal';
+import ElectronicTicketModal from '../../components/tickets/ElectronicTicketModal';
 import AnimalDetailModal from '../../components/animals/AnimalDetailModal';
 import SpeciesNarrationModal from '../../components/species/SpeciesNarrationModal';
 import TranscriptModal from '../../components/audio/TranscriptModal';
@@ -380,6 +381,7 @@ export default function VisitorPortal() {
             <MobileBottomNav />
 
             <TicketModal />
+            <ElectronicTicketModal />
             <AnimalDetailModal
                 onPlayAudio={playAnimalAudio}
                 onNavigate={(animal) => handleLocateMap(animal)}

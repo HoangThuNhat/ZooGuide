@@ -1,7 +1,10 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.Interfaces;
+using ZooGuide.Domain.Enums;
+using ZooGuide.Infrastructure.Data;
 
 namespace ZooGuide.API.Controllers;
 
@@ -34,7 +37,47 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
-    /// Lưu bản ghi kiểm tra sức khỏe thú y thực tế vào cơ sở dữ liệu
+    /// Lấy số lượng người mua vé đang online theo thời gian thực (chỉ tính khách đã mua vé thành công)
+    /// </summary>
+    [HttpGet("online-users")]
+    [HttpGet("/api/admin/dashboard/online-users")]
+    [ProducesResponseType(typeof(ApiResponse<OnlineUsersSummaryDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOnlineUsers(
+        [FromServices] IOnlineUserTracker onlineTracker,
+        [FromServices] ZooGuideDbContext dbContext)
+    {
+        var totalBuyers = await dbContext.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.PaymentStatus == PaymentStatus.Paid && !string.IsNullOrEmpty(o.CustomerEmail))
+            .Select(o => o.CustomerEmail.ToLower().Trim())
+            .Distinct()
+            .CountAsync();
+
+        var totalSold = await dbContext.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.PaymentStatus == PaymentStatus.Paid)
+            .SumAsync(o => (int?)o.Quantity) ?? 0;
+
+        var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
+        var activeDevices = onlineTracker.GetActiveDevicesCount();
+        var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
+
+        var summary = new OnlineUsersSummaryDto
+        {
+            ActiveTicketBuyers = activeBuyers,
+            ActiveDevices = activeDevices,
+            ActiveBuyerConnections = activeConnections,
+            TotalTicketBuyers = totalBuyers,
+            TotalTicketsSold = totalSold,
+            OnlineUsers = activeBuyers,
+            ActiveConnections = activeConnections,
+            CalculatedAtUtc = DateTime.UtcNow
+        };
+        return Ok(ApiResponse<OnlineUsersSummaryDto>.Ok(summary));
+    }
+
+    /// <summary>
+    /// Lưu bản ghi kiểm tra sức khỏe thú y thực tế vào cơ sở dữ liệu Supabase
     /// </summary>
     [HttpPost("health-logs")]
     [ProducesResponseType(typeof(ApiResponse<DashboardHealthLogDto>), StatusCodes.Status200OK)]

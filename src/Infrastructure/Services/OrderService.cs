@@ -12,6 +12,7 @@ public class OrderService : IOrderService
 {
     private readonly ZooGuideDbContext _context;
     private readonly ITicketService _ticketService;
+    private readonly IEmailService? _emailService;
 
     // Cấu hình ngân hàng VietQR mặc định (hỗ trợ ghi đè qua biến môi trường)
     private static string BankId => Environment.GetEnvironmentVariable("VIETQR_BANK_ID") ?? "MB";
@@ -20,10 +21,11 @@ public class OrderService : IOrderService
     private static string AccountName => Environment.GetEnvironmentVariable("VIETQR_ACCOUNT_NAME") ?? "CONG TY TNHH MTV THAO CAM VIEN SAI GON";
     private static string WebhookSecret => Environment.GetEnvironmentVariable("PAYMENT_WEBHOOK_SECRET") ?? "ZooGuideSecKey2026";
 
-    public OrderService(ZooGuideDbContext context, ITicketService ticketService)
+    public OrderService(ZooGuideDbContext context, ITicketService ticketService, IEmailService? emailService = null)
     {
         _context = context;
         _ticketService = ticketService;
+        _emailService = emailService;
     }
 
     public async Task<OrderDto> CreateOrderAsync(CreateOrderRequest request)
@@ -183,6 +185,8 @@ public class OrderService : IOrderService
         // 6. Tự động phát hành vé điện tử cho đơn hàng
         await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
 
+        // Lưu ý: Đã bỏ chức năng gửi vé qua email theo yêu cầu nghiệp vụ mới.
+        // Khách hàng nhận và xem vé điện tử/mã QR trực tiếp trên website.
         return true;
     }
 
@@ -193,19 +197,32 @@ public class OrderService : IOrderService
             throw new ArgumentException("Mã đơn hàng không hợp lệ.");
         }
 
+        var normalizedCode = request.OrderCode.Trim().ToUpper();
         var order = await _context.TicketOrders
             .Include(o => o.TicketType)
             .Include(o => o.Tickets)
-            .FirstOrDefaultAsync(o => o.OrderCode == request.OrderCode.Trim().ToUpper());
+            .FirstOrDefaultAsync(o => o.OrderCode.ToUpper() == normalizedCode || o.PaymentDescription.ToUpper() == normalizedCode);
 
         if (order == null)
         {
             throw new ArgumentException($"Không tìm thấy đơn hàng {request.OrderCode}.");
         }
 
+        // Mô phỏng thất bại phục vụ kiểm thử
+        if (request.FailSimulation == true)
+        {
+            order.PaymentStatus = PaymentStatus.Failed;
+            order.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+            throw new InvalidOperationException("Giao dịch thanh toán sandbox thất bại (mô phỏng lỗi giao dịch). Không có vé nào được phát hành.");
+        }
+
         if (order.PaymentStatus == PaymentStatus.Paid)
         {
-            return MapToDto(order, order.TicketType, order.Tickets?.ToList() ?? new List<Ticket>());
+            var existingTickets = await _context.Tickets
+                .Where(t => t.OrderId == order.OrderId)
+                .ToListAsync();
+            return MapToDto(order, order.TicketType, existingTickets);
         }
 
         var amount = request.Amount ?? order.TotalAmount;
@@ -227,7 +244,60 @@ public class OrderService : IOrderService
             .Where(t => t.OrderId == order.OrderId)
             .ToListAsync();
 
-        return MapToDto(order, order.TicketType, ticketsList);
+        // Đã bỏ chức năng gửi vé qua email theo yêu cầu nghiệp vụ mới.
+        // Khách hàng nhận và xem vé điện tử/mã QR trực tiếp trên website.
+        var dto = MapToDto(order, order.TicketType, ticketsList);
+        dto.EmailSent = null;
+        dto.EmailStatusMessage = null;
+
+        return dto;
+    }
+
+    public async Task<OrderDto> ResendTicketEmailAsync(string orderCode, string? recipientEmail = null)
+    {
+        if (string.IsNullOrWhiteSpace(orderCode))
+            throw new ArgumentException("Mã đơn hàng không hợp lệ.");
+
+        var normalizedCode = orderCode.Trim().ToUpper();
+        var order = await _context.TicketOrders
+            .Include(o => o.TicketType)
+            .Include(o => o.Tickets)
+            .FirstOrDefaultAsync(o => o.OrderCode.ToUpper() == normalizedCode || o.PaymentDescription.ToUpper() == normalizedCode);
+
+        if (order == null)
+            throw new ArgumentException($"Không tìm thấy đơn hàng #{orderCode}.");
+
+        if (order.PaymentStatus != PaymentStatus.Paid)
+            throw new InvalidOperationException($"Đơn hàng #{orderCode} chưa được thanh toán (Trạng thái: {order.PaymentStatus}). Không thể gửi vé.");
+
+        var ticketsList = order.Tickets?.ToList() ?? new List<Ticket>();
+        if (!ticketsList.Any())
+        {
+            await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
+            ticketsList = await _context.Tickets.Where(t => t.OrderId == order.OrderId).ToListAsync();
+        }
+
+        var targetEmail = !string.IsNullOrWhiteSpace(recipientEmail) ? recipientEmail.Trim().ToLower() : order.CustomerEmail;
+
+        EmailSendResult emailResult;
+        if (_emailService == null)
+        {
+            emailResult = new EmailSendResult
+            {
+                Success = false,
+                ErrorCode = "SERVICE_UNAVAILABLE",
+                Message = "Dịch vụ gửi email chưa được cài đặt trên hệ thống máy chủ."
+            };
+        }
+        else
+        {
+            emailResult = await _emailService.SendTicketConfirmationEmailAsync(order, ticketsList, targetEmail);
+        }
+
+        var dto = MapToDto(order, order.TicketType, ticketsList);
+        dto.EmailSent = emailResult.Success;
+        dto.EmailStatusMessage = emailResult.Message;
+        return dto;
     }
 
     private static OrderDto MapToDto(TicketOrder o, TicketType tt, List<Ticket> tickets)

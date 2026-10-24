@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ZooApi } from '../../services/api';
+import { ZooApi, API_CONFIG } from '../../services/api';
+import { setBuyerIdentity } from '../../services/deviceTracker';
+
+const PENDING_ORDER_STORAGE_KEY = 'zooguide_pending_ticket_order';
 
 export default function TicketsTab() {
-    const { currentSession, hasActiveSession, validateTicketCode, clearSession, showToast, t } = useApp();
+    const { currentSession, hasActiveSession, validateTicketCode, clearSession, openElectronicTicketModal, showToast, t } = useApp();
 
     // Mode Switcher: 'buy' (Mua vé & Thanh toán VietQR) | 'activate' (Quét/Nhập vé mở khóa)
     const [activeTabMode, setActiveTabMode] = useState('buy');
@@ -63,6 +66,34 @@ export default function TicketsTab() {
         return () => { isMounted = false; };
     }, []);
 
+    // 1b. Khôi phục đơn hàng nếu người dùng tải lại trang trong quá trình thanh toán
+    useEffect(() => {
+        try {
+            const saved = sessionStorage.getItem(PENDING_ORDER_STORAGE_KEY);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && parsed.orderCode) {
+                    ZooApi.getOrderByCode(parsed.orderCode).then(res => {
+                        if (res && res.success && res.data) {
+                            setCurrentOrder(res.data);
+                            if (res.data.paymentStatus === 'Paid' || res.data.paymentStatus === 2) {
+                                setOrderSuccessModal(true);
+                                setBuyerIdentity({
+                                    orderCode: res.data.orderCode,
+                                    email: res.data.customerEmail || parsed.customerEmail
+                                });
+                            }
+                        } else {
+                            sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY);
+                        }
+                    }).catch(() => {});
+                }
+            }
+        } catch (e) {
+            console.warn("Error restoring pending order:", e);
+        }
+    }, []);
+
     // 2. Tính toán tổng tiền giỏ vé
     const totalOrderAmount = Object.entries(cartQuantities).reduce((sum, [typeId, qty]) => {
         const tt = ticketTypes.find(t => String(t.ticketTypeId || t.id) === String(typeId));
@@ -91,6 +122,12 @@ export default function TicketsTab() {
             return;
         }
 
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(customerInfo.email.trim())) {
+            showToast("Địa chỉ email không đúng định dạng. Vui lòng nhập đúng định dạng (ví dụ: yourname@gmail.com).", "error");
+            return;
+        }
+
         const items = Object.entries(cartQuantities)
             .filter(([_, qty]) => qty > 0)
             .map(([typeId, qty]) => ({
@@ -110,6 +147,7 @@ export default function TicketsTab() {
             if (res && res.success && res.data) {
                 setCurrentOrder(res.data);
                 setPaymentTimeRemaining(900);
+                sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, JSON.stringify(res.data));
                 showToast(`Đã tạo đơn hàng ${res.data.orderCode}. Vui lòng chuyển khoản theo mã VietQR.`, "success");
             } else {
                 showToast(res.message || "Không thể khởi tạo đơn hàng.", "error");
@@ -124,7 +162,7 @@ export default function TicketsTab() {
 
     // 4. Polling tự động kiểm tra trạng thái thanh toán đơn hàng
     useEffect(() => {
-        if (!currentOrder || currentOrder.paymentStatus === 'Paid' || currentOrder.paymentStatus === 'Expired') {
+        if (!currentOrder || currentOrder.paymentStatus === 'Paid' || currentOrder.paymentStatus === 2 || currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4) {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
             return;
         }
@@ -133,11 +171,17 @@ export default function TicketsTab() {
             try {
                 const res = await ZooApi.getOrderByCode(currentOrder.orderCode);
                 if (res && res.success && res.data) {
-                    if (res.data.paymentStatus === 'Paid') {
+                    if (res.data.paymentStatus === 'Paid' || res.data.paymentStatus === 2) {
                         setCurrentOrder(res.data);
+                        sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, JSON.stringify(res.data));
                         setOrderSuccessModal(true);
+                        setBuyerIdentity({
+                            orderCode: res.data.orderCode,
+                            email: res.data.customerEmail || customerInfo.email
+                        });
                         clearInterval(pollingIntervalRef.current);
-                        showToast(`Thanh toán thành công đơn hàng ${res.data.orderCode}! Mã vé đã được cấp.`, "success");
+                        const ticketList = res.data.issuedTickets || res.data.tickets || [];
+                        showToast(`Thanh toán thành công đơn hàng ${res.data.orderCode}! Đã cấp ${ticketList.length} vé.`, "success");
                     }
                 }
             } catch (err) {
@@ -148,17 +192,18 @@ export default function TicketsTab() {
         return () => {
             if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
         };
-    }, [currentOrder, showToast]);
+    }, [currentOrder, customerInfo.email, showToast]);
 
     // 5. Đếm ngược thời gian thanh toán (15 phút)
     useEffect(() => {
-        if (!currentOrder || currentOrder.paymentStatus === 'Paid') return;
+        if (!currentOrder || currentOrder.paymentStatus === 'Paid' || currentOrder.paymentStatus === 2) return;
 
         const timer = setInterval(() => {
             setPaymentTimeRemaining(prev => {
                 if (prev <= 1) {
                     clearInterval(timer);
                     setCurrentOrder(curr => curr ? { ...curr, paymentStatus: 'Expired' } : null);
+                    sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY);
                     return 0;
                 }
                 return prev - 1;
@@ -168,22 +213,42 @@ export default function TicketsTab() {
         return () => clearInterval(timer);
     }, [currentOrder]);
 
-    // 6. Giả lập thanh toán thành công trong môi trường Sandbox
-    const handleSimulatePayment = async () => {
-        if (!currentOrder) return;
+    // 6. Giả lập thanh toán thành công hoặc thất bại trong môi trường Sandbox
+    const handleSimulatePayment = async (failSimulation = false) => {
+        if (isSimulatingPayment) return;
+        if (!currentOrder || !currentOrder.orderCode) return;
+
+        // Nếu đã thanh toán rồi mà nhấn lại, mở lại modal kết quả, không tạo trùng
+        if (!failSimulation && (currentOrder.paymentStatus === 'Paid' || currentOrder.paymentStatus === 2)) {
+            setOrderSuccessModal(true);
+            showToast(`Đơn hàng ${currentOrder.orderCode} đã hoàn tất thanh toán trước đó.`, "info");
+            return;
+        }
+
         setIsSimulatingPayment(true);
         try {
-            const res = await ZooApi.simulateSandboxPayment(currentOrder.orderCode);
+            const res = await ZooApi.simulateSandboxPayment({
+                orderCode: currentOrder.orderCode,
+                amount: currentOrder.totalAmount,
+                failSimulation: failSimulation
+            });
+
             if (res && res.success && res.data) {
                 setCurrentOrder(res.data);
+                sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, JSON.stringify(res.data));
                 setOrderSuccessModal(true);
-                showToast(`Đơn hàng ${res.data.orderCode} đã thanh toán thành công và cấp ${res.data.tickets?.length || 0} vé!`, "success");
+                setBuyerIdentity({
+                    orderCode: res.data.orderCode,
+                    email: res.data.customerEmail || customerInfo.email
+                });
+                const ticketList = res.data.issuedTickets || res.data.tickets || [];
+                showToast(`Đơn hàng ${res.data.orderCode} đã thanh toán thành công và cấp ${ticketList.length} vé!`, "success");
             } else {
                 showToast(res.message || "Giả lập thanh toán không thành công.", "error");
             }
         } catch (err) {
             console.error("Simulate payment error:", err);
-            showToast("Lỗi kết nối giả lập thanh toán.", "error");
+            showToast("Lỗi kết nối máy chủ khi giả lập thanh toán.", "error");
         } finally {
             setIsSimulatingPayment(false);
         }
@@ -330,10 +395,26 @@ export default function TicketsTab() {
         }
     };
 
-    const handleExitSession = () => {
-        if (window.confirm('Quý khách có chắc chắn muốn kết thúc phiên tham quan hiện tại?')) {
+    const handleExitSession = async () => {
+        const confirmMsg = "Quý khách có chắc chắn muốn thoát phiên tham quan hiện tại trên thiết bị?\n\nLưu ý: Mã vé và lịch sử của quý khách vẫn được bảo toàn nguyên vẹn trên hệ thống.";
+        if (!window.confirm(confirmMsg)) return;
+
+        if (currentSession?.sessionId) {
+            try {
+                const res = await ZooApi.exitTicketSession(currentSession.sessionId);
+                if (res.success) {
+                    clearSession();
+                    showToast("Đã thoát phiên tham quan thành công.", "info");
+                } else {
+                    showToast(res.message || "Không thể kết thúc phiên tham quan từ máy chủ.", "error");
+                }
+            } catch (e) {
+                console.warn("Backend exit session error:", e);
+                showToast("Lỗi kết nối khi thoát phiên tham quan.", "error");
+            }
+        } else {
             clearSession();
-            showToast("Đã kết thúc phiên tham quan.", "info");
+            showToast("Đã thoát phiên tham quan thành công.", "info");
         }
     };
 
@@ -537,7 +618,7 @@ export default function TicketsTab() {
                                                     <input
                                                         type="email"
                                                         required
-                                                        placeholder="Email nhận mã vé *"
+                                                        placeholder="Địa chỉ Email liên hệ *"
                                                         value={customerInfo.email}
                                                         onChange={(e) => setCustomerInfo({ ...customerInfo, email: e.target.value })}
                                                         style={{ padding: '9px 12px', borderRadius: '10px', border: '1px solid #CBD5E1', fontSize: '0.85rem' }}
@@ -656,34 +737,37 @@ export default function TicketsTab() {
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                         <button
                                             type="button"
-                                            onClick={handleSimulatePayment}
+                                            onClick={() => handleSimulatePayment(false)}
                                             disabled={isSimulatingPayment}
                                             style={{
                                                 flex: 1,
-                                                padding: '11px',
+                                                padding: '12px',
                                                 borderRadius: '10px',
                                                 background: '#2563EB',
                                                 color: '#FFFFFF',
                                                 border: 'none',
                                                 fontWeight: 700,
-                                                fontSize: '0.85rem',
-                                                cursor: 'pointer'
+                                                fontSize: '0.9rem',
+                                                cursor: isSimulatingPayment ? 'wait' : 'pointer'
                                             }}
                                         >
-                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Giả lập thanh toán thành công (Sandbox)'}
+                                            {isSimulatingPayment ? 'Đang xử lý...' : '✓ Giả lập thanh toán thành công (Sandbox)'}
                                         </button>
 
                                         <button
                                             type="button"
-                                            onClick={() => setCurrentOrder(null)}
+                                            onClick={() => {
+                                                setCurrentOrder(null);
+                                                sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY);
+                                            }}
                                             style={{
-                                                padding: '11px 16px',
+                                                padding: '12px 18px',
                                                 borderRadius: '10px',
                                                 background: '#F1F5F9',
                                                 color: '#475569',
                                                 border: 'none',
                                                 fontWeight: 600,
-                                                fontSize: '0.82rem',
+                                                fontSize: '0.85rem',
                                                 cursor: 'pointer'
                                             }}
                                         >
@@ -852,6 +936,26 @@ export default function TicketsTab() {
                                 </div>
                             </div>
 
+                            {/* Ảnh mã QR vé thực tế */}
+                            {hasActiveSession && currentSession.ticketCode && (
+                                <div style={{ textAlign: 'center', margin: '14px 0', background: '#F8FAFC', padding: '12px', borderRadius: '14px', border: '1px solid #E2E8F0' }}>
+                                    <div style={{ display: 'inline-block', background: '#FFFFFF', padding: '8px', borderRadius: '10px', border: '1px solid #CBD5E1' }}>
+                                        <img
+                                            src={`${API_CONFIG.BASE_URL}/tickets/${encodeURIComponent(currentSession.ticketCode)}/qr`}
+                                            alt={`QR Code ${currentSession.ticketCode}`}
+                                            style={{ width: '130px', height: '130px', display: 'block' }}
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=130x130&data=${encodeURIComponent(currentSession.ticketCode)}`;
+                                            }}
+                                        />
+                                    </div>
+                                    <span style={{ fontSize: '0.72rem', color: '#64748B', display: 'block', marginTop: '6px' }}>
+                                        Mã QR quét tại cổng soát vé
+                                    </span>
+                                </div>
+                            )}
+
                             {/* Chi tiết người dùng & thời hạn */}
                             <div className="ticket-detail-grid">
                                 <div className="ticket-info-item">
@@ -914,7 +1018,7 @@ export default function TicketsTab() {
                                     className="btn-ticket-end" 
                                     onClick={handleExitSession}
                                 >
-                                    Kết thúc phiên tham quan
+                                    Thoát phiên tham quan
                                 </button>
                             )}
                         </div>
@@ -935,89 +1039,148 @@ export default function TicketsTab() {
                         </div>
 
                         <div className="modal-body" style={{ padding: '20px' }}>
+                            {/* Thông báo thanh toán thành công và hướng dẫn sử dụng vé trực tiếp */}
+                            <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '12px', padding: '12px 14px', marginBottom: '16px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#166534', fontWeight: 700, fontSize: '0.85rem' }}>
+                                    <span>✓ Đặt vé thành công! Quý khách có thể sử dụng vé điện tử ngay bên dưới.</span>
+                                </div>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', color: '#15803D' }}>
+                                    Xuất trình mã QR tại cổng kiểm soát hoặc nhấn &quot;Xem Thẻ Điện Tử&quot; để mở thẻ tham quan số.
+                                </p>
+                            </div>
+
                             <div style={{ marginBottom: '16px' }}>
                                 <label style={{ display: 'block', fontWeight: 700, fontSize: '0.82rem', color: '#475569', marginBottom: '8px' }}>
-                                    MÃ VÉ ĐIỆN TỬ ĐÃ CẤP TỰ ĐỘNG:
+                                    MÃ VÉ ĐIỆN TỬ & MÃ QR XUẤT TRÌNH TẠI CỔNG:
                                 </label>
                                 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {currentOrder.tickets && currentOrder.tickets.length > 0 ? (
-                                        currentOrder.tickets.map((t, idx) => (
-                                            <div
-                                                key={t.ticketId || idx}
-                                                style={{
-                                                    display: 'flex',
-                                                    justifyContent: 'space-between',
-                                                    alignItems: 'center',
-                                                    background: '#F0FDF4',
-                                                    border: '1px solid #86EFAC',
-                                                    padding: '10px 14px',
-                                                    borderRadius: '10px'
-                                                }}
-                                            >
-                                                <div>
-                                                    <span style={{ fontSize: '0.72rem', color: '#166534', fontWeight: 700 }}>Vé #{idx + 1} ({t.ticketTypeName || 'Chuẩn'})</span>
-                                                    <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '1rem', color: '#0F172A' }}>
-                                                        {t.ticketCode}
-                                                    </div>
-                                                </div>
-
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        navigator.clipboard.writeText(t.ticketCode);
-                                                        showToast(`Đã sao chép mã vé: ${t.ticketCode}`, "info");
-                                                    }}
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                    {(() => {
+                                        const ticketList = currentOrder.issuedTickets || currentOrder.tickets || [];
+                                        return ticketList.length > 0 ? (
+                                            ticketList.map((t, idx) => (
+                                                <div
+                                                    key={t.ticketId || idx}
                                                     style={{
-                                                        padding: '5px 10px',
-                                                        borderRadius: '6px',
-                                                        border: '1px solid #CBD5E1',
-                                                        background: '#FFF',
-                                                        fontSize: '0.75rem',
-                                                        fontWeight: 600,
-                                                        cursor: 'pointer'
+                                                        background: '#F0FDF4',
+                                                        border: '1px solid #86EFAC',
+                                                        padding: '14px',
+                                                        borderRadius: '12px',
+                                                        textAlign: 'center'
                                                     }}
                                                 >
-                                                    Sao chép mã
-                                                </button>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                        <span style={{ fontSize: '0.75rem', color: '#166534', fontWeight: 700 }}>
+                                                            Vé #{idx + 1} ({t.ticketTypeName || 'Tiêu Chuẩn'})
+                                                        </span>
+                                                        <div style={{ display: 'flex', gap: '6px' }}>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    openElectronicTicketModal({
+                                                                        ticketCode: t.ticketCode,
+                                                                        ticketTypeName: t.ticketTypeName,
+                                                                        customerName: currentOrder.customerName,
+                                                                        validUntil: t.validUntil
+                                                                    });
+                                                                }}
+                                                                style={{
+                                                                    padding: '4px 10px',
+                                                                    borderRadius: '6px',
+                                                                    border: 'none',
+                                                                    background: '#15803D',
+                                                                    color: '#FFF',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 700,
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                Xem Thẻ Điện Tử
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(t.ticketCode);
+                                                                    showToast(`Đã sao chép mã vé: ${t.ticketCode}`, "info");
+                                                                }}
+                                                                style={{
+                                                                    padding: '4px 8px',
+                                                                    borderRadius: '6px',
+                                                                    border: '1px solid #CBD5E1',
+                                                                    background: '#FFF',
+                                                                    fontSize: '0.72rem',
+                                                                    fontWeight: 600,
+                                                                    cursor: 'pointer'
+                                                                }}
+                                                            >
+                                                                Sao chép mã
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ fontFamily: 'monospace', fontWeight: 800, fontSize: '1.05rem', color: '#0F172A', marginBottom: '10px' }}>
+                                                        {t.ticketCode}
+                                                    </div>
+
+                                                    {/* Hiển thị hình ảnh mã QR vé */}
+                                                    <div style={{ background: '#FFFFFF', padding: '8px', borderRadius: '10px', display: 'inline-block', border: '1px solid #CBD5E1' }}>
+                                                        <img
+                                                            src={`${API_CONFIG.BASE_URL}/tickets/${encodeURIComponent(t.ticketCode)}/qr`}
+                                                            alt={`Mã QR vé ${t.ticketCode}`}
+                                                            onError={(e) => {
+                                                                e.target.onerror = null;
+                                                                e.target.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(t.ticketCode)}`;
+                                                            }}
+                                                            style={{ width: '130px', height: '130px', display: 'block' }}
+                                                        />
+                                                    </div>
+
+                                                    <div style={{ marginTop: '6px', fontSize: '0.75rem', color: '#64748B' }}>
+                                                        Hạn dùng: {t.validUntil ? t.validUntil.slice(0, 16).replace('T', ' ') : 'Trong ngày'}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <div style={{ padding: '12px', background: '#F8FAFC', borderRadius: '10px', fontSize: '0.85rem' }}>
+                                                Mã vé đang được hệ thống xuất bản.
                                             </div>
-                                        ))
-                                    ) : (
-                                        <div style={{ padding: '12px', background: '#F8FAFC', borderRadius: '10px', fontSize: '0.85rem' }}>
-                                            Mã vé đang được hệ thống xuất bản.
-                                        </div>
-                                    )}
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
                             {/* Nút Kích Hoạt Ngay */}
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '18px' }}>
-                                {currentOrder.tickets && currentOrder.tickets.length > 0 && (
-                                    <button
-                                        type="button"
-                                        disabled={isValidatingTicket}
-                                        onClick={() => handleActivatePurchasedTicket(currentOrder.tickets[0].ticketCode)}
-                                        style={{
-                                            padding: '12px',
-                                            borderRadius: '12px',
-                                            background: '#15803D',
-                                            color: '#FFFFFF',
-                                            border: 'none',
-                                            fontWeight: 800,
-                                            fontSize: '0.95rem',
-                                            cursor: 'pointer',
-                                            boxShadow: '0 2px 8px rgba(21,128,61,0.2)'
-                                        }}
-                                    >
-                                        {isValidatingTicket ? 'Đang kích hoạt...' : 'Kích hoạt phiên tham quan ngay'}
-                                    </button>
-                                )}
+                                {(() => {
+                                    const ticketList = currentOrder.issuedTickets || currentOrder.tickets || [];
+                                    return ticketList.length > 0 ? (
+                                        <button
+                                            type="button"
+                                            disabled={isValidatingTicket}
+                                            onClick={() => handleActivatePurchasedTicket(ticketList[0].ticketCode)}
+                                            style={{
+                                                padding: '12px',
+                                                borderRadius: '12px',
+                                                background: '#15803D',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                fontWeight: 800,
+                                                fontSize: '0.95rem',
+                                                cursor: 'pointer',
+                                                boxShadow: '0 2px 8px rgba(21,128,61,0.2)'
+                                            }}
+                                        >
+                                            {isValidatingTicket ? 'Đang kích hoạt...' : 'Kích hoạt phiên tham quan ngay'}
+                                        </button>
+                                    ) : null;
+                                })()}
 
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setOrderSuccessModal(false);
                                         setCurrentOrder(null);
+                                        sessionStorage.removeItem(PENDING_ORDER_STORAGE_KEY);
                                     }}
                                     style={{
                                         padding: '10px',
