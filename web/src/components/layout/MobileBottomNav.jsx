@@ -31,7 +31,8 @@ export default function MobileBottomNav() {
                     onClick={() => switchTab('animals')}
                 >
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"></polygon>
                     </svg>
                     <span>{t?.tabAnimals || 'Khám Phá'}</span>
                 </button>
@@ -42,8 +43,9 @@ export default function MobileBottomNav() {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <rect x="2" y="6" width="20" height="12" rx="2"></rect>
                         <circle cx="12" cy="12" r="2"></circle>
+                        <path d="M6 12h.01M18 12h.01"></path>
                     </svg>
-                    <span>{t?.tabTicket || 'Vé Vào'}</span>
+                    <span>{t?.tabTicket || 'Vé Tham Quan'}</span>
                 </button>
             </div>
         </nav>

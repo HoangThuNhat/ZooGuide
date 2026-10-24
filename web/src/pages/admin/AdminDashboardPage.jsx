@@ -1,26 +1,41 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
 export default function AdminDashboardPage() {
     const { showToast } = useApp();
     const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+
     const [stats, setStats] = useState({
+        activeDevices5Min: 0,
+        totalTrackedDevices: 0,
+        activeSessions: 0,
         totalTickets: 0,
         activeTickets: 0,
         expiredTickets: 0,
         totalAnimals: 0,
         totalSpecies: 0,
         totalAreas: 0,
+        totalEnclosures: 0,
+        totalPois: 0,
+        activePois: 0,
+        verifiedPois: 0,
+        unverifiedPois: 0,
+        poisWithNarration: 0,
+        poisMissingNarration: 0,
+        poisMissingAudio: 0,
         totalNarrations: 0,
         totalAudios: 0,
-        activeSessions: 0,
+        languageStats: [],
         recentHealthLogs: [],
         recentActivities: []
     });
+
     const [animalOptions, setAnimalOptions] = useState([]);
 
-    // Time filter states
+    // Time filter states (applies to tickets, sessions and activities)
     const [selectedPeriod, setSelectedPeriod] = useState('all');
     const [customStartDate, setCustomStartDate] = useState('');
     const [customEndDate, setCustomEndDate] = useState('');
@@ -31,11 +46,9 @@ export default function AdminDashboardPage() {
         label: 'Toàn bộ thời gian'
     });
 
-    // Business filter states
+    // Veterinary form & section toggle
+    const [showHealthForm, setShowHealthForm] = useState(false);
     const [healthStatusFilter, setHealthStatusFilter] = useState('all');
-    const [selectedAnimalFilter, setSelectedAnimalFilter] = useState('all');
-
-    // Form inputs for Health Log
     const [healthForm, setHealthForm] = useState({
         animalCode: '',
         veterinarian: 'BS. Trần Minh Quân',
@@ -46,7 +59,6 @@ export default function AdminDashboardPage() {
         actionRequired: ''
     });
 
-    // Calculate start & end ISO strings for a chosen period preset
     const calculatePeriodRange = (period, startStr = '', endStr = '') => {
         const now = new Date();
         const startOfDay = (d) => {
@@ -61,12 +73,11 @@ export default function AdminDashboardPage() {
         };
 
         if (period === 'today') {
-            const dateStr = now.toLocaleDateString('vi-VN');
             return {
                 fromDate: startOfDay(now),
                 toDate: endOfDay(now),
                 label: 'Hôm nay',
-                rangeDesc: dateStr
+                rangeDesc: now.toLocaleDateString('vi-VN')
             };
         } else if (period === 'last7days') {
             const past7 = new Date(now);
@@ -93,41 +104,20 @@ export default function AdminDashboardPage() {
                 fromDate: startOfDay(startMonth),
                 toDate: endOfDay(endMonth),
                 label: 'Tháng này',
-                rangeDesc: `01/${now.getMonth() + 1}/${now.getFullYear()} - ${endMonth.getDate()}/${now.getMonth() + 1}/${now.getFullYear()}`
-            };
-        } else if (period === 'lastMonth') {
-            const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const endLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
-            return {
-                fromDate: startOfDay(startLastMonth),
-                toDate: endOfDay(endLastMonth),
-                label: 'Tháng trước',
-                rangeDesc: `01/${startLastMonth.getMonth() + 1}/${startLastMonth.getFullYear()} - ${endLastMonth.getDate()}/${startLastMonth.getMonth() + 1}/${startLastMonth.getFullYear()}`
-            };
-        } else if (period === 'thisYear') {
-            const startYear = new Date(now.getFullYear(), 0, 1);
-            const endYear = new Date(now.getFullYear(), 11, 31);
-            return {
-                fromDate: startOfDay(startYear),
-                toDate: endOfDay(endYear),
-                label: 'Năm nay',
-                rangeDesc: `01/01/${now.getFullYear()} - 31/12/${now.getFullYear()}`
+                rangeDesc: `Tháng ${now.getMonth() + 1}/${now.getFullYear()}`
             };
         } else if (period === 'custom') {
             if (!startStr && !endStr) {
                 return { fromDate: null, toDate: null, label: 'Tùy chỉnh khoảng ngày', rangeDesc: 'Chưa chọn khoảng ngày' };
             }
-            const from = startStr ? startOfDay(new Date(startStr)) : null;
-            const to = endStr ? endOfDay(new Date(endStr)) : null;
             return {
-                fromDate: from,
-                toDate: to,
+                fromDate: startStr ? startOfDay(new Date(startStr)) : null,
+                toDate: endStr ? endOfDay(new Date(endStr)) : null,
                 label: 'Tùy chỉnh khoảng ngày',
-                rangeDesc: `${startStr ? new Date(startStr).toLocaleDateString('vi-VN') : '...'} đến ${endStr ? new Date(endStr).toLocaleDateString('vi-VN') : '...'}`
+                rangeDesc: `${startStr ? new Date(startStr).toLocaleDateString('vi-VN') : '...'} - ${endStr ? new Date(endStr).toLocaleDateString('vi-VN') : '...'}`
             };
         }
 
-        // 'all'
         return {
             fromDate: null,
             toDate: null,
@@ -138,6 +128,7 @@ export default function AdminDashboardPage() {
 
     const loadDashboardData = async (filterObj = appliedFilter) => {
         setIsLoading(true);
+        setLoadError(null);
         try {
             const apiFilter = {};
             if (filterObj.fromDate) apiFilter.fromDate = filterObj.fromDate;
@@ -150,6 +141,8 @@ export default function AdminDashboardPage() {
 
             if (statsRes.success && statsRes.data) {
                 setStats(statsRes.data);
+            } else {
+                setLoadError(statsRes.error || 'Không thể đồng bộ số liệu từ máy chủ.');
             }
 
             if (animalsRes.success && animalsRes.data && animalsRes.data.length > 0) {
@@ -160,8 +153,9 @@ export default function AdminDashboardPage() {
                 }));
             }
         } catch (err) {
-            console.error("Lỗi khi tải dữ liệu dashboard:", err);
-            showToast("Không thể tải toàn bộ số liệu thống kê máy chủ", "error");
+            console.error('Lỗi khi tải dữ liệu dashboard:', err);
+            setLoadError('Không thể kết nối đến máy chủ API.');
+            showToast('Không thể tải toàn bộ số liệu thống kê máy chủ', 'error');
         } finally {
             setIsLoading(false);
         }
@@ -171,30 +165,14 @@ export default function AdminDashboardPage() {
         loadDashboardData(appliedFilter);
     }, []);
 
-    // Filtered health logs based on health status and selected animal
-    const filteredHealthLogs = useMemo(() => {
-        if (!stats.recentHealthLogs) return [];
-        return stats.recentHealthLogs.filter(log => {
-            if (healthStatusFilter !== 'all' && log.healthStatus !== healthStatusFilter) {
-                return false;
-            }
-            if (selectedAnimalFilter !== 'all') {
-                const matchCode = (log.animalCode || '').toLowerCase() === selectedAnimalFilter.toLowerCase();
-                const matchName = (log.animalName || '').toLowerCase() === selectedAnimalFilter.toLowerCase();
-                if (!matchCode && !matchName) return false;
-            }
-            return true;
-        });
-    }, [stats.recentHealthLogs, healthStatusFilter, selectedAnimalFilter]);
-
     const handleApplyFilter = (period = selectedPeriod) => {
         if (period === 'custom') {
             if (!customStartDate && !customEndDate) {
-                showToast("Vui lòng chọn ngày bắt đầu hoặc ngày kết thúc.", "error");
+                showToast('Vui lòng chọn ngày bắt đầu hoặc ngày kết thúc.', 'error');
                 return;
             }
             if (customStartDate && customEndDate && customStartDate > customEndDate) {
-                showToast("Ngày bắt đầu không được lớn hơn ngày kết thúc.", "error");
+                showToast('Ngày bắt đầu không được lớn hơn ngày kết thúc.', 'error');
                 return;
             }
         }
@@ -210,7 +188,6 @@ export default function AdminDashboardPage() {
         setCustomStartDate('');
         setCustomEndDate('');
         setHealthStatusFilter('all');
-        setSelectedAnimalFilter('all');
         const defaultFilter = {
             period: 'all',
             fromDate: null,
@@ -221,8 +198,6 @@ export default function AdminDashboardPage() {
         setAppliedFilter(defaultFilter);
         loadDashboardData(defaultFilter);
     };
-
-    const hasActiveFilters = appliedFilter.period !== 'all' || healthStatusFilter !== 'all' || selectedAnimalFilter !== 'all';
 
     const handleHealthSubmit = async (e) => {
         e.preventDefault();
@@ -236,17 +211,17 @@ export default function AdminDashboardPage() {
             weightKg: parseFloat(healthForm.weightKg) || 0,
             temperatureC: parseFloat(healthForm.temperatureC) || 38.0,
             healthStatus: healthForm.healthStatus,
-            notes: healthForm.notes || "Kiểm tra định kỳ bình thường",
+            notes: healthForm.notes || 'Kiểm tra định kỳ bình thường',
             actionRequired: healthForm.actionRequired
         };
 
         try {
             const res = await ZooApi.addHealthRecord(newRecord);
             if (!res.success) {
-                showToast(res.error || "Không thể lưu nhật ký khám sức khỏe vào cơ sở dữ liệu", "error");
+                showToast(res.error || 'Không thể lưu nhật ký khám sức khỏe', 'error');
                 return;
             }
-            showToast("Đã lưu nhật ký khám sức khỏe động vật vào cơ sở dữ liệu Supabase!", "success");
+            showToast('Đã lưu hồ sơ khám sức khỏe thú y vào cơ sở dữ liệu Supabase!', 'success');
             setHealthForm(prev => ({
                 ...prev,
                 weightKg: '',
@@ -255,431 +230,582 @@ export default function AdminDashboardPage() {
                 actionRequired: ''
             }));
             await loadDashboardData(appliedFilter);
+            setShowHealthForm(false);
         } catch (err) {
-            showToast(err.message || "Lỗi kết nối khi lưu nhật ký sức khỏe", "error");
+            showToast(err.message || 'Lỗi kết nối khi lưu nhật ký sức khỏe', 'error');
         }
     };
 
+    const filteredHealthLogs = useMemo(() => {
+        if (!stats.recentHealthLogs) return [];
+        return stats.recentHealthLogs.filter(log => {
+            if (healthStatusFilter !== 'all' && log.healthStatus !== healthStatusFilter) {
+                return false;
+            }
+            return true;
+        });
+    }, [stats.recentHealthLogs, healthStatusFilter]);
+
     return (
-        <div>
+        <div className="admin-page-container">
+            {/* Page Header */}
             <div className="admin-page-header">
                 <div>
-                    <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#0F172A', margin: '0 0 6px 0' }}>
-                        Trung Tâm Điều Hành ZooGuide
+                    <h2 className="admin-page-title" style={{ fontSize: '1.35rem', fontWeight: 700, margin: '0 0 4px 0', color: '#0F172A' }}>
+                        Tổng Quan Vận Hành
                     </h2>
-                    <p style={{ color: '#64748B', margin: 0, fontSize: '0.9rem' }}>
-                        Thống kê tổng quan tình trạng vận hành, động vật, chuồng trại và dịch vụ tham quan thời gian thực từ cơ sở dữ liệu.
+                    <p className="admin-page-desc" style={{ margin: 0, color: '#64748B', fontSize: '0.85rem' }}>
+                        Số liệu vận hành thời gian thực từ cơ sở dữ liệu Supabase: Thiết bị hoạt động, phiên tham quan, sức khỏe POI và quản lý thuyết minh.
                     </p>
                 </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button 
-                        className="btn btn-sm btn-outline" 
+                        className="btn btn-sm btn-outline"
                         onClick={() => loadDashboardData(appliedFilter)}
                         disabled={isLoading}
-                        title="Đồng bộ lại số liệu"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem' }}
                     >
-                        {isLoading ? "Đang đồng bộ..." : "Làm mới số liệu"}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        {isLoading ? 'Đang đồng bộ...' : 'Làm mới'}
                     </button>
+                    <Link to="/admin/pois" className="btn btn-sm btn-primary" style={{ fontSize: '0.8125rem' }}>
+                        + Quản Lý POI
+                    </Link>
                 </div>
             </div>
 
-            {/* Operational Data Filters Bar */}
-            <div className="admin-card" style={{ marginBottom: '28px', padding: '20px 24px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                    <div>
-                        <span style={{ fontWeight: '700', fontSize: '1rem', color: '#0F172A' }}>
-                            Bộ Lọc Dữ Liệu Vận Hành
-                        </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <span className="badge badge-info" style={{ fontSize: '0.8rem', padding: '5px 12px' }}>
-                            Thời gian: <strong>{appliedFilter.label}</strong> {appliedFilter.rangeDesc ? `(${appliedFilter.rangeDesc})` : ''}
-                        </span>
-                        {healthStatusFilter !== 'all' && (
-                            <span className="badge badge-primary" style={{ fontSize: '0.8rem', padding: '5px 12px' }}>
-                                Sức khỏe: <strong>{healthStatusFilter}</strong>
-                            </span>
-                        )}
-                        {selectedAnimalFilter !== 'all' && (
-                            <span className="badge badge-success" style={{ fontSize: '0.8rem', padding: '5px 12px' }}>
-                                Cá thể: <strong>{selectedAnimalFilter}</strong>
-                            </span>
-                        )}
-                        {hasActiveFilters && (
-                            <button
-                                type="button"
-                                className="btn btn-sm btn-secondary"
-                                onClick={handleResetFilter}
-                                style={{ fontSize: '0.8rem', padding: '4px 12px' }}
-                                title="Đưa toàn bộ bộ lọc về mặc định"
-                            >
-                                Đặt lại bộ lọc
-                            </button>
-                        )}
+            {/* Error Banner if API fails */}
+            {loadError && (
+                <div className="admin-card" style={{ background: '#FEF2F2', borderColor: '#FCA5A5', marginBottom: '20px', padding: '14px 18px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ color: '#991B1B', fontSize: '0.88rem', fontWeight: 600 }}>
+                            ⚠ Lỗi đồng bộ: {loadError}
+                        </div>
+                        <button className="btn btn-sm btn-outline" onClick={() => loadDashboardData(appliedFilter)}>
+                            Thử lại
+                        </button>
                     </div>
                 </div>
+            )}
 
-                <div className="admin-filter-grid">
-                    {/* Period Preset Dropdown */}
-                    <div>
-                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            Khoảng thời gian
-                        </label>
-                        <select
-                            className="form-select"
-                            value={selectedPeriod}
-                            onChange={(e) => {
-                                const val = e.target.value;
-                                setSelectedPeriod(val);
-                                if (val !== 'custom') {
-                                    handleApplyFilter(val);
-                                }
+            {/* Operational Time Filter */}
+            <div className="admin-card" style={{ marginBottom: '24px', padding: '16px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A' }}>
+                            Bộ lọc giao dịch & phiên tham quan
+                        </span>
+                        <span className="badge badge-info text-xs">
+                            Kỳ báo cáo: {appliedFilter.label} {appliedFilter.rangeDesc ? `(${appliedFilter.rangeDesc})` : ''}
+                        </span>
+                    </div>
+
+                    {appliedFilter.period !== 'all' && (
+                        <button 
+                            className="btn btn-sm btn-secondary" 
+                            onClick={handleResetFilter}
+                            style={{ fontSize: '0.78rem' }}
+                        >
+                            Xem toàn bộ thời gian
+                        </button>
+                    )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                    {[
+                        { key: 'all', label: 'Toàn bộ' },
+                        { key: 'today', label: 'Hôm nay' },
+                        { key: 'last7days', label: '7 ngày qua' },
+                        { key: 'last30days', label: '30 ngày qua' },
+                        { key: 'thisMonth', label: 'Tháng này' }
+                    ].map(p => (
+                        <button
+                            key={p.key}
+                            type="button"
+                            className={`btn btn-sm ${selectedPeriod === p.key ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ fontSize: '0.8rem', padding: '5px 12px' }}
+                            onClick={() => {
+                                setSelectedPeriod(p.key);
+                                handleApplyFilter(p.key);
                             }}
-                            style={{ width: '100%' }}
                         >
-                            <option value="all">Toàn bộ thời gian (Tất cả)</option>
-                            <option value="today">Hôm nay</option>
-                            <option value="last7days">7 ngày gần nhất</option>
-                            <option value="last30days">30 ngày gần nhất</option>
-                            <option value="thisMonth">Tháng này</option>
-                            <option value="lastMonth">Tháng trước</option>
-                            <option value="thisYear">Năm nay</option>
-                            <option value="custom">Tùy chỉnh khoảng ngày...</option>
-                        </select>
-                    </div>
+                            {p.label}
+                        </button>
+                    ))}
 
-                    {/* Health Status Filter */}
-                    <div>
-                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            Tình trạng sức khỏe
-                        </label>
-                        <select
-                            className="form-select"
-                            value={healthStatusFilter}
-                            onChange={(e) => setHealthStatusFilter(e.target.value)}
-                            style={{ width: '100%' }}
-                        >
-                            <option value="all">Tất cả tình trạng</option>
-                            <option value="Rất tốt">Rất tốt</option>
-                            <option value="Khỏe mạnh">Khỏe mạnh</option>
-                            <option value="Theo dõi định kỳ">Theo dõi định kỳ</option>
-                            <option value="Cần cách ly chăm sóc">Cần cách ly chăm sóc</option>
-                            <option value="Bình thường">Bình thường</option>
-                        </select>
-                    </div>
+                    <button
+                        type="button"
+                        className={`btn btn-sm ${selectedPeriod === 'custom' ? 'btn-primary' : 'btn-outline'}`}
+                        style={{ fontSize: '0.8rem', padding: '5px 12px' }}
+                        onClick={() => setSelectedPeriod('custom')}
+                    >
+                        Tùy chỉnh ngày...
+                    </button>
 
-                    {/* Animal Filter */}
-                    <div>
-                        <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                            Cá thể động vật
-                        </label>
-                        <select
-                            className="form-select"
-                            value={selectedAnimalFilter}
-                            onChange={(e) => setSelectedAnimalFilter(e.target.value)}
-                            style={{ width: '100%' }}
-                        >
-                            <option value="all">Tất cả cá thể động vật</option>
-                            {animalOptions.map(a => (
-                                <option key={a.code || a.id} value={a.nameVi || a.name || a.code}>
-                                    {a.nameVi || a.name} ({a.code || `ANI-${a.id}`})
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Custom Start Date */}
                     {selectedPeriod === 'custom' && (
-                        <div>
-                            <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                                Từ ngày
-                            </label>
-                            <input
-                                type="date"
-                                className="form-input"
-                                value={customStartDate}
-                                onChange={(e) => setCustomStartDate(e.target.value)}
-                                style={{ width: '100%' }}
+                        <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center', marginLeft: '6px' }}>
+                            <input 
+                                type="date" 
+                                className="form-input" 
+                                style={{ padding: '4px 8px', fontSize: '0.8rem', width: '130px' }}
+                                value={customStartDate} 
+                                onChange={e => setCustomStartDate(e.target.value)} 
                             />
-                        </div>
-                    )}
-
-                    {/* Custom End Date */}
-                    {selectedPeriod === 'custom' && (
-                        <div>
-                            <label className="form-label" style={{ marginBottom: '6px', fontSize: '0.82rem', fontWeight: '700' }}>
-                                Đến ngày
-                            </label>
-                            <input
-                                type="date"
-                                className="form-input"
-                                value={customEndDate}
-                                onChange={(e) => setCustomEndDate(e.target.value)}
-                                style={{ width: '100%' }}
+                            <span style={{ color: '#94A3B8' }}>→</span>
+                            <input 
+                                type="date" 
+                                className="form-input" 
+                                style={{ padding: '4px 8px', fontSize: '0.8rem', width: '130px' }}
+                                value={customEndDate} 
+                                onChange={e => setCustomEndDate(e.target.value)} 
                             />
-                        </div>
-                    )}
-
-                    {/* Action Buttons for Custom Period */}
-                    {selectedPeriod === 'custom' && (
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
+                            <button 
+                                type="button" 
+                                className="btn btn-sm btn-primary"
+                                style={{ fontSize: '0.78rem' }}
                                 onClick={() => handleApplyFilter('custom')}
-                                style={{ padding: '9px 18px', fontSize: '0.85rem' }}
                             >
-                                Áp dụng khoảng ngày
+                                Áp dụng
                             </button>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Metrics Row */}
-            <div className="admin-metrics-row">
-                <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">
-                        {appliedFilter.period !== 'all' ? `Vé phát hành (${appliedFilter.label})` : 'Tổng vé phát hành'}
-                    </span>
-                    <span className="metric-number">
-                        {isLoading ? "..." : (stats.totalTickets || 0)}
-                    </span>
-                    <span className="text-xs text-success font-semibold">
-                        Đang hoạt động: {stats.activeTickets || 0}
+            {/* SECTION A — OPERATIONAL SUMMARY */}
+            <div style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                        Phần A — Tổng Quan Vận Hành Trực Tiếp
+                    </h3>
+                    <span className="text-xs text-muted">
+                        Số liệu thời gian thực được tổng hợp từ máy chủ Supabase
                     </span>
                 </div>
-                <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">Tổng số cá thể động vật</span>
-                    <span className="metric-number">
-                        {isLoading ? "..." : (stats.totalAnimals || 0)}
-                    </span>
-                    <span className="text-xs text-info font-semibold">
-                        {stats.totalSpecies || 0} loài sinh thái
-                    </span>
-                </div>
-                <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">Phân khu chuồng trại</span>
-                    <span className="metric-number">
-                        {isLoading ? "..." : (stats.totalAreas || 0)}
-                    </span>
-                    <span className="text-xs text-success font-semibold">100% đạt chuẩn an toàn</span>
-                </div>
-                <div className="metric-card">
-                    <span className="text-xs text-muted uppercase font-bold">
-                        {appliedFilter.period !== 'all' ? `Bài thuyết minh (${appliedFilter.label})` : 'Bài thuyết minh đa ngữ'}
-                    </span>
-                    <span className="metric-number">
-                        {isLoading ? "..." : (stats.totalNarrations || 0)}
-                    </span>
-                    <span className="text-xs text-muted font-semibold">
-                        {stats.activeSessions || 0} phiên khách trong kỳ
-                    </span>
+
+                <div className="admin-metrics-grid">
+                    {/* Active Devices Heartbeat */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #10B981' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Thiết Bị Đang Hoạt Động</span>
+                            <span className="badge badge-success text-xs">5 phút qua</span>
+                        </div>
+                        <div className="metric-value" style={{ color: '#059669' }}>
+                            {isLoading ? '...' : (stats.activeDevices5Min ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <span>Heartbeat: {stats.totalTrackedDevices || 0} thiết bị</span>
+                        </div>
+                    </div>
+
+                    {/* Active Sessions */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #3B82F6' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Phiên Tham Quan Mở Khóa</span>
+                            <span className="badge badge-info text-xs">Thời gian thực</span>
+                        </div>
+                        <div className="metric-value" style={{ color: '#1D4ED8' }}>
+                            {isLoading ? '...' : (stats.activeSessions ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <Link to="/admin/ticket-sessions">
+                                Danh sách phiên tham quan →
+                            </Link>
+                        </div>
+                    </div>
+
+                    {/* Tickets Issued */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #F59E0B' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Vé Phát Hành ({appliedFilter.label})</span>
+                            <span className="badge badge-warning text-xs">
+                                {stats.activeTickets || 0} còn hạn
+                            </span>
+                        </div>
+                        <div className="metric-value">
+                            {isLoading ? '...' : (stats.totalTickets ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <span>Hết hạn: {stats.expiredTickets || 0}</span>
+                            <Link to="/admin/tickets">Quản lý vé →</Link>
+                        </div>
+                    </div>
+
+                    {/* Animals & Species */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Động Vật & Loài</span>
+                            <span className="badge badge-primary text-xs">Hiện có</span>
+                        </div>
+                        <div className="metric-value">
+                            {isLoading ? '...' : (stats.totalAnimals ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <span>{stats.totalSpecies || 0} loài sinh thái</span>
+                            <Link to="/admin/animals">Cá thể thú →</Link>
+                        </div>
+                    </div>
+
+                    {/* Total POIs */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #059669' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Điểm Tham Quan (POI)</span>
+                            <span className="badge badge-success text-xs">
+                                {stats.activePois || 0} đang mở
+                            </span>
+                        </div>
+                        <div className="metric-value" style={{ color: '#064E3B' }}>
+                            {isLoading ? '...' : (stats.totalPois ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <span>{stats.verifiedPois || 0} tọa độ chuẩn</span>
+                            <Link to="/admin/pois">Quản lý POIs →</Link>
+                        </div>
+                    </div>
+
+                    {/* Total Areas & Enclosures */}
+                    <div className="admin-metric-card" style={{ borderLeft: '3px solid #64748B' }}>
+                        <div className="metric-header">
+                            <span className="metric-label">Phân Khu & Chuồng Trại</span>
+                            <span className="badge badge-secondary text-xs">Cơ sở vật chất</span>
+                        </div>
+                        <div className="metric-value">
+                            {isLoading ? '...' : (stats.totalAreas ?? 0)}
+                        </div>
+                        <div className="metric-footer">
+                            <span>{stats.totalEnclosures || 0} chuồng thực tế</span>
+                            <Link to="/admin/areas">Quản lý phân khu →</Link>
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Health & Breeding Quick Log Section */}
-            <div className="ticket-page-layout">
-                {/* Left: Health Log Records & Recent Activities */}
+            {/* SECTION B — POI & NARRATION HEALTH */}
+            <div style={{ marginBottom: '28px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                    <div>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                            Phần B — Tình Trạng Điểm Tham Quan (POI) & Sức Khỏe Thuyết Minh
+                        </h3>
+                        <p style={{ margin: 0, color: '#64748B', fontSize: '0.8rem' }}>
+                            Kiểm định tọa độ WGS84, độ bao phủ thuyết minh âm thanh đa ngôn ngữ cho du khách.
+                        </p>
+                    </div>
+                    <Link to="/admin/pois" className="btn btn-sm btn-outline">
+                        Xem chi tiết POIs
+                    </Link>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                    {/* POI Verification Status */}
+                    <div className="admin-card" style={{ padding: '18px 20px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '14px', color: '#0F172A', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Kiểm Định Tọa Độ Địa Lý</span>
+                            <span className="badge badge-info text-xs">{stats.totalPois || 0} tổng điểm</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#F0FDF4', borderRadius: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#16A34A', fontWeight: 700 }}>✓</span>
+                                    <span style={{ fontSize: '0.85rem', color: '#166534', fontWeight: 600 }}>Tọa độ đã kiểm định WGS84</span>
+                                </div>
+                                <strong style={{ color: '#166534', fontSize: '1rem' }}>{stats.verifiedPois || 0}</strong>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: stats.unverifiedPois > 0 ? '#FFFBEB' : '#F8FAFC', borderRadius: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <span style={{ color: '#D97706', fontWeight: 700 }}>⚠</span>
+                                    <span style={{ fontSize: '0.85rem', color: '#92400E', fontWeight: 600 }}>Tọa độ chưa xác thực</span>
+                                </div>
+                                <strong style={{ color: '#92400E', fontSize: '1rem' }}>{stats.unverifiedPois || 0}</strong>
+                            </div>
+
+                            <div style={{ fontSize: '0.78rem', color: '#64748B', marginTop: '4px' }}>
+                                {stats.unverifiedPois > 0 ? (
+                                    <Link to="/admin/pois" style={{ color: '#D97706', fontWeight: 600 }}>
+                                        Cần kiểm định {stats.unverifiedPois} điểm tham quan trên thực địa →
+                                    </Link>
+                                ) : (
+                                    <span style={{ color: '#16A34A' }}>100% điểm tham quan đã có tọa độ WGS84 chuẩn xác.</span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* POI Narration & Audio Coverage */}
+                    <div className="admin-card" style={{ padding: '18px 20px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '14px', color: '#0F172A', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Bao Phủ Thuyết Minh Điểm Tham Quan</span>
+                            <span className="badge badge-success text-xs">{stats.poisWithNarration || 0} / {stats.totalPois || 0} có bài</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: '#F8FAFC', borderRadius: '6px' }}>
+                                <span style={{ fontSize: '0.85rem', color: '#334155' }}>Điểm đã có bài thuyết minh xuất bản</span>
+                                <strong style={{ color: '#0F172A' }}>{stats.poisWithNarration || 0}</strong>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: stats.poisMissingNarration > 0 ? '#FFF7ED' : '#F8FAFC', borderRadius: '6px' }}>
+                                <span style={{ fontSize: '0.85rem', color: stats.poisMissingNarration > 0 ? '#C2410C' : '#64748B' }}>
+                                    Điểm chưa có bài thuyết minh
+                                </span>
+                                <strong style={{ color: stats.poisMissingNarration > 0 ? '#C2410C' : '#64748B' }}>
+                                    {stats.poisMissingNarration || 0}
+                                </strong>
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: stats.poisMissingAudio > 0 ? '#FEF2F2' : '#F8FAFC', borderRadius: '6px' }}>
+                                <span style={{ fontSize: '0.85rem', color: stats.poisMissingAudio > 0 ? '#DC2626' : '#64748B' }}>
+                                    Điểm thiếu file âm thanh MP3
+                                </span>
+                                <strong style={{ color: stats.poisMissingAudio > 0 ? '#DC2626' : '#64748B' }}>
+                                    {stats.poisMissingAudio || 0}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Language Breakdown */}
+                    <div className="admin-card" style={{ padding: '18px 20px' }}>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '14px', color: '#0F172A', display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Phân Bổ Ngôn Ngữ Thuyết Minh</span>
+                            <span className="badge badge-info text-xs">{stats.totalNarrations || 0} bài động vật</span>
+                        </div>
+
+                        {stats.languageStats && stats.languageStats.length > 0 ? (
+                            <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                {stats.languageStats.map(ls => (
+                                    <div key={ls.languageCode} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem', padding: '4px 6px', borderBottom: '1px solid #F1F5F9' }}>
+                                        <span>
+                                            <strong>{ls.languageName}</strong> ({ls.languageCode.toUpperCase()})
+                                        </span>
+                                        <div style={{ display: 'flex', gap: '8px' }}>
+                                            <span className="badge badge-primary text-xs" title="Thuyết minh loài động vật">
+                                                {ls.animalNarrationsCount} loài
+                                            </span>
+                                            <span className="badge badge-success text-xs" title="Thuyết minh POI">
+                                                {ls.poiNarrationsCount} POI
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center p-3 text-muted text-xs">
+                                12 ngôn ngữ được kích hoạt trong cơ sở dữ liệu.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            {/* SECTION C & SECTION D GRID */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '20px' }}>
+                {/* SECTION C — RECENT OPERATIONAL ACTIVITIES */}
                 <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                        <h3 className="font-bold text-base m-0">Nhật Ký Y Tế & Chăm Sóc Gần Nhất</h3>
-                        <span className="text-xs text-muted font-semibold">
-                            {filteredHealthLogs.length} / {stats.recentHealthLogs?.length || 0} hồ sơ phù hợp
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                            Phần C — Hoạt Động Vận Hành Gần Nhất
+                        </h3>
+                        <span className="text-xs text-muted">
+                            {stats.recentActivities?.length || 0} bản ghi thực tế
                         </span>
                     </div>
 
-                    <div id="admin-health-logs-list">
-                        {isLoading ? (
-                            <div className="text-center p-6 text-muted">Đang tải nhật ký kiểm tra y tế...</div>
-                        ) : filteredHealthLogs.length > 0 ? (
-                            filteredHealthLogs.map(log => (
-                                <div key={log.id} className="health-log-card">
-                                    <div className="health-log-header">
-                                        <div>
-                                            <h4 className="font-bold text-sm text-primary">
-                                                {log.animalName} <span className="font-mono text-muted text-xs">({log.animalCode})</span>
-                                            </h4>
-                                            <span className="text-xs text-muted">Ngày khám: {log.date} • Bác sĩ: {log.veterinarian}</span>
+                    <div className="admin-card" style={{ padding: '4px 16px' }}>
+                        {stats.recentActivities && stats.recentActivities.length > 0 ? (
+                            stats.recentActivities.map((act, idx) => (
+                                <div 
+                                    key={idx}
+                                    style={{
+                                        padding: '12px 0',
+                                        borderBottom: idx !== stats.recentActivities.length - 1 ? '1px solid #F1F5F9' : 'none',
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        gap: '12px'
+                                    }}
+                                >
+                                    <div>
+                                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0F172A' }}>
+                                            {act.title}
                                         </div>
-                                        <span className="badge badge-info">{log.healthStatus}</span>
+                                        <div style={{ fontSize: '0.8rem', color: '#64748B', marginTop: '2px' }}>
+                                            {act.description}
+                                        </div>
                                     </div>
-                                    <div className="health-log-details">
-                                        <div className="pill-stat">Cân nặng: <strong>{log.weightKg} kg</strong></div>
-                                        <div className="pill-stat">Thân nhiệt: <strong>{log.temperatureC}°C</strong></div>
+                                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                        <span className={`badge ${act.type === 'Ticket' ? 'badge-success' : act.type === 'POI' ? 'badge-primary' : 'badge-info'} text-xs`}>
+                                            {act.type}
+                                        </span>
+                                        <div style={{ fontSize: '0.72rem', color: '#94A3B8', marginTop: '3px' }}>
+                                            {new Date(act.timestamp).toLocaleDateString('vi-VN')}
+                                        </div>
                                     </div>
-                                    <p className="health-log-notes"><strong>Ghi chú:</strong> {log.notes}</p>
-                                    {log.actionRequired && (
-                                        <p className="health-log-action"><strong>Hành động:</strong> {log.actionRequired}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center p-6 text-muted text-xs">
+                                Chưa có hoạt động mới trong khoảng thời gian đã chọn.
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* SECTION D — VETERINARY HEALTH LOGS */}
+                <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <div>
+                            <h3 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: '#0F172A' }}>
+                                Phần D — Nhật Ký Thú Y & Sức Khỏe Động Vật
+                            </h3>
+                        </div>
+                        <button 
+                            className="btn btn-sm btn-outline"
+                            onClick={() => setShowHealthForm(!showHealthForm)}
+                            style={{ fontSize: '0.8rem' }}
+                        >
+                            {showHealthForm ? 'Đóng biểu mẫu' : '+ Ghi nhận kiểm tra y tế'}
+                        </button>
+                    </div>
+
+                    {/* Expandable Health Record Form */}
+                    {showHealthForm && (
+                        <div className="admin-card" style={{ marginBottom: '16px', background: '#F8FAFC' }}>
+                            <h4 className="font-bold text-sm mb-3" style={{ color: '#0F172A' }}>
+                                Bản Ghi Kiểm Tra Y Tế Mới
+                            </h4>
+                            <form onSubmit={handleHealthSubmit}>
+                                <div className="form-group">
+                                    <label className="form-label text-xs">Chọn cá thể động vật</label>
+                                    <select 
+                                        className="form-select"
+                                        required
+                                        value={healthForm.animalCode}
+                                        onChange={e => setHealthForm({ ...healthForm, animalCode: e.target.value })}
+                                    >
+                                        {animalOptions.map(a => (
+                                            <option key={a.code || a.id} value={a.code || a.id}>
+                                                {a.nameVi || a.name} ({a.code || `ANI-${a.id}`})
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label className="form-label text-xs">Bác sĩ thú y</label>
+                                        <input 
+                                            type="text" 
+                                            className="form-input" 
+                                            required
+                                            value={healthForm.veterinarian}
+                                            onChange={e => setHealthForm({ ...healthForm, veterinarian: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label text-xs">Tình trạng sức khỏe</label>
+                                        <select 
+                                            className="form-select"
+                                            value={healthForm.healthStatus}
+                                            onChange={e => setHealthForm({ ...healthForm, healthStatus: e.target.value })}
+                                        >
+                                            <option value="Rất tốt">Rất tốt</option>
+                                            <option value="Khỏe mạnh">Khỏe mạnh</option>
+                                            <option value="Theo dõi định kỳ">Theo dõi định kỳ</option>
+                                            <option value="Cần cách ly chăm sóc">Cần cách ly chăm sóc</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label className="form-label text-xs">Cân nặng (kg)</label>
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            className="form-input" 
+                                            required
+                                            value={healthForm.weightKg}
+                                            onChange={e => setHealthForm({ ...healthForm, weightKg: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label text-xs">Thân nhiệt (°C)</label>
+                                        <input 
+                                            type="number" 
+                                            step="0.1" 
+                                            className="form-input" 
+                                            required
+                                            value={healthForm.temperatureC}
+                                            onChange={e => setHealthForm({ ...healthForm, temperatureC: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="form-group">
+                                    <label className="form-label text-xs">Ghi chú lâm sàng & chế độ dinh dưỡng</label>
+                                    <textarea 
+                                        className="form-textarea" 
+                                        rows="2" 
+                                        value={healthForm.notes}
+                                        onChange={e => setHealthForm({ ...healthForm, notes: e.target.value })}
+                                    />
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                                    <button 
+                                        type="button" 
+                                        className="btn btn-sm btn-outline" 
+                                        onClick={() => setShowHealthForm(false)}
+                                    >
+                                        Hủy
+                                    </button>
+                                    <button type="submit" className="btn btn-sm btn-primary">
+                                        Lưu Vào Cơ Sở Dữ Liệu
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    )}
+
+                    {/* Recent Health Logs List */}
+                    <div className="admin-card" style={{ padding: '8px 16px', maxHeight: '420px', overflowY: 'auto' }}>
+                        {filteredHealthLogs.length > 0 ? (
+                            filteredHealthLogs.map(log => (
+                                <div 
+                                    key={log.id} 
+                                    style={{
+                                        padding: '10px 0',
+                                        borderBottom: '1px solid #F1F5F9'
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                                        <div style={{ fontWeight: 600, fontSize: '0.88rem', color: '#0F172A' }}>
+                                            {log.animalName} <span className="font-mono text-xs text-muted">({log.animalCode})</span>
+                                        </div>
+                                        <span className="badge badge-info text-xs">{log.healthStatus}</span>
+                                    </div>
+                                    <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                                        Ngày khám: {log.date} • Bác sĩ: {log.veterinarian} • {log.weightKg} kg • {log.temperatureC}°C
+                                    </div>
+                                    {log.notes && (
+                                        <div style={{ fontSize: '0.78rem', color: '#475569', marginTop: '3px' }}>
+                                            Ghi chú: {log.notes}
+                                        </div>
                                     )}
                                 </div>
                             ))
                         ) : (
-                            <div className="admin-card text-center text-muted p-6" style={{ marginBottom: '20px' }}>
-                                <div style={{ fontWeight: '600', color: '#1E293B', marginBottom: '4px', fontSize: '1rem' }}>
-                                    Không có nhật ký y tế nào phù hợp với bộ lọc đã chọn
-                                </div>
-                                <p style={{ margin: '0 0 16px 0', fontSize: '0.85rem' }}>
-                                    Thời gian: {appliedFilter.label} {appliedFilter.rangeDesc ? `(${appliedFilter.rangeDesc})` : ''}
-                                    {healthStatusFilter !== 'all' ? ` • Tình trạng: ${healthStatusFilter}` : ''}
-                                    {selectedAnimalFilter !== 'all' ? ` • Cá thể: ${selectedAnimalFilter}` : ''}
-                                </p>
-                                {hasActiveFilters && (
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline"
-                                        onClick={handleResetFilter}
-                                    >
-                                        Đặt lại bộ lọc
-                                    </button>
-                                )}
+                            <div className="text-center p-6 text-muted text-xs">
+                                Chưa có hồ sơ y tế nào.
                             </div>
                         )}
                     </div>
-
-                    {/* Operational Activities Section */}
-                    {stats.recentActivities && stats.recentActivities.length > 0 && (
-                        <div style={{ marginTop: '20px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                                <h3 className="font-bold text-base m-0">Dòng Hoạt Động Vận Hành Gần Nhất</h3>
-                                <span className="text-xs text-muted">{stats.recentActivities.length} sự kiện</span>
-                            </div>
-                            <div className="admin-card" style={{ padding: '8px 16px' }}>
-                                {stats.recentActivities.map((act, idx) => (
-                                    <div 
-                                        key={idx} 
-                                        style={{ 
-                                            padding: '10px 0', 
-                                            borderBottom: idx !== stats.recentActivities.length - 1 ? '1px dashed #E2E8F0' : 'none',
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            gap: '12px'
-                                        }}
-                                    >
-                                        <div>
-                                            <div style={{ fontWeight: '700', fontSize: '0.88rem', color: '#1E293B' }}>
-                                                {act.title}
-                                            </div>
-                                            <div style={{ fontSize: '0.8rem', color: '#64748B' }}>
-                                                {act.description}
-                                            </div>
-                                        </div>
-                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                            <span className={`badge ${act.type === 'Ticket' ? 'badge-success' : 'badge-info'}`} style={{ fontSize: '0.72rem' }}>
-                                                {act.type}
-                                            </span>
-                                            <div style={{ fontSize: '0.75rem', color: '#94A3B8', marginTop: '2px' }}>
-                                                {new Date(act.timestamp).toLocaleDateString('vi-VN')}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Right: Add Health Log Form */}
-                <div className="admin-card">
-                    <h3 className="font-bold text-base mb-3">Ghi Nhận Kiểm Tra Sức Khỏe Mới</h3>
-                    <form id="admin-health-form" onSubmit={handleHealthSubmit}>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="health-select-animal">Chọn động vật kiểm tra</label>
-                            <select 
-                                id="health-select-animal" 
-                                className="form-select" 
-                                required
-                                value={healthForm.animalCode}
-                                onChange={(e) => setHealthForm({ ...healthForm, animalCode: e.target.value })}
-                            >
-                                {animalOptions.map(a => (
-                                    <option key={a.code || a.id} value={a.code || a.id}>
-                                        {a.nameVi || a.name} ({a.code || `ANI-${a.id}`})
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div className="form-grid-2">
-                            <div className="form-group">
-                                <label className="form-label" htmlFor="health-input-vet">Bác sĩ phụ trách</label>
-                                <input 
-                                    type="text" 
-                                    id="health-input-vet" 
-                                    className="form-input" 
-                                    required
-                                    value={healthForm.veterinarian}
-                                    onChange={(e) => setHealthForm({ ...healthForm, veterinarian: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" htmlFor="health-input-status">Tình trạng chung</label>
-                                <select 
-                                    id="health-input-status" 
-                                    className="form-select"
-                                    value={healthForm.healthStatus}
-                                    onChange={(e) => setHealthForm({ ...healthForm, healthStatus: e.target.value })}
-                                >
-                                    <option value="Rất tốt">Rất tốt</option>
-                                    <option value="Khỏe mạnh">Khỏe mạnh</option>
-                                    <option value="Theo dõi định kỳ">Theo dõi định kỳ</option>
-                                    <option value="Cần cách ly chăm sóc">Cần cách ly chăm sóc</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div className="form-grid-2">
-                            <div className="form-group">
-                                <label className="form-label" htmlFor="health-input-weight">Cân nặng (kg)</label>
-                                <input 
-                                    type="number" 
-                                    step="0.1" 
-                                    id="health-input-weight" 
-                                    className="form-input" 
-                                    placeholder="VD: 215.5" 
-                                    required
-                                    value={healthForm.weightKg}
-                                    onChange={(e) => setHealthForm({ ...healthForm, weightKg: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-label" htmlFor="health-input-temp">Thân nhiệt (°C)</label>
-                                <input 
-                                    type="number" 
-                                    step="0.1" 
-                                    id="health-input-temp" 
-                                    className="form-input" 
-                                    required
-                                    value={healthForm.temperatureC}
-                                    onChange={(e) => setHealthForm({ ...healthForm, temperatureC: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="health-input-notes">Ghi chú lâm sàng & chế độ ăn</label>
-                            <textarea 
-                                id="health-input-notes" 
-                                className="form-textarea" 
-                                rows="2" 
-                                placeholder="Ghi nhận hoạt động, ăn uống, móng răng..."
-                                value={healthForm.notes}
-                                onChange={(e) => setHealthForm({ ...healthForm, notes: e.target.value })}
-                            ></textarea>
-                        </div>
-                        <div className="form-group">
-                            <label className="form-label" htmlFor="health-input-action">Hành động y tế cần tiếp theo</label>
-                            <input 
-                                type="text" 
-                                id="health-input-action" 
-                                className="form-input" 
-                                placeholder="VD: Bổ sung canxi tuần tới"
-                                value={healthForm.actionRequired}
-                                onChange={(e) => setHealthForm({ ...healthForm, actionRequired: e.target.value })}
-                            />
-                        </div>
-                        <button type="submit" className="btn btn-primary w-full" style={{ width: '100%' }}>
-                            Lưu Nhật Ký Sức Khỏe
-                        </button>
-                    </form>
                 </div>
             </div>
         </div>

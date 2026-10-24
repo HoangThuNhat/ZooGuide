@@ -50,7 +50,7 @@ export default function OfflineBanner() {
                                 </svg>
                             </span>
                             <div className="banner-text">
-                                <strong>Chế độ ngoại tuyến:</strong> Thiết bị mất kết nối mạng. Bạn vẫn có thể duyệt giao diện App Shell đã lưu; các tác vụ quét vé, phiên tham quan và chatbot yêu cầu kết nối mạng.
+                                <strong>Chế độ ngoại tuyến:</strong> Thiết bị mất kết nối mạng. Bạn vẫn có thể duyệt giao diện App Shell đã lưu; các tác vụ quét vé và phiên tham quan yêu cầu kết nối mạng.
                             </div>
                             <button 
                                 className="banner-dismiss-btn"

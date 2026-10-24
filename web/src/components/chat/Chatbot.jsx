@@ -151,7 +151,11 @@ export default function Chatbot() {
                     {/* Header */}
                     <div className="chatbot-header">
                         <div className="flex items-center gap-2">
-                            <span style={{ fontSize: '1.1rem' }}>🦁</span>
+                            <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF' }}>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            </div>
                             <div>
                                 <h4 className="font-bold text-sm">ZooBot Trợ Lý Vườn Thú</h4>
                                 <span className="text-xs opacity-80">Kết nối cơ sở dữ liệu thực tế 24/7</span>
@@ -183,8 +187,8 @@ export default function Chatbot() {
                             {quota.hasValidTicket 
                                 ? '✓ Vé Hợp Lệ • Không giới hạn câu hỏi' 
                                 : (quota.isLimitReached 
-                                    ? '🔒 Đã dùng hết 3 câu hỏi miễn phí' 
-                                    : `🎟️ Khách chưa có vé • Bạn còn ${quota.remainingQuestions}/3 câu hỏi miễn phí`)}
+                                    ? 'Đã dùng hết 3 câu hỏi miễn phí' 
+                                    : `Khách chưa kích hoạt vé • Còn ${quota.remainingQuestions}/3 câu hỏi miễn phí`)}
                         </span>
                         {!quota.hasValidTicket && (
                             <button 
@@ -253,7 +257,7 @@ export default function Chatbot() {
                             gap: '6px'
                         }}>
                             <div>
-                                <strong>⚠️ Giới hạn câu hỏi:</strong> Bạn đã sử dụng hết 3 câu hỏi miễn phí. Vui lòng kích hoạt vé tham quan hợp lệ để tiếp tục sử dụng chatbot.
+                                <strong>Giới hạn câu hỏi:</strong> Bạn đã sử dụng hết 3 câu hỏi miễn phí. Vui lòng kích hoạt vé tham quan hợp lệ để tiếp tục sử dụng chatbot.
                             </div>
                             <button 
                                 type="button" 
@@ -261,7 +265,7 @@ export default function Chatbot() {
                                 style={{ alignSelf: 'flex-start', padding: '4px 10px', fontSize: '0.78rem' }}
                                 onClick={() => setIsTicketModalOpen(true)}
                             >
-                                🎟️ Kích hoạt vé tham quan
+                                Kích hoạt vé tham quan
                             </button>
                         </div>
                     )}

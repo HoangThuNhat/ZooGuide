@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ZooGuide - Live Supabase API & Data Access Layer
  * Connects exclusively to ASP.NET Core API backed by Supabase PostgreSQL & Storage.
  * Strictly zero mock data, zero hardcoded fallback datasets, and zero fake audio/translations.
@@ -1448,6 +1448,230 @@ export const ZooApi = {
                 success: false,
                 error: err.message || 'Không thể kết nối đến trợ lý ZooBot.'
             };
+        }
+    }
+    ,
+    // 19. DEVICE HEARTBEAT & MONITORING
+    async sendDeviceHeartbeat(installationId) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/devices/heartbeat`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ installationId })
+            });
+            if (!res.ok) return { success: false };
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    async getActiveDevicesSummary() {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/devices/active-count`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('getActiveDevicesSummary error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    // 20. POINTS OF INTEREST (POI) & NARRATIONS
+    async getPois(filter = {}) {
+        try {
+            const params = new URLSearchParams();
+            if (filter.category && filter.category !== 'all') params.append('category', filter.category);
+            if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') params.append('isActive', filter.isActive);
+            if (filter.isVerified !== undefined && filter.isVerified !== null && filter.isVerified !== '') params.append('isVerified', filter.isVerified);
+            if (filter.search) params.append('search', filter.search);
+            if (filter.areaId) params.append('areaId', filter.areaId);
+
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois${qs}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data || [] };
+        } catch (err) {
+            console.error('getPois error:', err);
+            return { success: false, data: [], error: err.message };
+        }
+    },
+
+    async getPoiById(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('getPoiById error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async createPoi(dto) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dto)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi khi tạo điểm tham quan');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('createPoi error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async updatePoi(id, dto) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dto)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi khi cập nhật điểm tham quan');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('updatePoi error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async updatePoiStatus(id, isActive) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}/status?isActive=${Boolean(isActive)}`, {
+                method: 'PATCH'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi khi cập nhật trạng thái POI');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('updatePoiStatus error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async verifyPoiCoordinates(id, isVerified, verificationSource = '') {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}/verify-coordinates`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isVerified, verificationSource })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi khi kiểm định tọa độ POI');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('verifyPoiCoordinates error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async deletePoi(id) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi khi xóa điểm tham quan');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('deletePoi error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async getPoiNarrations(poiId) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data || [] };
+        } catch (err) {
+            console.error('getPoiNarrations error:', err);
+            return { success: false, data: [], error: err.message };
+        }
+    },
+
+    async addPoiNarration(poiId, dto) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dto)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi thêm thuyết minh POI');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('addPoiNarration error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async updatePoiNarration(poiId, narrationId, dto) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dto)
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi cập nhật thuyết minh POI');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('updatePoiNarration error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async deletePoiNarration(poiId, narrationId) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi xóa thuyết minh POI');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('deletePoiNarration error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async uploadPoiNarrationAudio(poiId, narrationId, file) {
+        try {
+            const formData = new FormData();
+            formData.append('audioFile', file);
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}/audio`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.message || 'Lỗi tải lên file âm thanh');
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('uploadPoiNarrationAudio error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async getPoiPublicNarration(poiId, lang = 'vi') {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/public-narration?lang=${encodeURIComponent(lang)}`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('getPoiPublicNarration error:', err);
+            return { success: false, error: err.message };
         }
     }
 };

@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ZooApi } from '../../services/api';
 
@@ -19,7 +19,6 @@ import AnimalDetailModal from '../../components/animals/AnimalDetailModal';
 import SpeciesNarrationModal from '../../components/species/SpeciesNarrationModal';
 import TranscriptModal from '../../components/audio/TranscriptModal';
 import AudioPlayerBar from '../../components/audio/AudioPlayerBar';
-import Chatbot from '../../components/chat/Chatbot';
 import ErrorBoundary from '../../components/common/ErrorBoundary';
 
 export default function VisitorPortal() {
@@ -275,6 +274,55 @@ export default function VisitorPortal() {
         };
     }, []);
 
+    const playPoiAudio = useCallback(async (poiId, startAutoplay = true) => {
+        try {
+            const res = await ZooApi.getPoiPublicNarration(poiId, currentLang);
+            if (!res.success) {
+                showToast(res.message || 'Chưa có bài thuyết minh cho điểm tham quan này.', 'error');
+                return;
+            }
+            const data = res.data;
+            const poiObj = {
+                id: `poi_${data.poiId}`,
+                name: data.poiName,
+                nameVi: data.poiName,
+                imageUrl: data.imageUrl || '',
+                scientificName: `Điểm tham quan (${data.category || 'POI'})`
+            };
+            const duration = data.durationSeconds || 60;
+            const narrationData = {
+                title: data.title || data.poiName,
+                narrator: 'ZooGuide Audio',
+                audioSrc: data.audioUrl,
+                publicUrl: data.audioUrl,
+                content: data.content,
+                transcript: data.content,
+                durationFormatted: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
+                durationSec: duration,
+                hasAudio: Boolean(data.audioUrl)
+            };
+            setAudioState({
+                animal: poiObj,
+                narration: narrationData,
+                isPlaying: Boolean(data.audioUrl && startAutoplay),
+                currentTime: 0,
+                duration,
+                playbackRate: 1.0,
+                isVisible: true
+            });
+            if (data.isFallbackLanguage) {
+                showToast(data.fallbackMessage || `Đang phát thuyết minh bằng ngôn ngữ dự phòng (${data.languageCode?.toUpperCase()}).`, 'info');
+            }
+            if (startAutoplay && data.audioUrl) {
+                startAudioPlayback(narrationData, 1.0);
+            } else if (!data.audioUrl) {
+                showToast('Điểm tham quan này hiện chưa có file âm thanh thuyết minh.', 'info');
+            }
+        } catch (err) {
+            showToast('Không thể phát thuyết minh: ' + err.message, 'error');
+        }
+    }, [currentLang, setAudioState, showToast, startAudioPlayback]);
+
     const handleLocateMap = (entity) => {
         if (entity) {
             setNavTargetAnimal(entity);
@@ -296,6 +344,7 @@ export default function VisitorPortal() {
                                 onPlayAudio={playAnimalAudio}
                                 onOpenSpeciesNarration={(species) => setSelectedSpeciesForNarration(species)}
                                 onOpenDetail={(animal) => setSelectedAnimalForDetail(animal)}
+                                onPlayPoiAudio={playPoiAudio}
                             />
                         )}
 
@@ -329,7 +378,6 @@ export default function VisitorPortal() {
             />
 
             <MobileBottomNav />
-            <Chatbot />
 
             <TicketModal />
             <AnimalDetailModal

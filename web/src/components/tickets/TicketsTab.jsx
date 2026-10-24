@@ -355,8 +355,8 @@ export default function TicketsTab() {
                 gap: '8px',
                 marginBottom: '20px',
                 background: '#FFFFFF',
-                padding: '5px',
-                borderRadius: '16px',
+                padding: '4px',
+                borderRadius: '8px',
                 border: '1px solid #E2E8F0',
                 boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 maxWidth: '600px'
@@ -365,10 +365,10 @@ export default function TicketsTab() {
                     onClick={() => setActiveTabMode('buy')}
                     style={{
                         flex: 1,
-                        padding: '10px 16px',
-                        borderRadius: '12px',
-                        fontWeight: 700,
-                        fontSize: '0.88rem',
+                        padding: '9px 16px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
                         cursor: 'pointer',
                         border: 'none',
                         background: activeTabMode === 'buy' ? '#15803D' : 'transparent',
@@ -382,10 +382,10 @@ export default function TicketsTab() {
                     onClick={() => setActiveTabMode('activate')}
                     style={{
                         flex: 1,
-                        padding: '10px 16px',
-                        borderRadius: '12px',
-                        fontWeight: 700,
-                        fontSize: '0.88rem',
+                        padding: '9px 16px',
+                        borderRadius: '6px',
+                        fontWeight: 600,
+                        fontSize: '0.875rem',
                         cursor: 'pointer',
                         border: 'none',
                         background: activeTabMode === 'activate' ? '#15803D' : 'transparent',
@@ -399,7 +399,7 @@ export default function TicketsTab() {
 
             <div className="ticket-page-layout">
                 {/* CỘT TRÁI: FORM ĐẶT VÉ / THANH TOÁN QR / QUÉT MÃ */}
-                <div className="ticket-scan-box" style={{ background: '#FFFFFF', borderRadius: '20px', border: '1px solid #E2E8F0', padding: '24px', boxShadow: '0 4px 16px rgba(0,0,0,0.03)' }}>
+                <div className="ticket-scan-box" style={{ background: '#FFFFFF', borderRadius: '10px', border: '1px solid #E2E8F0', padding: '24px', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
                     
                     {/* TAB 1: MUA VÉ TRỰC TUYẾN & THANH TOÁN VIETQR */}
                     {activeTabMode === 'buy' && (
@@ -442,7 +442,7 @@ export default function TicketsTab() {
                                                                 justifyContent: 'space-between',
                                                                 alignItems: 'center',
                                                                 padding: '12px 16px',
-                                                                borderRadius: '14px',
+                                                                borderRadius: '8px',
                                                                 background: qty > 0 ? '#F0FDF4' : '#F8FAFC',
                                                                 border: `1.5px solid ${qty > 0 ? '#86EFAC' : '#E2E8F0'}`,
                                                                 transition: 'all 0.15s ease'

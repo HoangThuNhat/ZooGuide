@@ -30,6 +30,11 @@ public class ZooGuideDbContext : DbContext
     public virtual DbSet<Audio> Audios => Set<Audio>();
     public virtual DbSet<VisitHistory> VisitHistories => Set<VisitHistory>();
 
+    // POI & Device Management
+    public virtual DbSet<DeviceActivity> DeviceActivities => Set<DeviceActivity>();
+    public virtual DbSet<PointOfInterest> PointsOfInterest => Set<PointOfInterest>();
+    public virtual DbSet<PoiNarration> PoiNarrations => Set<PoiNarration>();
+
     // Extended Sets
     public virtual DbSet<LocationLog> LocationLogs => Set<LocationLog>();
     public virtual DbSet<MembershipLevel> MembershipLevels => Set<MembershipLevel>();

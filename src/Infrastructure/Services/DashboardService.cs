@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.Interfaces;
@@ -32,7 +36,22 @@ public class DashboardService : IDashboardService
             utcTo = utcTo.Value.Date.AddDays(1).AddTicks(-1);
         }
 
-        // 1. Dữ liệu vé (có trường ngày phát hành IssuedAt / CreatedAt -> chịu ảnh hưởng của bộ lọc thời gian)
+        // 1. Truthful active-device monitoring (last 5 minutes)
+        var cutoff5Min = now.AddMinutes(-5);
+        var deviceStats = await _context.DeviceActivities
+            .AsNoTracking()
+            .GroupBy(d => 1)
+            .Select(g => new
+            {
+                Total = g.Count(),
+                Active5Min = g.Count(d => d.LastSeenAt >= cutoff5Min)
+            })
+            .FirstOrDefaultAsync();
+
+        var totalTrackedDevices = deviceStats?.Total ?? 0;
+        var activeDevices5Min = deviceStats?.Active5Min ?? 0;
+
+        // 2. Dữ liệu vé theo bộ lọc thời gian
         var ticketQuery = _context.Tickets.AsQueryable();
         if (utcFrom.HasValue)
         {
@@ -47,14 +66,74 @@ public class DashboardService : IDashboardService
         var activeTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
         var expiredTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
 
-        // 2. Chỉ số tổng tích lũy không phụ thuộc thời gian (Động vật, Loài sinh thái, Khu chuồng trại, Thuyết minh, Audio)
+        // 3. Current Inventory Metrics (không phụ thuộc bộ lọc lịch sử)
         var totalAnimals = await _context.Animals.CountAsync();
         var totalSpecies = await _context.Species.CountAsync();
         var totalAreas = await _context.Areas.CountAsync();
+        var totalEnclosures = await _context.Enclosures.CountAsync();
         var totalNarrations = await _context.Narrations.CountAsync();
         var totalAudios = await _context.Audios.CountAsync();
 
-        // 3. Phiên khách tham quan (StartedAt trong kỳ)
+        // 4. POI & Narration Health Metrics (Single aggregated query)
+        var poiSummary = await _context.PointsOfInterest
+            .AsNoTracking()
+            .Select(p => new
+            {
+                p.IsActive,
+                p.IsCoordinateVerified,
+                HasPublishedNarration = p.Narrations.Any(n => n.Status == NarrationStatus.Published),
+                HasAudio = p.Narrations.Any(n => n.Status == NarrationStatus.Published && !string.IsNullOrEmpty(n.AudioUrl))
+            })
+            .ToListAsync();
+
+        var totalPois = poiSummary.Count;
+        var activePois = poiSummary.Count(p => p.IsActive);
+        var verifiedPois = poiSummary.Count(p => p.IsCoordinateVerified);
+        var unverifiedPois = totalPois - verifiedPois;
+        var poisWithNarration = poiSummary.Count(p => p.HasPublishedNarration);
+        var poisMissingNarration = totalPois - poisWithNarration;
+        var poisMissingAudio = poiSummary.Count(p => !p.HasAudio);
+
+        // 5. Language Breakdown for Narrations and Audios
+        var languages = await _context.Languages
+            .Where(l => l.IsActive)
+            .OrderBy(l => l.Code)
+            .Select(l => new
+            {
+                l.LanguageId,
+                l.Code,
+                l.Name
+            })
+            .ToListAsync();
+
+        var animalNarrByLang = await _context.Narrations
+            .Where(n => n.Status == NarrationStatus.Published)
+            .GroupBy(n => n.LanguageId)
+            .Select(g => new { LanguageId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.LanguageId, g => g.Count);
+
+        var poiNarrByLang = await _context.PoiNarrations
+            .Where(n => n.Status == NarrationStatus.Published)
+            .GroupBy(n => n.LanguageId)
+            .Select(g => new { LanguageId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.LanguageId, g => g.Count);
+
+        var audiosByLang = await _context.Audios
+            .Where(a => a.Status == AudioStatus.Active && a.LanguageCode != null)
+            .GroupBy(a => a.LanguageCode!.ToLower())
+            .Select(g => new { LanguageCode = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.LanguageCode, g => g.Count);
+
+        var languageStats = languages.Select(l => new DashboardLanguageStatDto
+        {
+            LanguageCode = l.Code,
+            LanguageName = l.Name,
+            AnimalNarrationsCount = animalNarrByLang.TryGetValue(l.LanguageId, out var anc) ? anc : 0,
+            PoiNarrationsCount = poiNarrByLang.TryGetValue(l.LanguageId, out var pnc) ? pnc : 0,
+            AudioFilesCount = audiosByLang.TryGetValue(l.Code.ToLower(), out var ac) ? ac : 0
+        }).ToList();
+
+        // 6. Phiên khách tham quan trong kỳ
         var sessionQuery = _context.TicketSessions.AsQueryable();
         if (utcFrom.HasValue)
         {
@@ -67,7 +146,7 @@ public class DashboardService : IDashboardService
 
         var activeSessions = await sessionQuery.CountAsync(s => s.Status == SessionStatus.Active && (s.ExpiredAt > now || !utcFrom.HasValue));
 
-        // 4. Lấy danh sách kiểm tra sức khỏe từ các cá thể động vật thực tế theo thời gian cập nhật
+        // 7. Lấy danh sách kiểm tra sức khỏe
         var animalQuery = _context.Animals
             .Include(a => a.Species)
             .AsQueryable();
@@ -102,7 +181,7 @@ public class DashboardService : IDashboardService
                 : (a.Status == AnimalStatus.UnderTreatment ? "Cần theo dõi sát sao phác đồ điều trị" : string.Empty)
         }).ToList();
 
-        // 5. Lấy các hoạt động gần đây trong kỳ
+        // 8. Lấy các hoạt động thực tế gần đây (Tickets, Animals, POIs, Narrations)
         var recentTickets = await ticketQuery
             .OrderByDescending(t => t.IssuedAt)
             .Take(3)
@@ -127,21 +206,45 @@ public class DashboardService : IDashboardService
             })
             .ToListAsync();
 
-        var activities = recentTickets.Concat(recentAnimals)
+        var recentPois = await _context.PointsOfInterest
+            .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+            .Take(2)
+            .Select(p => new DashboardActivityDto
+            {
+                Title = $"Điểm tham quan {p.Name} ({p.Code})",
+                Description = $"Phân loại: {p.Category}, tọa độ {(p.IsCoordinateVerified ? "đã xác thực" : "chưa xác thực")}",
+                Type = "POI",
+                Timestamp = p.UpdatedAt ?? p.CreatedAt
+            })
+            .ToListAsync();
+
+        var activities = recentTickets.Concat(recentAnimals).Concat(recentPois)
             .OrderByDescending(a => a.Timestamp)
+            .Take(8)
             .ToList();
 
         return new DashboardStatsDto
         {
+            ActiveDevices5Min = activeDevices5Min,
+            TotalTrackedDevices = totalTrackedDevices,
+            ActiveSessions = activeSessions,
             TotalTickets = totalTickets,
             ActiveTickets = activeTickets,
             ExpiredTickets = expiredTickets,
             TotalAnimals = totalAnimals,
             TotalSpecies = totalSpecies,
             TotalAreas = totalAreas,
+            TotalEnclosures = totalEnclosures,
+            TotalPois = totalPois,
+            ActivePois = activePois,
+            VerifiedPois = verifiedPois,
+            UnverifiedPois = unverifiedPois,
+            PoisWithNarration = poisWithNarration,
+            PoisMissingNarration = poisMissingNarration,
+            PoisMissingAudio = poisMissingAudio,
             TotalNarrations = totalNarrations,
             TotalAudios = totalAudios,
-            ActiveSessions = activeSessions,
+            LanguageStats = languageStats,
             RecentHealthLogs = healthLogs,
             RecentActivities = activities
         };

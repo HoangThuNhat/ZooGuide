@@ -118,12 +118,17 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
             <div className="container" style={{ paddingBottom: '80px' }}>
                 <div style={{ marginBottom: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                        <span style={{ fontSize: '1.8rem' }}>🎧</span>
+                        <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', flexShrink: 0 }}>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                            </svg>
+                        </div>
                         <div>
-                            <h2 style={{ fontSize: '1.35rem', fontWeight: '800', margin: 0, color: '#0F172A' }}>
+                            <h2 style={{ fontSize: '1.25rem', fontWeight: '700', margin: 0, color: '#0F172A' }}>
                                 {t?.speciesTitle || 'Thuyết Minh Các Loài (Species Audio Guide)'}
                             </h2>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: '#64748B' }}>
+                            <p style={{ margin: 0, fontSize: '0.84rem', color: '#64748B' }}>
                                 {t?.speciesSubtitle || 'Chọn một loài động vật để nghe bài thuyết minh tự động đa ngôn ngữ, xem thông tin sinh học và các cá thể nuôi dưỡng.'}
                             </p>
                         </div>
@@ -132,44 +137,55 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
 
                 {/* Search & Filter Bar */}
                 <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px', alignItems: 'center' }}>
-                    <div style={{ flex: '1 1 260px' }}>
+                    <div style={{ flex: '1 1 260px', position: 'relative' }}>
                         <input
                             type="text"
                             className="form-control"
-                            style={{ borderRadius: '24px', padding: '10px 18px', fontSize: '0.9rem' }}
-                            placeholder={t?.speciesSearchPlaceholder || '🔍 Tìm loài hoặc tên khoa học...'}
+                            style={{ borderRadius: '6px', padding: '8px 14px 8px 34px', fontSize: '0.875rem', width: '100%', border: '1px solid #CBD5E1' }}
+                            placeholder={t?.speciesSearchPlaceholder?.replace('🔍 ', '') || 'Tìm loài hoặc tên khoa học...'}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
+                        <span style={{ position: 'absolute', left: '11px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, display: 'flex' }}>
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                            </svg>
+                        </span>
                     </div>
 
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                         <button
                             className={`btn btn-sm ${selectedIucn === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                            style={{ borderRadius: '6px' }}
                             onClick={() => setSelectedIucn('all')}
                         >
                             {t?.filterAll || 'Tất cả'} ({speciesWithDetails.length})
                         </button>
                         <button
                             className={`btn btn-sm ${selectedIucn === 'CR' ? 'btn-danger' : 'btn-outline'}`}
+                            style={{ borderRadius: '6px' }}
                             onClick={() => setSelectedIucn(selectedIucn === 'CR' ? 'all' : 'CR')}
                         >
                             CR
                         </button>
                         <button
                             className={`btn btn-sm ${selectedIucn === 'EN' ? 'btn-warning' : 'btn-outline'}`}
+                            style={{ borderRadius: '6px' }}
                             onClick={() => setSelectedIucn(selectedIucn === 'EN' ? 'all' : 'EN')}
                         >
                             EN
                         </button>
                         <button
                             className={`btn btn-sm ${selectedIucn === 'VU' ? 'btn-warning' : 'btn-outline'}`}
+                            style={{ borderRadius: '6px' }}
                             onClick={() => setSelectedIucn(selectedIucn === 'VU' ? 'all' : 'VU')}
                         >
                             VU
                         </button>
                         <button
                             className={`btn btn-sm ${selectedIucn === 'LC' ? 'btn-success' : 'btn-outline'}`}
+                            style={{ borderRadius: '6px' }}
                             onClick={() => setSelectedIucn(selectedIucn === 'LC' ? 'all' : 'LC')}
                         >
                             LC
@@ -218,14 +234,15 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                                     key={sp.id}
                                     className="card"
                                     style={{
-                                        borderRadius: '14px',
+                                        borderRadius: '10px',
                                         overflow: 'hidden',
                                         display: 'flex',
                                         flexDirection: 'column',
                                         transition: 'transform 0.2s, box-shadow 0.2s',
                                         cursor: 'pointer',
-                                        border: '1.5px solid #E2E8F0',
-                                        backgroundColor: '#FFFFFF'
+                                        border: '1px solid #E2E8F0',
+                                        backgroundColor: '#FFFFFF',
+                                        boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                                     }}
                                     onClick={() => {
                                         if (onSelectSpecies) onSelectSpecies(sp);
@@ -291,8 +308,8 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
 
                                         <div style={{ marginTop: 'auto', marginBottom: '12px' }}>
                                             {animalCount > 0 ? (
-                                                <div style={{ fontSize: '0.76rem', color: '#2563EB', backgroundColor: '#EFF6FF', padding: '4px 8px', borderRadius: '6px' }}>
-                                                    🐾 <strong>{animalCount} {t?.individualsCount || 'cá thể'}:</strong> {sp.animals.map(a => a.name || a.nameVi).join(', ')}
+                                                <div style={{ fontSize: '0.76rem', color: '#15803D', backgroundColor: '#F0FDF4', padding: '4px 8px', borderRadius: '6px', border: '1px solid #DCFCE7' }}>
+                                                    <strong>{animalCount} {t?.individualsCount || 'cá thể'}:</strong> {sp.animals.map(a => a.name || a.nameVi).join(', ')}
                                                 </div>
                                             ) : (
                                                 <div style={{ fontSize: '0.74rem', color: '#94A3B8', fontStyle: 'italic' }}>
@@ -305,7 +322,7 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                                             <button
                                                 type="button"
                                                 className="btn btn-primary btn-sm"
-                                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px' }}
+                                                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px 12px', borderRadius: '6px' }}
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     if (onSelectSpecies) onSelectSpecies(sp);
@@ -321,14 +338,18 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                                                 <button
                                                     type="button"
                                                     className="btn btn-outline btn-sm"
-                                                    style={{ padding: '8px 10px' }}
+                                                    style={{ padding: '8px 10px', borderRadius: '6px' }}
                                                     title={t?.viewOnMap || 'Bản đồ'}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         onLocateMap(sp.animals[0] || sp);
                                                     }}
                                                 >
-                                                    🗺
+                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                                                        <line x1="8" y1="2" x2="8" y2="18"></line>
+                                                        <line x1="16" y1="6" x2="16" y2="22"></line>
+                                                    </svg>
                                                 </button>
                                             )}
                                         </div>

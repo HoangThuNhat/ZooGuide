@@ -74,6 +74,8 @@ builder.Services.AddScoped<IAreaService, AreaService>();
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
 builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDeviceTrackingService, ZooGuide.Infrastructure.Services.DeviceTrackingService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.IPoiService, ZooGuide.Infrastructure.Services.PoiService>();
 
 // Register Services for Dashboard, Narration, Chatbot, Audit
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IAuditLogService, ZooGuide.Infrastructure.Services.AuditLogService>();

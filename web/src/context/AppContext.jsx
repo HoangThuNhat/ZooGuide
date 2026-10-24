@@ -23,13 +23,14 @@ export const DEFAULT_LANGUAGES = [
 
 export const translations = {
     vi: {
-        appTitle: 'ZooGuide • Thuyết Minh Tự Động Sở Thú',
-        brandSubtitle: 'Hệ Thống Thuyết Minh Đa Ngôn Ngữ',
+        appTitle: 'ZooGuide • Thảo Cầm Viên Sài Gòn',
+        brandSubtitle: 'Thảo Cầm Viên Sài Gòn',
         tabMap: 'Bản Đồ',
-        tabSpeciesAudio: 'Thuyết Minh Loài',
-        tabAnimals: 'Khám Phá Cá Thể',
+        tabSpeciesAudio: 'Thuyết Minh',
+        tabAnimals: 'Khám Phá Động Vật',
         tabTicket: 'Vé Tham Quan',
         tabAdmin: 'Khu Quản Lý',
+        headerTicketActivate: 'Kích Hoạt Vé',
         heroTag: 'HỆ THỐNG THUYẾT MINH THÔNG MINH',
         heroTitle: 'Thuyết Minh Tự Động & Định Vị Sở Thú Đa Ngôn Ngữ',
         heroDesc: 'Trải nghiệm tham quan Thảo Cầm Viên tương tác thực tế: quét vé mở khóa thuyết minh 12 ngôn ngữ, dẫn đường Dijkstra trên bản đồ và trợ lý ảo giải đáp trực tuyến.',
@@ -93,13 +94,14 @@ export const translations = {
         animalListenBtn: 'Nghe Thuyết Minh Tự Động'
     },
     en: {
-        appTitle: 'ZooGuide • Multilingual Smart Zoo Audio Tour',
-        brandSubtitle: 'Multilingual Smart Audio Tour',
+        appTitle: 'ZooGuide • Saigon Zoo & Botanical Gardens',
+        brandSubtitle: 'Saigon Zoo & Botanical Gardens',
         tabMap: 'Interactive Map',
-        tabSpeciesAudio: 'Species Audio',
-        tabAnimals: 'Discover Animals',
-        tabTicket: 'Visitor Ticket',
+        tabSpeciesAudio: 'Audio Guide',
+        tabAnimals: 'Animals Explorer',
+        tabTicket: 'Tickets',
         tabAdmin: 'Staff & Admin',
+        headerTicketActivate: 'Activate Ticket',
         heroTag: 'MULTILINGUAL AUDIO TOUR SYSTEM',
         heroTitle: 'Smart Zoo Audio Narration & Wayfinding System',
         heroDesc: 'Explore the botanical & zoological sanctuary with 12-language audio guides, real-time Dijkstra pathfinding, and an interactive wildlife assistant.',

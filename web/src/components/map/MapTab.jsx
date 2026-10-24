@@ -219,7 +219,7 @@ const REAL_MAP_LANDMARKS = [
     }
 ];
 
-export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration }) {
+export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration, onPlayPoiAudio }) {
     const { 
         showToast, 
         navTargetAnimal,
@@ -231,6 +231,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const [areas, setAreas] = useState([]);
     const [enclosures, setEnclosures] = useState([]);
     const [animals, setAnimals] = useState([]);
+    const [dbPois, setDbPois] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
 
@@ -256,15 +257,17 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         setIsLoading(true);
         setLoadError(null);
         try {
-            const [resAreas, resEnclosures, resAnimals] = await Promise.all([
+            const [resAreas, resEnclosures, resAnimals, resPois] = await Promise.all([
                 ZooApi.getAreas(lang),
                 ZooApi.getEnclosures({ lang }),
-                ZooApi.getAnimals({ lang })
+                ZooApi.getAnimals({ lang }),
+                ZooApi.getPois({ isActive: true })
             ]);
 
             if (resAreas && resAreas.success) setAreas(resAreas.data || []);
             if (resEnclosures && resEnclosures.success) setEnclosures(resEnclosures.data || []);
             if (resAnimals && resAnimals.success) setAnimals(resAnimals.data || []);
+            if (resPois && resPois.success) setDbPois(resPois.data || []);
         } catch (err) {
             console.error("MapTab loadMapData error:", err);
             setLoadError(err.message || "Không thể kết nối đến máy chủ cơ sở dữ liệu.");
@@ -327,8 +330,46 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             }
         });
 
+        // Bổ sung các điểm POI thực tế từ cơ sở dữ liệu
+        if (dbPois && dbPois.length > 0) {
+            dbPois.forEach(poi => {
+                const matchIdx = markerList.findIndex(m => 
+                    (poi.code && m.code === poi.code) || 
+                    (poi.name && m.name && m.name.toLowerCase() === poi.name.toLowerCase())
+                );
+
+                if (matchIdx >= 0) {
+                    markerList[matchIdx].poiId = poi.poiId;
+                    markerList[matchIdx].isVerified = poi.isVerified;
+                    if (poi.latitude && poi.longitude) {
+                        markerList[matchIdx].lat = Number(poi.latitude);
+                        markerList[matchIdx].lng = Number(poi.longitude);
+                    }
+                    if (poi.description) markerList[matchIdx].description = poi.description;
+                    if (poi.category) markerList[matchIdx].category = poi.category;
+                    markerList[matchIdx].hasAudio = poi.hasAudio;
+                } else {
+                    markerList.push({
+                        id: `db_poi_${poi.poiId}`,
+                        poiId: poi.poiId,
+                        nodeId: `node_poi_${poi.poiId}`,
+                        code: poi.code || `POI-${poi.poiId}`,
+                        name: poi.name,
+                        description: poi.description || 'Điểm tham quan tại Thảo Cầm Viên Sài Gòn.',
+                        lat: Number(poi.latitude) || 10.7876,
+                        lng: Number(poi.longitude) || 106.7053,
+                        category: poi.category || 'landmark',
+                        isVerified: Boolean(poi.isVerified),
+                        hasAudio: Boolean(poi.hasAudio),
+                        residentAnimals: [],
+                        animalCount: 0
+                    });
+                }
+            });
+        }
+
         return markerList;
-    }, [areas, enclosures, animals]);
+    }, [areas, enclosures, animals, dbPois]);
 
     // 3. Lọc danh sách marker
     const filteredMarkers = useMemo(() => {
@@ -432,9 +473,9 @@ tileLayer.addTo(map);
                     gap: 5px;
                     background: ${isSelected ? '#0F172A' : bgColor};
                     color: #FFFFFF;
-                    padding: ${isSelected ? '5px 10px' : '4px 8px'};
-                    border-radius: 20px;
-                    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+                    padding: ${isSelected ? '4px 8px' : '3px 6px'};
+                    border-radius: 6px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
                     border: 2px solid ${isSelected ? '#FEF08A' : '#FFFFFF'};
                     font-size: 11px;
                     font-weight: 700;
@@ -622,34 +663,34 @@ tileLayer.addTo(map);
             {/* Header Toolbar: Tìm kiếm, lọc danh mục, điểm xuất phát */}
             <div style={{
                 background: '#FFFFFF',
-                borderRadius: '20px',
-                padding: '16px 20px',
+                borderRadius: '10px',
+                padding: '14px 18px',
                 border: '1px solid #E2E8F0',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
                 marginBottom: '14px'
             }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 800, color: '#0F172A' }}>
+                            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0F172A' }}>
                                 Bản Đồ Địa Lý Thảo Cầm Viên Sài Gòn
                             </h2>
                         </div>
-                        <p style={{ margin: '2px 0 0 0', fontSize: '0.84rem', color: '#15803D', fontWeight: 600 }}>
+                        <p style={{ margin: '2px 0 0 0', fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
                             Nền tảng bản đồ địa lý thực tế (OpenStreetMap) • Tọa độ GPS chính xác 2 Nguyễn Bỉnh Khiêm, Quận 1
                         </p>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         {/* Dropdown cổng xuất phát */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '12px', border: '1px solid #BBF7D0' }}>
-                            <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#166534' }}>Cổng xuất phát:</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>Cổng xuất phát:</span>
                             <select
                                 style={{
                                     border: 'none',
                                     background: 'transparent',
-                                    fontSize: '0.82rem',
-                                    fontWeight: 700,
+                                    fontSize: '0.8125rem',
+                                    fontWeight: 600,
                                     color: '#0F172A',
                                     cursor: 'pointer',
                                     outline: 'none'
@@ -672,9 +713,9 @@ tileLayer.addTo(map);
                                 type="text"
                                 style={{
                                     width: '100%',
-                                    padding: '8px 14px 8px 32px',
-                                    fontSize: '0.85rem',
-                                    borderRadius: '20px',
+                                    padding: '7px 12px 7px 32px',
+                                    fontSize: '0.84rem',
+                                    borderRadius: '6px',
                                     border: '1px solid #CBD5E1',
                                     outline: 'none',
                                     background: '#F8FAFC'
@@ -683,8 +724,11 @@ tileLayer.addTo(map);
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                             />
-                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, fontSize: '0.85rem' }}>
-                                🔍
+                            <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5, display: 'flex', alignItems: 'center' }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
                             </span>
                             {searchKeyword && (
                                 <button
@@ -710,7 +754,7 @@ tileLayer.addTo(map);
                             className="btn btn-sm btn-outline"
                             onClick={() => loadMapData(currentLang)}
                             disabled={isLoading}
-                            style={{ borderRadius: '12px', fontWeight: 600 }}
+                            style={{ borderRadius: '6px', fontWeight: 600 }}
                         >
                             {isLoading ? 'Đang tải...' : 'Làm mới'}
                         </button>
@@ -742,7 +786,7 @@ tileLayer.addTo(map);
                             onClick={() => setActiveCategory(cat.key)}
                             style={{
                                 padding: '5px 12px',
-                                borderRadius: '16px',
+                                borderRadius: '6px',
                                 fontSize: '0.8rem',
                                 fontWeight: activeCategory === cat.key ? 700 : 500,
                                 background: activeCategory === cat.key ? '#15803D' : '#F8FAFC',
@@ -772,7 +816,7 @@ tileLayer.addTo(map);
                 width: '100%',
                 height: '68vh',
                 minHeight: '520px',
-                borderRadius: '24px',
+                borderRadius: '10px',
                 overflow: 'hidden',
                 border: '1px solid #CBD5E1',
                 boxShadow: '0 8px 24px rgba(0,0,0,0.06)',
@@ -791,7 +835,7 @@ tileLayer.addTo(map);
                     <div style={{
                         background: 'rgba(255, 255, 255, 0.95)',
                         backdropFilter: 'blur(8px)',
-                        borderRadius: '14px',
+                        borderRadius: '6px',
                         padding: '4px',
                         display: 'flex',
                         flexDirection: 'column',
@@ -827,9 +871,16 @@ tileLayer.addTo(map);
                             className="btn btn-icon btn-sm"
                             title="Định vị GPS của bạn"
                             onClick={handleLocateUser}
-                            style={{ width: '36px', height: '36px', fontSize: '1.1rem', background: '#FFF', color: '#2563EB' }}
+                            style={{ width: '36px', height: '36px', background: '#FFF', color: '#15803D' }}
                         >
-                            🎯
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="3"></circle>
+                                <line x1="12" y1="2" x2="12" y2="6"></line>
+                                <line x1="12" y1="18" x2="12" y2="22"></line>
+                                <line x1="2" y1="12" x2="6" y2="12"></line>
+                                <line x1="18" y1="12" x2="22" y2="12"></line>
+                            </svg>
                         </button>
                     </div>
                 </div>
@@ -872,7 +923,7 @@ tileLayer.addTo(map);
                         background: 'rgba(15, 23, 42, 0.95)',
                         color: '#F8FAFC',
                         padding: '12px 16px',
-                        borderRadius: '16px',
+                        borderRadius: '8px',
                         backdropFilter: 'blur(10px)',
                         boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
                         maxWidth: '360px',
@@ -960,7 +1011,7 @@ tileLayer.addTo(map);
                 <div style={{
                     marginTop: '14px',
                     background: '#FFFFFF',
-                    borderRadius: '20px',
+                    borderRadius: '10px',
                     border: '1px solid #E2E8F0',
                     boxShadow: '0 6px 20px rgba(0,0,0,0.05)',
                     padding: '20px 24px',
@@ -992,7 +1043,7 @@ tileLayer.addTo(map);
                                         padding: '2px 8px',
                                         borderRadius: '10px'
                                     }}>
-                                        🟡 Đang cập nhật tọa độ
+                                        Đang cập nhật tọa độ
                                     </span>
                                 )}
                             </div>
@@ -1018,7 +1069,7 @@ tileLayer.addTo(map);
                                                 style={{
                                                     background: '#F8FAFC',
                                                     border: '1px solid #E2E8F0',
-                                                    borderRadius: '12px',
+                                                    borderRadius: '8px',
                                                     padding: '8px 12px',
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -1076,25 +1127,48 @@ tileLayer.addTo(map);
                         </div>
 
                         {/* Nút hành động */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '160px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', minWidth: '170px' }}>
+                            {selectedMarker.poiId && onPlayPoiAudio && (
+                                <button
+                                    className="btn btn-primary"
+                                    style={{
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                        fontSize: '0.85rem',
+                                        backgroundColor: '#15803D',
+                                        color: '#FFFFFF',
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        gap: '6px'
+                                    }}
+                                    onClick={() => onPlayPoiAudio(selectedMarker.poiId)}
+                                >
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                                    </svg>
+                                    <span>Thuyết minh điểm này</span>
+                                </button>
+                            )}
+
                             <button
-                                className="btn btn-primary"
+                                className="btn btn-outline"
                                 style={{
-                                    borderRadius: '10px',
-                                    fontWeight: 700,
-                                    fontSize: '0.85rem',
-                                    background: '#15803D'
+                                    borderRadius: '6px',
+                                    fontWeight: 600,
+                                    fontSize: '0.85rem'
                                 }}
                                 onClick={() => handleSelectMarker(selectedMarker)}
                             >
-                                Chỉ đường từ cổng
+                                ➔ Chỉ đường từ cổng
                             </button>
 
                             <button
                                 className="btn btn-outline"
                                 style={{
-                                    borderRadius: '10px',
-                                    fontWeight: 600,
+                                    borderRadius: '6px',
+                                    fontWeight: 500,
                                     fontSize: '0.82rem'
                                 }}
                                 onClick={() => setSelectedMarker(null)}

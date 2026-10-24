@@ -1,211 +1,376 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 
+const HERO_SLIDES = [
+    {
+        id: 'tiger',
+        speciesName: 'Hổ Bengal',
+        scientificName: 'Panthera tigris tigris',
+        statusLabel: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLevel: 'EN',
+        habitat: 'Khu sinh cảnh rừng mưa tự nhiên',
+        imageSrc: '/assets/hero-tiger.jpg',
+        alt: 'Hổ Bengal dũng mãnh tại Thảo Cầm Viên Sài Gòn'
+    },
+    {
+        id: 'lion',
+        speciesName: 'Sư tử Châu Phi',
+        scientificName: 'Panthera leo',
+        statusLabel: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLevel: 'VU',
+        habitat: 'Khu sinh thái đồng cỏ Savanna',
+        imageSrc: '/assets/hero-lion.jpg',
+        alt: 'Sư tử Châu Phi oai vệ tại Thảo Cầm Viên Sài Gòn'
+    },
+    {
+        id: 'elephant',
+        speciesName: 'Voi Châu Á',
+        scientificName: 'Elephas maximus',
+        statusLabel: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLevel: 'EN',
+        habitat: 'Khu bảo tồn thú ăn cỏ nhiệt đới',
+        imageSrc: '/assets/hero-elephant.jpg',
+        alt: 'Voi Châu Á hiền hòa tại Thảo Cầm Viên Sài Gòn'
+    },
+    {
+        id: 'eagle',
+        speciesName: 'Đại Bàng Hoàng Gia',
+        scientificName: 'Aquila heliaca',
+        statusLabel: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLevel: 'VU',
+        habitat: 'Khu chuồng chim vòm tự nhiên',
+        imageSrc: '/assets/hero-eagle.jpg',
+        alt: 'Đại Bàng Hoàng Gia sải cánh tại Thảo Cầm Viên Sài Gòn'
+    }
+];
+
+const SLIDE_INTERVAL_MS = 6000;
+
 export default function HeroBanner() {
-    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, t } = useApp();
+    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession } = useApp();
+
+    const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
+    const [isPaused, setIsPaused] = useState(false);
+    const timerRef = useRef(null);
+
+    // Preload all slide images on mount to prevent any delay during transitions
+    useEffect(() => {
+        HERO_SLIDES.forEach(slide => {
+            const img = new Image();
+            img.src = slide.imageSrc;
+        });
+    }, []);
+
+    const resetTimer = useCallback(() => {
+        if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+        }
+    }, []);
+
+    const nextSlide = useCallback(() => {
+        setCurrentSlideIndex(prev => (prev + 1) % HERO_SLIDES.length);
+    }, []);
+
+    const prevSlide = useCallback(() => {
+        setCurrentSlideIndex(prev => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
+    }, []);
+
+    const goToSlide = useCallback((index) => {
+        setCurrentSlideIndex(index);
+    }, []);
+
+    // Set up auto-rotation interval
+    useEffect(() => {
+        resetTimer();
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                resetTimer();
+            } else if (!isPaused) {
+                timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+            }
+        };
+
+        if (!isPaused) {
+            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+        }
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            resetTimer();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [isPaused, nextSlide, resetTimer]);
+
+    const handleManualNext = () => {
+        nextSlide();
+        resetTimer();
+        if (!isPaused) {
+            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+        }
+    };
+
+    const handleManualPrev = () => {
+        prevSlide();
+        resetTimer();
+        if (!isPaused) {
+            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+        }
+    };
+
+    const handleManualSelect = (index) => {
+        goToSlide(index);
+        resetTimer();
+        if (!isPaused) {
+            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+        }
+    };
 
     return (
-        <section className="hero-banner" style={{
-            background: 'linear-gradient(135deg, #064E3B 0%, #15803D 60%, #166534 100%)',
-            color: '#FFFFFF',
-            position: 'relative',
-            overflow: 'hidden',
-            padding: '36px 0 28px 0'
-        }}>
-            <div className="container hero-banner-inner" style={{ position: 'relative', zIndex: 2 }}>
-                <div className="hero-content" style={{ maxWidth: '640px' }}>
-                    <div style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        background: 'rgba(255,255,255,0.16)',
-                        color: '#FEF08A',
-                        border: '1px solid rgba(254,240,138,0.3)',
-                        fontWeight: 700,
-                        letterSpacing: '0.6px',
-                        fontSize: '0.75rem',
-                        padding: '4px 12px',
-                        borderRadius: '20px',
-                        marginBottom: '12px'
-                    }}>
-                        <span>THẢO CẦM VIÊN SÀI GÒN</span>
-                        <span>•</span>
-                        <span>THÀNH LẬP NĂM 1864</span>
-                    </div>
+        <section 
+            className="hero-banner" 
+            role="region" 
+            aria-label="Thông tin du khách và điều hướng chính"
+        >
+            <div className="container">
+                <div className="hero-editorial-grid">
+                    {/* Left: Editorial Intro & Actions */}
+                    <div className="hero-intro-column">
+                        <div className="hero-eyebrow">
+                            <span className="eyebrow-dot"></span>
+                            <span>Thảo Cầm Viên Sài Gòn • Thành Lập 1864</span>
+                        </div>
 
-                    <h1 className="hero-title" style={{
-                        fontSize: '2rem',
-                        fontWeight: 800,
-                        lineHeight: 1.25,
-                        margin: '0 0 12px 0',
-                        color: '#FFFFFF',
-                        letterSpacing: '-0.3px'
-                    }}>
-                        Hệ Thống Hướng Dẫn Tham Quan Sở Thú & Định Vị Bản Đồ Thực Tế
-                    </h1>
+                        <h1 className="hero-headline">
+                            Khám Phá Thiên Nhiên Hoang Dã & Thuyết Minh Tương Tác
+                        </h1>
 
-                    <p className="hero-desc" style={{
-                        fontSize: '0.95rem',
-                        color: 'rgba(255,255,255,0.92)',
-                        lineHeight: 1.6,
-                        margin: '0 0 20px 0'
-                    }}>
-                        Trải nghiệm tham quan tương tác với bản đồ địa lý thực tế (OpenStreetMap), thuyết minh âm thanh đa ngôn ngữ và đặt vé trực tuyến thanh toán VietQR cấp mã tức thì.
-                    </p>
+                        <p className="hero-description">
+                            Trải nghiệm hướng dẫn tham quan số với bản đồ địa lý thực tế (OpenStreetMap), thuyết minh âm thanh đa ngôn ngữ cho từng loài động vật quý hiếm và đặt vé trực tuyến VietQR tức thì.
+                        </p>
 
-                    {/* Action Buttons */}
-                    <div className="hero-ctas" style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
-                        <button
-                            className="btn"
-                            style={{
-                                background: '#F59E0B',
-                                color: '#0F172A',
-                                fontWeight: 700,
-                                padding: '10px 20px',
-                                borderRadius: '12px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.9rem',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                            }}
-                            onClick={() => switchTab('tickets')}
-                        >
-                            Đặt vé & Thanh toán VietQR
-                        </button>
-
-                        <button
-                            className="btn"
-                            style={{
-                                background: 'rgba(255,255,255,0.16)',
-                                color: '#FFFFFF',
-                                fontWeight: 700,
-                                padding: '10px 18px',
-                                borderRadius: '12px',
-                                border: '1px solid rgba(255,255,255,0.3)',
-                                backdropFilter: 'blur(6px)',
-                                cursor: 'pointer',
-                                fontSize: '0.9rem'
-                            }}
-                            onClick={() => switchTab('map')}
-                        >
-                            Xem bản đồ địa lý
-                        </button>
-
-                        <button
-                            className="btn"
-                            style={{
-                                background: 'transparent',
-                                color: '#FFFFFF',
-                                fontWeight: 600,
-                                padding: '10px 14px',
-                                borderRadius: '12px',
-                                border: 'none',
-                                cursor: 'pointer',
-                                fontSize: '0.88rem',
-                                textDecoration: 'underline'
-                            }}
-                            onClick={() => switchTab('animals')}
-                        >
-                            Khám phá động vật
-                        </button>
-                    </div>
-                </div>
-
-                {/* Quick Session Pass Widget */}
-                <div className="hero-ticket-box" style={{
-                    background: 'rgba(255,255,255,0.12)',
-                    backdropFilter: 'blur(10px)',
-                    border: '1px solid rgba(255,255,255,0.2)',
-                    borderRadius: '20px',
-                    padding: '20px',
-                    color: '#FFFFFF',
-                    maxWidth: '340px'
-                }}>
-                    {hasActiveSession ? (
-                        <div id="active-session-info">
-                            <span className="badge badge-success mb-2" style={{ background: '#4ADE80', color: '#064E3B', fontWeight: 800, fontSize: '0.72rem' }}>
-                                PHIÊN THAM QUAN ĐÃ KÍCH HOẠT
-                            </span>
-                            <h4 style={{ margin: '8px 0 4px 0', fontSize: '1rem', color: '#FFF' }}>
-                                Mã vé: <span className="font-mono" style={{ color: '#FEF08A' }}>{currentSession.ticketCode}</span>
-                            </h4>
-                            <p style={{ margin: '4px 0', fontSize: '0.85rem', opacity: 0.9 }}>
-                                Du khách: <strong>{currentSession.customerName || 'Khách tham quan'}</strong>
-                            </p>
-                            <p style={{ margin: '4px 0 12px 0', fontSize: '0.78rem', opacity: 0.8 }}>
-                                Hạng vé: {currentSession.ticketType || 'Chuẩn'} • Mở khóa thuyết minh & bản đồ
-                            </p>
+                        {/* Primary and Secondary Action Buttons */}
+                        <div className="hero-action-buttons">
                             <button
-                                className="btn btn-sm btn-outline"
-                                style={{ background: '#FFF', color: '#0F172A', border: 'none', fontWeight: 700, borderRadius: '8px', width: '100%', fontSize: '0.82rem' }}
+                                type="button"
+                                className="btn-hero-primary"
                                 onClick={() => switchTab('tickets')}
                             >
-                                Xem thẻ tham quan điện tử
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                                    <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                                    <circle cx="12" cy="12" r="2"></circle>
+                                    <path d="M6 12h.01M18 12h.01"></path>
+                                </svg>
+                                <span>Đặt Vé Tham Quan</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn-hero-secondary"
+                                onClick={() => switchTab('map')}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                                    <line x1="8" y1="2" x2="8" y2="18"></line>
+                                    <line x1="16" y1="6" x2="16" y2="22"></line>
+                                </svg>
+                                <span>Bản Đồ Đi Lại</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                className="btn-hero-ghost"
+                                onClick={() => switchTab('species-audio')}
+                            >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                    <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
+                                    <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
+                                </svg>
+                                <span>Thuyết Minh Âm Thanh</span>
                             </button>
                         </div>
-                    ) : (
-                        <div id="no-session-info">
-                            <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.2)', padding: '2px 8px', borderRadius: '6px', fontWeight: 700 }}>
-                                THẺ THAM QUAN
-                            </span>
-                            <h4 style={{ margin: '8px 0 4px 0', fontSize: '1.05rem', fontWeight: 800 }}>
-                                Kích hoạt vé tham quan
-                            </h4>
-                            <p style={{ margin: '0 0 12px 0', fontSize: '0.82rem', opacity: 0.9, lineHeight: 1.5 }}>
-                                Nhập mã vé hoặc quét QR để mở khóa nghe thuyết minh tự động GPS và bản đồ hướng dẫn chi tiết.
-                            </p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                <button
-                                    className="btn btn-sm"
-                                    style={{ background: '#FFFFFF', color: '#064E3B', fontWeight: 700, borderRadius: '8px', padding: '9px', fontSize: '0.85rem' }}
-                                    onClick={() => setIsTicketModalOpen(true)}
-                                >
-                                    Quét hoặc nhập mã vé
-                                </button>
-                                <button
-                                    className="btn btn-sm"
-                                    style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.4)', color: '#FFF', fontWeight: 600, borderRadius: '8px', fontSize: '0.82rem' }}
-                                    onClick={() => switchTab('tickets')}
-                                >
-                                    Mua vé trực tuyến
-                                </button>
-                            </div>
+
+                        {/* Ticket Pass Active / Activation Prompt Banner */}
+                        <div className="hero-ticket-prompt">
+                            {hasActiveSession ? (
+                                <div className="hero-active-session-pill">
+                                    <div className="session-status-indicator">
+                                        <span className="live-dot"></span>
+                                        <span>Phiên tham quan đang hoạt động:</span>
+                                        <strong className="session-code font-mono">{currentSession.ticketCode}</strong>
+                                        <span className="session-user">• {currentSession.customerName || 'Khách tham quan'}</span>
+                                    </div>
+                                    <button 
+                                        type="button"
+                                        className="btn-view-pass"
+                                        onClick={() => switchTab('tickets')}
+                                    >
+                                        Xem Thẻ Điện Tử
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="hero-inactive-prompt">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                    </svg>
+                                    <span>Quý khách đã có vé giấy hoặc mã QR vào cổng?</span>
+                                    <button 
+                                        type="button" 
+                                        className="btn-link-activate"
+                                        onClick={() => setIsTicketModalOpen(true)}
+                                    >
+                                        Kích hoạt vé ngay →
+                                    </button>
+                                </div>
+                            )}
                         </div>
-                    )}
+                    </div>
+
+                    {/* Right: Automatic Animal Carousel Focal Point */}
+                    <div className="hero-visual-column">
+                        <div 
+                            className="hero-carousel-container"
+                            onMouseEnter={() => setIsPaused(true)}
+                            onMouseLeave={() => setIsPaused(false)}
+                            onFocus={() => setIsPaused(true)}
+                            onBlur={() => setIsPaused(false)}
+                            role="region"
+                            aria-roledescription="carousel"
+                            aria-label="Ảnh động vật tiêu biểu Thảo Cầm Viên"
+                        >
+                            {/* Slide Counter / Indicators */}
+                            <div className="hero-carousel-nav" role="tablist" aria-label="Bộ điều khiển chọn slide">
+                                {HERO_SLIDES.map((slide, idx) => (
+                                    <button
+                                        key={slide.id}
+                                        type="button"
+                                        role="tab"
+                                        className={`carousel-dot ${idx === currentSlideIndex ? 'active' : ''}`}
+                                        onClick={() => handleManualSelect(idx)}
+                                        aria-selected={idx === currentSlideIndex}
+                                        aria-label={`Xem ảnh loài ${slide.speciesName} (${idx + 1}/${HERO_SLIDES.length})`}
+                                    />
+                                ))}
+                            </div>
+
+                            {/* Manual Prev / Next Arrow Controls */}
+                            <button
+                                type="button"
+                                className="carousel-arrow prev"
+                                onClick={handleManualPrev}
+                                aria-label="Xem loài động vật trước đó"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="15 18 9 12 15 6"></polyline>
+                                </svg>
+                            </button>
+                            <button
+                                type="button"
+                                className="carousel-arrow next"
+                                onClick={handleManualNext}
+                                aria-label="Xem loài động vật tiếp theo"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6"></polyline>
+                                </svg>
+                            </button>
+
+                            {/* Render All Slides for Smooth Crossfade */}
+                            {HERO_SLIDES.map((slide, idx) => {
+                                const isActive = idx === currentSlideIndex;
+                                return (
+                                    <div 
+                                        key={slide.id}
+                                        className={`hero-slide ${isActive ? 'active' : ''}`}
+                                        aria-hidden={!isActive}
+                                    >
+                                        <img 
+                                            src={slide.imageSrc} 
+                                            alt={slide.alt} 
+                                            className="hero-photography-img"
+                                            loading={idx === 0 ? "eager" : "lazy"}
+                                            onError={(e) => {
+                                                // Graceful fallback to default tiger photo if any local asset is missing
+                                                if (e.target.src !== '/assets/hero-tiger.jpg') {
+                                                    e.target.src = '/assets/hero-tiger.jpg';
+                                                }
+                                            }}
+                                        />
+                                        <div className="hero-photography-overlay">
+                                            <div className="photo-badge">{slide.statusLabel} • {slide.statusLevel}</div>
+                                            <h3 className="photo-species-title">{slide.speciesName} • {slide.scientificName}</h3>
+                                            <p className="photo-species-subtitle">{slide.habitat} • Có sẵn bài thuyết minh âm thanh</p>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            {/* Thông tin thực tế Thảo Cầm Viên Sài Gòn */}
-            <div className="container" style={{ position: 'relative', zIndex: 2, marginTop: '20px' }}>
-                <div style={{
-                    background: 'rgba(0, 0, 0, 0.22)',
-                    backdropFilter: 'blur(6px)',
-                    borderRadius: '14px',
-                    padding: '10px 18px',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-                    gap: '12px',
-                    fontSize: '0.82rem'
-                }}>
-                    <div>
-                        <div style={{ fontWeight: 700, color: '#FEF08A' }}>Giờ mở cửa hàng ngày</div>
-                        <div style={{ opacity: 0.9 }}>07:00 – 18:30 (Kể cả Lễ, Tết)</div>
+                {/* Essential Visitor Information Strip */}
+                <div className="hero-info-strip">
+                    <div className="info-strip-item">
+                        <div className="strip-icon-box" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                        </div>
+                        <div className="strip-content">
+                            <span className="strip-label">Giờ mở cửa hàng ngày</span>
+                            <span className="strip-val">07:00 – 18:30 (Kể cả Lễ, Tết)</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <div style={{ fontWeight: 700, color: '#FEF08A' }}>Địa chỉ sở thú</div>
-                        <div style={{ opacity: 0.9 }}>2 Nguyễn Bỉnh Khiêm, P. Bến Nghé, Q.1</div>
+                    <div className="info-strip-divider"></div>
+
+                    <div className="info-strip-item">
+                        <div className="strip-icon-box" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
+                            </svg>
+                        </div>
+                        <div className="strip-content">
+                            <span className="strip-label">Địa chỉ sở thú</span>
+                            <span className="strip-val">Số 2 Nguyễn Bỉnh Khiêm, P. Bến Nghé, Q.1</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <div style={{ fontWeight: 700, color: '#FEF08A' }}>Giá vé vào cổng</div>
-                        <div style={{ opacity: 0.9 }}>60.000đ (Người lớn) • 40.000đ (Trẻ em)</div>
+                    <div className="info-strip-divider"></div>
+
+                    <div className="info-strip-item">
+                        <div className="strip-icon-box" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <rect x="2" y="6" width="20" height="12" rx="2"></rect>
+                                <circle cx="12" cy="12" r="2"></circle>
+                                <path d="M6 12h.01M18 12h.01"></path>
+                            </svg>
+                        </div>
+                        <div className="strip-content">
+                            <span className="strip-label">Giá vé vào cổng</span>
+                            <span className="strip-val">60.000đ (Người lớn) • 40.000đ (Trẻ em)</span>
+                        </div>
                     </div>
 
-                    <div>
-                        <div style={{ fontWeight: 700, color: '#FEF08A' }}>4 Cổng đón khách</div>
-                        <div style={{ opacity: 0.9 }}>Cổng A (Lê Duẩn), Cổng B, C, E</div>
+                    <div className="info-strip-divider"></div>
+
+                    <div className="info-strip-item">
+                        <div className="strip-icon-box" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"></polygon>
+                                <line x1="8" y1="2" x2="8" y2="18"></line>
+                                <line x1="16" y1="6" x2="16" y2="22"></line>
+                            </svg>
+                        </div>
+                        <div className="strip-content">
+                            <span className="strip-label">4 Cổng đón khách</span>
+                            <span className="strip-val">Cổng A (Lê Duẩn), Cổng B, Cổng C, Cổng E</span>
+                        </div>
                     </div>
                 </div>
             </div>
