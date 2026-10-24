@@ -250,7 +250,7 @@ export default function SpeciesNarrationModal({
                     {/* Narration Content & Audio Player */}
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '24px 0', color: '#64748B' }}>
-                            {t?.loadingData || 'Đang tải bài thuyết minh từ Supabase...'}
+                            {t?.loadingData || 'Đang tải bài thuyết minh...'}
                         </div>
                     ) : !hasActiveSession ? (
                         <div style={{ textAlign: 'center', padding: '24px 16px', backgroundColor: '#F8FAFC', borderRadius: '12px', border: '1px dashed #CBD5E1' }}>

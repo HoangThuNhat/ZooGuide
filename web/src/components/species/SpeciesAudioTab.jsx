@@ -27,7 +27,7 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                     setSpeciesList(spRes.data || []);
                 } else {
                     setSpeciesList([]);
-                    setLoadError(spRes.message || 'Không thể tải danh sách loài từ Supabase.');
+                    setLoadError(spRes.message || 'Không thể tải danh sách loài.');
                 }
                 if (animRes.success) {
                     setAnimalsList(animRes.data || []);

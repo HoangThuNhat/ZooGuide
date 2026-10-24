@@ -34,7 +34,7 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
-    /// Lưu bản ghi kiểm tra sức khỏe thú y thực tế vào cơ sở dữ liệu Supabase
+    /// Lưu bản ghi kiểm tra sức khỏe thú y thực tế vào cơ sở dữ liệu
     /// </summary>
     [HttpPost("health-logs")]
     [ProducesResponseType(typeof(ApiResponse<DashboardHealthLogDto>), StatusCodes.Status200OK)]
