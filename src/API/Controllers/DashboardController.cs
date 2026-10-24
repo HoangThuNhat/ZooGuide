@@ -59,11 +59,13 @@ public class DashboardController : ControllerBase
             .SumAsync(o => (int?)o.Quantity) ?? 0;
 
         var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
-        var activeDevices = onlineTracker.GetActiveDevicesCount();
-        var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
+var activeBuyerDevices = onlineTracker.GetActiveTicketBuyerDevicesCount();
+var activeDevices = onlineTracker.GetActiveDevicesCount();
+var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
 
         var summary = new OnlineUsersSummaryDto
         {
+            ActiveTicketBuyerDevices = activeBuyerDevices,
             ActiveTicketBuyers = activeBuyers,
             ActiveDevices = activeDevices,
             ActiveBuyerConnections = activeConnections,

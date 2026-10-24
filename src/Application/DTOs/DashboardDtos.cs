@@ -107,5 +107,6 @@ public class OnlineUsersSummaryDto
     public int TotalTicketsSold { get; set; }
     public int OnlineUsers { get; set; }
     public int ActiveConnections { get; set; }
+    public int ActiveTicketBuyerDevices { get; set; }
     public DateTime CalculatedAtUtc { get; set; } = DateTime.UtcNow;
 }
