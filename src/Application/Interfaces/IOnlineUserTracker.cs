@@ -78,4 +78,6 @@ public interface IOnlineUserTracker
     /// Sự kiện thông báo khi số lượng người mua vé hoặc số lượng thiết bị thay đổi (bao gồm cả khi timeout).
     /// </summary>
     event Action<int, int>? OnCountsChanged;
+
+    int GetActiveTicketBuyerDevicesCount();
 }

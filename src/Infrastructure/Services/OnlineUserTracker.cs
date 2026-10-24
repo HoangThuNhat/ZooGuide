@@ -176,6 +176,18 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
     }
 
     /// <summary>
+/// Số thiết bị đã xác minh là người mua vé đang hoạt động.
+/// Mỗi DeviceId chỉ được tính một lần, không gộp theo email.
+/// </summary>
+public int GetActiveTicketBuyerDevicesCount()
+{
+    CleanupExpiredSessions();
+
+    return _devices.Values
+        .Count(d => d.IsTicketBuyer);
+}
+
+    /// <summary>
     /// Số lượng thiết bị / phiên trình duyệt đang hoạt động (cả người chưa mua vé và đã mua vé, còn trong timeout 45s).
     /// </summary>
     public int GetActiveDevicesCount()

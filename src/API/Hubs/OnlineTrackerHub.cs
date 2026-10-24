@@ -117,9 +117,22 @@ public class OnlineTrackerHub : Hub
             var activeBuyers = _tracker.GetActiveTicketBuyersCount();
             var activeDevs = _tracker.GetActiveDevicesCount();
             var activeConn = _tracker.GetActiveBuyerConnectionsCount();
-            await Clients.Caller.SendAsync("ActiveBuyersUpdated", new { activeTicketBuyers = activeBuyers, activeDevices = activeDevs, activeBuyerConnections = activeConn });
-            await Clients.Caller.SendAsync("ActiveDevicesUpdated", new { activeDevices = activeDevs });
-            await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
+            var activeBuyerDevices = _tracker.GetActiveTicketBuyerDevicesCount();
+            await Clients.Caller.SendAsync("ActiveBuyersUpdated", new
+{
+    activeTicketBuyers = activeBuyers,
+    activeTicketBuyerDevices = activeBuyerDevices,
+    activeDevices = activeDevs,
+    activeBuyerConnections = activeConn
+});
+
+await Clients.Caller.SendAsync("ActiveDevicesUpdated", new
+{
+    activeDevices = activeDevs,
+    activeTicketBuyerDevices = activeBuyerDevices
+});
+
+await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
         }
 
         // Thông báo cho Dashboard Admin khi có thiết bị/phiên mới hoặc trạng thái thay đổi
@@ -219,15 +232,31 @@ public class OnlineTrackerHub : Hub
         return _tracker.GetActiveDevicesCount();
     }
 
-    private Task BroadcastToAdmins()
-    {
-        var activeBuyers = _tracker.GetActiveTicketBuyersCount();
-        var activeDevs = _tracker.GetActiveDevicesCount();
-        var activeConn = _tracker.GetActiveBuyerConnectionsCount();
-        return Task.WhenAll(
-            Clients.Group("Admins").SendAsync("ActiveBuyersUpdated", new { activeTicketBuyers = activeBuyers, activeDevices = activeDevs, activeBuyerConnections = activeConn }),
-            Clients.Group("Admins").SendAsync("ActiveDevicesUpdated", new { activeDevices = activeDevs }),
-            Clients.Group("Admins").SendAsync("OnlineUsersUpdated", activeBuyers)
-        );
-    }
+    
+
+    
+private Task BroadcastToAdmins()
+{
+    var activeBuyers = _tracker.GetActiveTicketBuyersCount();
+    var activeBuyerDevices = _tracker.GetActiveTicketBuyerDevicesCount();
+    var activeDevs = _tracker.GetActiveDevicesCount();
+    var activeConn = _tracker.GetActiveBuyerConnectionsCount();
+
+    return Task.WhenAll(
+        Clients.Group("Admins").SendAsync("ActiveBuyersUpdated", new
+        {
+            activeTicketBuyers = activeBuyers,
+            activeTicketBuyerDevices = activeBuyerDevices,
+            activeDevices = activeDevs,
+            activeBuyerConnections = activeConn
+        }),
+        Clients.Group("Admins").SendAsync("ActiveDevicesUpdated", new
+        {
+            activeDevices = activeDevs,
+            activeTicketBuyerDevices = activeBuyerDevices
+        }),
+        Clients.Group("Admins").SendAsync("OnlineUsersUpdated", activeBuyers)
+    );
+}
+
 }
