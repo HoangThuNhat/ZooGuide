@@ -49,7 +49,18 @@ public class OrderDto
     public DateTime? PaidAt { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ExpiresAt { get; set; }
+    public bool? EmailSent { get; set; }
+    public string? EmailStatusMessage { get; set; }
     public List<IssuedTicketDto> IssuedTickets { get; set; } = new();
+
+    /// <summary>
+    /// Đồng bộ trường Tickets tương thích với frontend client
+    /// </summary>
+    public List<IssuedTicketDto> Tickets
+    {
+        get => IssuedTickets;
+        set => IssuedTickets = value;
+    }
 }
 
 public class IssuedTicketDto
@@ -89,4 +100,15 @@ public class SimulatePaymentRequest
     public string OrderCode { get; set; } = string.Empty;
 
     public decimal? Amount { get; set; }
+
+    /// <summary>
+    /// Cho phép mô phỏng thanh toán thất bại phục vụ kiểm thử (Kịch bản 7.3)
+    /// </summary>
+    public bool? FailSimulation { get; set; }
+}
+
+public class ResendTicketEmailRequest
+{
+    [EmailAddress(ErrorMessage = "Địa chỉ email không hợp lệ.")]
+    public string? Email { get; set; }
 }

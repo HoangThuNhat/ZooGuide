@@ -8,6 +8,11 @@ public class TicketDto
     public string TicketCode { get; set; } = string.Empty;
     public int TicketTypeId { get; set; }
     public string TicketTypeName { get; set; } = string.Empty;
+    public int? OrderId { get; set; }
+    public string? OrderCode { get; set; }
+    public string? CustomerName { get; set; }
+    public string? CustomerEmail { get; set; }
+    public string? CustomerPhone { get; set; }
     public DateTime IssuedAt { get; set; }
     public DateTime ValidFrom { get; set; }
     public DateTime ValidUntil { get; set; }
@@ -20,10 +25,14 @@ public class TicketDto
 public class TicketCreateRequest
 {
     public int TicketTypeId { get; set; }
-    public string TicketCode { get; set; } = string.Empty;
-    public DateTime ValidFrom { get; set; }
-    public DateTime ValidUntil { get; set; }
+    public string? TicketCode { get; set; }
+    public DateTime? ValidFrom { get; set; }
+    public DateTime? ValidUntil { get; set; }
     public TicketStatus Status { get; set; } = TicketStatus.Valid;
+    public string? CustomerName { get; set; }
+    public string? CustomerEmail { get; set; }
+    public string? CustomerPhone { get; set; }
+    public string? Note { get; set; }
 }
 
 public class TicketUpdateRequest
@@ -38,6 +47,11 @@ public class TicketUpdateRequest
 public class ValidateTicketRequest
 {
     public string TicketCode { get; set; } = string.Empty;
+}
+
+public class ExitSessionRequest
+{
+    public string? SessionId { get; set; }
 }
 
 public class ValidateTicketResponse

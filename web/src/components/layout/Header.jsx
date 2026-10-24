@@ -12,6 +12,7 @@ export default function Header() {
         currentSession,
         hasActiveSession,
         setIsTicketModalOpen,
+        openElectronicTicketModal,
         t
     } = useApp();
 
@@ -110,8 +111,8 @@ export default function Header() {
                                 id="ticket-status-badge"
                                 className="ticket-badge-btn badge-active"
                                 aria-label="Trạng thái vé tham quan đang hoạt động"
-                                title={`Mã vé: ${currentSession.ticketCode} - Bấm để xem thông tin`}
-                                onClick={() => switchTab('tickets')}
+                                title={`Mã vé: ${currentSession.ticketCode} - Bấm để xem thông tin thẻ điện tử`}
+                                onClick={() => openElectronicTicketModal()}
                             >
                                 <span className="status-dot"></span>
                                 <span id="badge-ticket-text" className="font-mono">
@@ -282,7 +283,7 @@ export default function Header() {
                                 style={{ width: '100%', borderRadius: '6px' }}
                                 onClick={() => {
                                     setIsMobileMenuOpen(false);
-                                    switchTab('tickets');
+                                    openElectronicTicketModal();
                                 }}
                             >
                                 Xem Thẻ Tham Quan ({currentSession.ticketCode})

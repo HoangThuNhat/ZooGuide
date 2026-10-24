@@ -20,6 +20,7 @@ public class OrdersController : ControllerBase
     /// <summary>
     /// Khởi tạo đơn hàng mua vé trực tuyến và tạo mã thanh toán VietQR
     /// </summary>
+    [HttpPost]
     [HttpPost("checkout")]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -60,6 +61,39 @@ public class OrdersController : ControllerBase
         }
 
         return Ok(ApiResponse<OrderDto>.Ok(order));
+    }
+
+    /// <summary>
+    /// Gửi lại email xác nhận kèm mã QR cho đơn hàng đã thanh toán thành công
+    /// </summary>
+    [HttpPost("{orderCode}/resend-email")]
+    [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ResendEmail(string orderCode, [FromBody] ResendTicketEmailRequest? request = null)
+    {
+        try
+        {
+            var updatedOrder = await _orderService.ResendTicketEmailAsync(orderCode, request?.Email);
+            var isSent = updatedOrder.EmailSent == true;
+            var message = isSent 
+                ? (updatedOrder.EmailStatusMessage ?? "Đã gửi lại email thành công.") 
+                : (updatedOrder.EmailStatusMessage ?? "Chưa thể gửi email.");
+
+            return Ok(ApiResponse<OrderDto>.Ok(updatedOrder, message));
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, ApiResponse<object>.Fail($"Lỗi khi gửi lại email: {ex.Message}"));
+        }
     }
 
     /// <summary>

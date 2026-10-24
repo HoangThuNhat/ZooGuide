@@ -243,35 +243,54 @@ public class OrderAndPaymentIntegrationTests : IDisposable
     }
 
     // =========================================================================
-    // 6. KIỂM THỬ VÔ HIỆU HÓA PHÁT HÀNH THỦ CÔNG (YÊU CẦU 5.1)
+    // 6. KIỂM THỬ KHÔI PHỤC PHÁT HÀNH VÉ THỦ CÔNG BỞI ADMIN
     // =========================================================================
     [Fact]
-    public async Task TicketService_ManualCreate_MustThrowInvalidOperationException()
+    public async Task TicketService_AdminManualCreate_ShouldIssueValidTicketWithAdminOrder()
     {
         var manualRequest = new TicketCreateRequest
         {
             TicketTypeId = 1,
-            TicketCode = "ZOO-MANUAL-ATTEMPT",
+            CustomerName = "Khách Đoàn Tham Quan",
+            CustomerEmail = "doan@example.com",
+            CustomerPhone = "0909123456",
+            Note = "Vé phát hành sự kiện tại quầy",
             ValidFrom = DateTime.UtcNow,
             ValidUntil = DateTime.UtcNow.AddDays(1)
         };
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _ticketService.CreateAsync(manualRequest)
-        );
+        var ticket = await _ticketService.CreateAsync(manualRequest);
 
-        Assert.Contains("vô hiệu hóa", exception.Message);
+        Assert.NotNull(ticket);
+        Assert.StartsWith("ZG-", ticket.TicketCode);
+        Assert.Equal(TicketStatus.Valid, ticket.Status);
+        Assert.NotNull(ticket.OrderId);
+        Assert.Equal("Khách Đoàn Tham Quan", ticket.CustomerName);
+
+        // Kiểm tra đơn hàng quản trị được tạo tương ứng
+        var order = await _context.TicketOrders.FindAsync(ticket.OrderId);
+        Assert.NotNull(order);
+        Assert.Equal(PaymentStatus.Paid, order.PaymentStatus);
+        Assert.Equal("AdminDirect", order.PaymentMethod);
     }
 
     [Fact]
-    public void TicketsController_PostManualEndpoint_MustReturn405MethodNotAllowed()
+    public async Task TicketsController_CreateEndpoint_ShouldReturnCreatedResult()
     {
         var controller = new TicketsController(_ticketService, _ticketSessionService);
 
-        var result = controller.CreateDisabled();
+        var request = new TicketCreateRequest
+        {
+            TicketTypeId = 1,
+            CustomerName = "Khách Quầy Lẻ",
+            ValidFrom = DateTime.UtcNow,
+            ValidUntil = DateTime.UtcNow.AddDays(1)
+        };
 
-        var objectResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(StatusCodes.Status405MethodNotAllowed, objectResult.StatusCode);
+        var result = await controller.Create(request);
+
+        var createdAtResult = Assert.IsType<CreatedAtActionResult>(result.Result);
+        Assert.Equal(StatusCodes.Status201Created, createdAtResult.StatusCode);
     }
 
     // =========================================================================
@@ -301,5 +320,78 @@ public class OrderAndPaymentIntegrationTests : IDisposable
         var checkOrder = await _orderService.GetByOrderCodeAsync(order.OrderCode);
         Assert.Equal(PaymentStatus.Paid, checkOrder!.PaymentStatus);
         Assert.Equal(order.TotalAmount, checkOrder.TotalAmount);
+    }
+
+    // =========================================================================
+    // 8. KIỂM THỬ PHÂN BIỆT VÉ ĐƯỢC XÓA VÀ VÉ KHÔNG ĐƯỢC XÓA CỨNG
+    // =========================================================================
+    [Fact]
+    public async Task TicketService_DeletePaidOfficialTicket_MustThrowInvalidOperationException()
+    {
+        // 1. Tạo đơn hàng và thanh toán thành công
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 1,
+            Quantity = 1,
+            CustomerName = "Khách Đã Mua Vé",
+            CustomerEmail = "khach.muave@example.com",
+            CustomerPhone = "0911223344"
+        });
+        var paidOrder = await _orderService.SimulateSandboxPaymentAsync(new SimulatePaymentRequest { OrderCode = order.OrderCode });
+        var ticket = paidOrder.IssuedTickets.First();
+
+        // 2. Cố gắng xóa cứng vé đã thanh toán phát hành chính thức -> Phải từ chối bảo vệ giao dịch
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => _ticketService.DeleteAsync(ticket.TicketId)
+        );
+
+        Assert.Contains("Không thể xóa cứng vé đã thanh toán", ex.Message);
+    }
+
+    [Fact]
+    public async Task TicketService_CancelTicket_ShouldPreventCheckIn()
+    {
+        // 1. Phát hành vé
+        var ticket = await _ticketService.CreateAsync(new TicketCreateRequest
+        {
+            TicketTypeId = 1,
+            CustomerName = "Khách Hủy Vé"
+        });
+
+        // 2. Chuyển trạng thái sang Hủy vé (Cancelled)
+        var cancelled = await _ticketService.UpdateStatusAsync(ticket.TicketId, TicketStatus.Cancelled);
+        Assert.NotNull(cancelled);
+        Assert.Equal(TicketStatus.Cancelled, cancelled.Status);
+
+        // 3. Thử xác thực / check-in vé đã hủy -> Phải bị từ chối
+        var validateRes = await _ticketService.ValidateAsync(new ValidateTicketRequest { TicketCode = ticket.TicketCode });
+        Assert.False(validateRes.Valid);
+        Assert.Equal("TICKET_CANCELLED", validateRes.ErrorCode);
+    }
+
+    [Fact]
+    public async Task TicketsController_ExitSession_ShouldRevokeSessionSuccessfully()
+    {
+        // 1. Tạo vé và kích hoạt session
+        var ticket = await _ticketService.CreateAsync(new TicketCreateRequest
+        {
+            TicketTypeId = 1,
+            CustomerName = "Khách Đang Tham Quan"
+        });
+        var validate = await _ticketService.ValidateAsync(new ValidateTicketRequest { TicketCode = ticket.TicketCode });
+        Assert.True(validate.Valid);
+        Assert.NotNull(validate.SessionId);
+
+        // 2. Gọi controller thoát phiên
+        var controller = new TicketsController(_ticketService, _ticketSessionService);
+        var exitResult = await controller.ExitSession(new ExitSessionRequest { SessionId = validate.SessionId.ToString() });
+
+        var okResult = Assert.IsType<OkObjectResult>(exitResult);
+        Assert.Equal(StatusCodes.Status200OK, okResult.StatusCode);
+
+        // 3. Vé vẫn còn nguyên vẹn trên hệ thống, không bị xóa hay hủy
+        var checkTicket = await _ticketService.GetByIdAsync(ticket.TicketId);
+        Assert.NotNull(checkTicket);
+        Assert.Equal(TicketStatus.Used, checkTicket.Status);
     }
 }

@@ -13,10 +13,12 @@ namespace ZooGuide.Infrastructure.Services;
 public class DashboardService : IDashboardService
 {
     private readonly ZooGuideDbContext _context;
+    private readonly IOnlineUserTracker? _onlineTracker;
 
-    public DashboardService(ZooGuideDbContext context)
+    public DashboardService(ZooGuideDbContext context, IOnlineUserTracker? onlineTracker = null)
     {
         _context = context;
+        _onlineTracker = onlineTracker;
     }
 
     public async Task<DashboardStatsDto> GetStatsAsync(DateTime? fromDate = null, DateTime? toDate = null)
@@ -51,16 +53,36 @@ public class DashboardService : IDashboardService
         var totalTrackedDevices = deviceStats?.Total ?? 0;
         var activeDevices5Min = deviceStats?.Active5Min ?? 0;
 
-        // 2. Dữ liệu vé theo bộ lọc thời gian
+        // 2. Dữ liệu vé và giao dịch thanh toán thành công theo bộ lọc thời gian
+        var paidOrdersQuery = _context.TicketOrders
+            .AsNoTracking()
+            .Where(o => o.PaymentStatus == PaymentStatus.Paid);
+
         var ticketQuery = _context.Tickets.AsQueryable();
         if (utcFrom.HasValue)
         {
             ticketQuery = ticketQuery.Where(t => t.IssuedAt >= utcFrom.Value || t.CreatedAt >= utcFrom.Value);
+            paidOrdersQuery = paidOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) >= utcFrom.Value);
         }
         if (utcTo.HasValue)
         {
             ticketQuery = ticketQuery.Where(t => t.IssuedAt <= utcTo.Value && t.CreatedAt <= utcTo.Value);
+            paidOrdersQuery = paidOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) <= utcTo.Value);
         }
+
+        // Thống kê người mua vé và vé đã bán thực tế
+        var totalTicketBuyers = await paidOrdersQuery
+            .Where(o => !string.IsNullOrEmpty(o.CustomerEmail))
+            .Select(o => o.CustomerEmail.ToLower().Trim())
+            .Distinct()
+            .CountAsync();
+
+        var totalTicketsSold = await paidOrdersQuery
+            .SumAsync(o => (int?)o.Quantity) ?? 0;
+
+        var activeTicketBuyers = _onlineTracker?.GetActiveTicketBuyersCount() ?? 0;
+        var activeDevices = _onlineTracker?.GetActiveDevicesCount() ?? activeDevices5Min;
+        var activeBuyerConnections = _onlineTracker?.GetActiveBuyerConnectionsCount() ?? 0;
 
         var totalTickets = await ticketQuery.CountAsync();
         var activeTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
@@ -225,6 +247,12 @@ public class DashboardService : IDashboardService
 
         return new DashboardStatsDto
         {
+            ActiveTicketBuyers = activeTicketBuyers,
+            ActiveDevices = activeDevices,
+            TotalTicketBuyers = totalTicketBuyers,
+            TotalTicketsSold = totalTicketsSold,
+            ActiveBuyerConnections = activeBuyerConnections,
+            OnlineUsers = activeTicketBuyers,
             ActiveDevices5Min = activeDevices5Min,
             TotalTrackedDevices = totalTrackedDevices,
             ActiveSessions = activeSessions,

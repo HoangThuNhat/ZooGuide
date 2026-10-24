@@ -885,6 +885,8 @@ export function AppProvider({ children }) {
     const [currentSession, setCurrentSession] = useState(null);
 
     const [isTicketModalOpen, setIsTicketModalOpen] = useState(false);
+    const [isElectronicTicketModalOpen, setIsElectronicTicketModalOpen] = useState(false);
+    const [selectedTicketForPass, setSelectedTicketForPass] = useState(null);
     const [selectedAnimalForDetail, setSelectedAnimalForDetail] = useState(null);
     const [isTranscriptModalOpen, setIsTranscriptModalOpen] = useState(false);
 
@@ -1014,6 +1016,11 @@ export function AppProvider({ children }) {
         showToast('Đã kết thúc phiên tham quan', 'info');
     };
 
+    const openElectronicTicketModal = (ticketData = null) => {
+        setSelectedTicketForPass(ticketData);
+        setIsElectronicTicketModalOpen(true);
+    };
+
     const hasActiveSession = Boolean(currentSession);
     const mergedT = {
         ...(translations[currentLang] || translations.vi),
@@ -1033,6 +1040,11 @@ export function AppProvider({ children }) {
             clearSession,
             isTicketModalOpen,
             setIsTicketModalOpen,
+            isElectronicTicketModalOpen,
+            setIsElectronicTicketModalOpen,
+            selectedTicketForPass,
+            setSelectedTicketForPass,
+            openElectronicTicketModal,
             selectedAnimalForDetail,
             setSelectedAnimalForDetail,
             isTranscriptModalOpen,

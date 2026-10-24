@@ -45,11 +45,26 @@ public class PaymentsController : ControllerBase
     [HttpPost("simulate")]
     [ProducesResponseType(typeof(ApiResponse<OrderDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
-    public async Task<IActionResult> SimulatePayment([FromBody] SimulatePaymentRequest request)
+    public async Task<IActionResult> SimulatePayment(
+        [FromBody] SimulatePaymentRequest? request = null,
+        [FromQuery] string? orderCode = null)
     {
+        var targetOrderCode = !string.IsNullOrWhiteSpace(request?.OrderCode) ? request.OrderCode : orderCode;
+        if (string.IsNullOrWhiteSpace(targetOrderCode))
+        {
+            return BadRequest(ApiResponse<object>.Fail("Mã đơn hàng (OrderCode) không được để trống."));
+        }
+
+        var effectiveRequest = new SimulatePaymentRequest
+        {
+            OrderCode = targetOrderCode,
+            Amount = request?.Amount,
+            FailSimulation = request?.FailSimulation
+        };
+
         try
         {
-            var updatedOrder = await _orderService.SimulateSandboxPaymentAsync(request);
+            var updatedOrder = await _orderService.SimulateSandboxPaymentAsync(effectiveRequest);
             return Ok(ApiResponse<OrderDto>.Ok(updatedOrder, "Đã hoàn tất thanh toán sandbox và tự động phát hành mã vé tham quan."));
         }
         catch (ArgumentException ex)

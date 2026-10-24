@@ -47,7 +47,7 @@ const HERO_SLIDES = [
 const SLIDE_INTERVAL_MS = 6000;
 
 export default function HeroBanner() {
-    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession } = useApp();
+    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, openElectronicTicketModal } = useApp();
 
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
@@ -205,7 +205,7 @@ export default function HeroBanner() {
                                     <button 
                                         type="button"
                                         className="btn-view-pass"
-                                        onClick={() => switchTab('tickets')}
+                                        onClick={() => openElectronicTicketModal()}
                                     >
                                         Xem Thẻ Điện Tử
                                     </button>

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ZooGuide - Live Supabase API & Data Access Layer
  * Connects exclusively to ASP.NET Core API backed by Supabase PostgreSQL & Storage.
  * Strictly zero mock data, zero hardcoded fallback datasets, and zero fake audio/translations.
@@ -921,9 +921,10 @@ export const ZooApi = {
     // 11. ORDERS & REAL VIETQR PAYMENTS
     async createOrder(data) {
         try {
+            const primaryItem = (data.items && data.items.length > 0) ? data.items[0] : null;
             const reqData = {
-                ticketTypeId: parseInt(data.ticketTypeId),
-                quantity: parseInt(data.quantity || 1),
+                ticketTypeId: parseInt(data.ticketTypeId || (primaryItem ? primaryItem.ticketTypeId : 1)),
+                quantity: parseInt(data.quantity || (primaryItem ? primaryItem.quantity : 1)),
                 customerName: data.customerName || 'Khách Tham Quan',
                 customerEmail: data.customerEmail || 'visitor@zooguide.vn',
                 customerPhone: data.customerPhone || '0900000000'
@@ -940,6 +941,26 @@ export const ZooApi = {
             return { success: true, data: json.data, message: json.message };
         } catch (err) {
             console.error('createOrder error:', err);
+            return { success: false, message: err.message };
+        }
+    },
+
+    async resendOrderEmail(orderCode, email = null) {
+        try {
+            const body = email ? JSON.stringify({ email }) : JSON.stringify({});
+            const res = await fetch(`${API_CONFIG.BASE_URL}/orders/${encodeURIComponent(orderCode)}/resend-email`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            const json = await res.json();
+            return {
+                success: res.ok && json.success,
+                data: json.data,
+                message: json.message || (res.ok ? 'Đã gửi lại email xác nhận vé.' : 'Không thể gửi lại email.')
+            };
+        } catch (err) {
+            console.error('resendOrderEmail error:', err);
             return { success: false, message: err.message };
         }
     },
@@ -975,29 +996,71 @@ export const ZooApi = {
         }
     },
 
-    async simulateSandboxPayment({ orderCode, amount }) {
+    async simulateSandboxPayment(payload) {
         try {
+            const bodyData = typeof payload === 'string'
+                ? { orderCode: payload }
+                : {
+                    orderCode: payload?.orderCode,
+                    amount: payload?.amount,
+                    failSimulation: payload?.failSimulation
+                };
+
+            if (!bodyData.orderCode) {
+                return {
+                    success: false,
+                    message: 'Mã đơn hàng không hợp lệ để thực hiện thanh toán sandbox.'
+                };
+            }
+
             const res = await fetch(`${API_CONFIG.BASE_URL}/payments/simulate`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ orderCode, amount })
+                body: JSON.stringify(bodyData)
             });
             const json = await res.json();
             if (!res.ok || !json.success) {
-                throw new Error(json.message || `Lỗi xử lý thanh toán sandbox (HTTP ${res.status})`);
+                return {
+                    success: false,
+                    message: json.message || `Lỗi xử lý thanh toán sandbox (HTTP ${res.status})`
+                };
             }
             return { success: true, data: json.data, message: json.message };
         } catch (err) {
             console.error('simulateSandboxPayment error:', err);
-            return { success: false, message: err.message };
+            return {
+                success: false,
+                message: err.message || 'Không thể kết nối đến máy chủ thanh toán. Vui lòng kiểm tra lại mạng.'
+            };
         }
     },
 
     async createTicket(data) {
-        return {
-            success: false,
-            message: 'Chức năng phát hành vé thủ công đã bị vô hiệu hóa. Vé tham quan chỉ được phát hành tự động qua thanh toán QR.'
-        };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await res.json();
+            if (!res.ok) {
+                return {
+                    success: false,
+                    message: result.message || 'Không thể phát hành vé thủ công.'
+                };
+            }
+            return {
+                success: true,
+                data: result.data || result,
+                message: result.message || 'Phát hành vé thành công.'
+            };
+        } catch (err) {
+            console.error('createTicket error:', err);
+            return {
+                success: false,
+                message: err.message || 'Lỗi mạng khi phát hành vé.'
+            };
+        }
     },
 
     async updateTicketStatus(idOrCode, status) {
@@ -1011,11 +1074,11 @@ export const ZooApi = {
                 ticketId = ticket.ticketId;
             }
 
-            let targetStatus = 'Valid';
-            if (status === 'Used' || status === 2) targetStatus = 'Used';
-            if (status === 'Expired' || status === 3) targetStatus = 'Expired';
-            if (status === 'Cancelled' || status === 4) targetStatus = 'Cancelled';
-            if (status === 'Locked' || status === 5) targetStatus = 'Locked';
+            let targetStatus = 1; // Valid
+            if (status === 'Used' || status === 2) targetStatus = 2;
+            if (status === 'Expired' || status === 3) targetStatus = 3;
+            if (status === 'Cancelled' || status === 4) targetStatus = 4;
+            if (status === 'Locked' || status === 5) targetStatus = 5;
 
             const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${ticketId}/status`, {
                 method: 'PATCH',
@@ -1178,6 +1241,29 @@ export const ZooApi = {
         }
     },
 
+    async exitTicketSession(sessionId) {
+        if (!sessionId) return { success: false, message: 'Mã phiên tham quan không hợp lệ.' };
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions/exit`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-Session-Id': String(sessionId) },
+                body: JSON.stringify({ sessionId: String(sessionId) })
+            });
+            const data = await res.json().catch(() => null);
+            if (res.ok) {
+                return { success: true, message: data?.message || 'Đã thoát phiên tham quan thành công.' };
+            }
+            if (res.status === 404) {
+                const fallbackRes = await this.revokeTicketSession(sessionId);
+                if (fallbackRes.success) return fallbackRes;
+            }
+            return { success: false, message: data?.message || 'Không thể kết thúc phiên tham quan từ máy chủ.' };
+        } catch (err) {
+            console.error('exitTicketSession error:', err);
+            return { success: false, message: 'Lỗi kết nối đến máy chủ khi thoát phiên tham quan.' };
+        }
+    },
+
     async verifyTicketSession(sessionId) {
         if (!sessionId) return { valid: false };
         try {
@@ -1212,6 +1298,18 @@ export const ZooApi = {
         } catch (err) {
             console.error('getDashboardStats error:', err);
             return { success: false, data: null, message: 'Không thể tải dữ liệu thống kê từ cơ sở dữ liệu.' };
+        }
+    },
+
+    async getOnlineUsers() {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/online-users`);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('getOnlineUsers error:', err);
+            return { success: false, data: null, message: err.message };
         }
     },
 
@@ -1452,18 +1550,47 @@ export const ZooApi = {
     }
     ,
     // 19. DEVICE HEARTBEAT & MONITORING
-    async sendDeviceHeartbeat(installationId) {
+    async sendDeviceHeartbeat(installationId, buyerInfo = null) {
         try {
+            const payload = {
+                installationId,
+                orderCode: buyerInfo?.orderCode || null,
+                buyerEmail: buyerInfo?.email || null
+            };
             const res = await fetch(`${API_CONFIG.BASE_URL}/devices/heartbeat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ installationId })
+                body: JSON.stringify(payload)
             });
             if (!res.ok) return { success: false };
             const data = await res.json();
             return { success: true, data: data.data || data };
         } catch (err) {
             return { success: false, error: err.message };
+        }
+    },
+
+    sendDeviceDisconnect(installationId, buyerInfo = null) {
+        if (!installationId) return;
+        try {
+            const payload = JSON.stringify({
+                installationId,
+                orderCode: buyerInfo?.orderCode || null,
+                buyerEmail: buyerInfo?.email || null
+            });
+            if (typeof navigator !== 'undefined' && navigator.sendBeacon) {
+                const blob = new Blob([payload], { type: 'application/json' });
+                navigator.sendBeacon(`${API_CONFIG.BASE_URL}/devices/disconnect`, blob);
+            } else if (typeof fetch !== 'undefined') {
+                fetch(`${API_CONFIG.BASE_URL}/devices/disconnect`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: payload,
+                    keepalive: true
+                }).catch(() => {});
+            }
+        } catch (e) {
+            // Ignore unload errors
         }
     },
 

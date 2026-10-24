@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.Interfaces;
@@ -33,7 +34,12 @@ while (dir != null)
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+    });
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -41,6 +47,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ISpeciesService, ZooGuide.Infrastructure.Services.SpeciesService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketTypeService, ZooGuide.Infrastructure.Services.TicketTypeService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketService, ZooGuide.Infrastructure.Services.TicketService>();
+builder.Services.AddScoped<ZooGuide.Application.Interfaces.IEmailService, ZooGuide.Infrastructure.Services.SmtpEmailService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IOrderService, ZooGuide.Infrastructure.Services.OrderService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITranslationService, ZooGuide.Infrastructure.Services.TranslationService>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.ISupabaseStorageService, ZooGuide.Infrastructure.Services.SupabaseStorageService>();
@@ -78,6 +85,7 @@ builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDeviceTrackingServic
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IPoiService, ZooGuide.Infrastructure.Services.PoiService>();
 
 // Register Services for Dashboard, Narration, Chatbot, Audit
+builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IOnlineUserTracker, ZooGuide.Infrastructure.Services.OnlineUserTracker>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IAuditLogService, ZooGuide.Infrastructure.Services.AuditLogService>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IGuestChatLimiterService, ZooGuide.Infrastructure.Services.GuestChatLimiterService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDashboardService, ZooGuide.Infrastructure.Services.DashboardService>();
@@ -92,9 +100,10 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.SetIsOriginAllowed(_ => true)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
@@ -112,6 +121,36 @@ app.UseStaticFiles();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ZooGuide.API.Hubs.OnlineTrackerHub>("/api/hubs/online");
+
+// Lắng nghe sự kiện timeout dọn dẹp session để broadcast realtime tới Admin Dashboard
+var onlineTracker = app.Services.GetRequiredService<ZooGuide.Application.Interfaces.IOnlineUserTracker>();
+var trackerHubContext = app.Services.GetRequiredService<Microsoft.AspNetCore.SignalR.IHubContext<ZooGuide.API.Hubs.OnlineTrackerHub>>();
+
+onlineTracker.OnCountsChanged += (activeBuyers, activeDevices) =>
+{
+    _ = Task.Run(async () =>
+    {
+        try
+        {
+            await trackerHubContext.Clients.Group("Admins").SendAsync("ActiveBuyersUpdated", new
+            {
+                activeTicketBuyers = activeBuyers,
+                activeDevices = activeDevices,
+                activeBuyerConnections = onlineTracker.GetActiveBuyerConnectionsCount()
+            });
+            await trackerHubContext.Clients.Group("Admins").SendAsync("ActiveDevicesUpdated", new
+            {
+                activeDevices = activeDevices
+            });
+            await trackerHubContext.Clients.Group("Admins").SendAsync("OnlineUsersUpdated", activeBuyers);
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Lỗi khi broadcast OnCountsChanged từ OnlineUserTracker");
+        }
+    });
+};
 
 // Health check / DB ping endpoint
 app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
