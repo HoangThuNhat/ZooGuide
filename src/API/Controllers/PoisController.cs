@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.Interfaces;
+using ZooGuide.API.Filters;
 
 namespace ZooGuide.API.Controllers;
 
@@ -10,10 +11,12 @@ namespace ZooGuide.API.Controllers;
 public class PoisController : ControllerBase
 {
     private readonly IPoiService _poiService;
+    private readonly ISupabaseStorageService? _storageService;
 
-    public PoisController(IPoiService poiService)
+    public PoisController(IPoiService poiService, ISupabaseStorageService? storageService = null)
     {
         _poiService = poiService;
+        _storageService = storageService;
     }
 
     /// <summary>
@@ -237,9 +240,12 @@ public class PoisController : ControllerBase
 
     /// <summary>
     /// Lấy thông tin thuyết minh địa điểm dành cho khách tham quan (kèm cơ chế ngôn ngữ dự phòng)
+    /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ
     /// </summary>
     [HttpGet("{id:int}/public-narration")]
+    [RequireTicketSession]
     [ProducesResponseType(typeof(ApiResponse<PoiPublicNarrationDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<PoiPublicNarrationDto>), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ApiResponse<PoiPublicNarrationDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetPublicNarration(int id, [FromQuery] string? lang = "vi")
     {
@@ -249,6 +255,54 @@ public class PoisController : ControllerBase
             return NotFound(ApiResponse<PoiPublicNarrationDto>.Fail($"Không tìm thấy điểm tham quan ID = {id}"));
         }
         return Ok(ApiResponse<PoiPublicNarrationDto>.Ok(data));
+    }
+
+    /// <summary>
+    /// Stream file âm thanh thuyết minh điểm tham quan có kiểm soát quyền truy cập theo TicketSession
+    /// YÊU CẦU: Khách tham quan phải có TicketSession hợp lệ (?sessionId=... hoặc header X-Session-Id)
+    /// </summary>
+    [HttpGet("{id:int}/stream")]
+    [HttpHead("{id:int}/stream")]
+    [RequireTicketSession]
+    public async Task<IActionResult> StreamAudio(int id, [FromQuery] string? lang = "vi")
+    {
+        var narration = await _poiService.GetPublicNarrationAsync(id, lang ?? "vi");
+        if (narration == null || !narration.HasAudio || string.IsNullOrWhiteSpace(narration.AudioUrl))
+        {
+            return NotFound(ApiResponse<object>.Fail($"Chưa có file âm thanh thuyết minh cho điểm tham quan ID = {id} với ngôn ngữ '{lang}'."));
+        }
+
+        var audioUrl = narration.AudioUrl;
+        var mimeType = "audio/mpeg";
+        string? resolvedFilePath = null;
+
+        if (_storageService != null)
+        {
+            resolvedFilePath = _storageService.ResolvePhysicalAudioPath(audioUrl, null);
+        }
+
+        if (resolvedFilePath == null && !string.IsNullOrWhiteSpace(audioUrl) && !audioUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            var webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+            var cleanUrl = audioUrl.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+            var candidate = Path.Combine(webRoot, cleanUrl);
+            if (System.IO.File.Exists(candidate))
+            {
+                resolvedFilePath = candidate;
+            }
+        }
+
+        if (resolvedFilePath != null && System.IO.File.Exists(resolvedFilePath))
+        {
+            return PhysicalFile(resolvedFilePath, mimeType, enableRangeProcessing: true);
+        }
+
+        if (!string.IsNullOrWhiteSpace(audioUrl) && audioUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+        {
+            return Redirect(audioUrl);
+        }
+
+        return NotFound(ApiResponse<object>.Fail("File âm thanh thuyết minh POI không tồn tại trên hệ thống lưu trữ."));
     }
 }
 

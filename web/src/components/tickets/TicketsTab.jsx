@@ -751,7 +751,7 @@ export default function TicketsTab() {
                                                 cursor: isSimulatingPayment ? 'wait' : 'pointer'
                                             }}
                                         >
-                                            {isSimulatingPayment ? 'Đang xử lý...' : '✓ Giả lập thanh toán thành công (Sandbox)'}
+                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Xác nhận thanh toán thành công'}
                                         </button>
 
                                         <button

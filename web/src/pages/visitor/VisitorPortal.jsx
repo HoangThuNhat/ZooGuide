@@ -216,7 +216,69 @@ export default function VisitorPortal() {
         }
     }, [currentLang]);
 
+    const handleStopAudio = useCallback(() => {
+        if (audioElementRef.current) {
+            try {
+                audioElementRef.current.pause();
+                audioElementRef.current.currentTime = 0;
+            } catch (e) {
+                console.warn('Error stopping audio:', e);
+            }
+        }
+        setAudioState(prev => ({
+            ...prev,
+            isPlaying: false,
+            currentTime: 0
+        }));
+    }, [setAudioState]);
+
+    const handleCloseAudio = useCallback(() => {
+        if (audioElementRef.current) {
+            try {
+                audioElementRef.current.pause();
+                audioElementRef.current.currentTime = 0;
+                audioElementRef.current.src = '';
+            } catch (e) {
+                console.warn('Error closing audio:', e);
+            }
+        }
+        setAudioState(prev => ({
+            ...prev,
+            isPlaying: false,
+            currentTime: 0,
+            isVisible: false
+        }));
+    }, [setAudioState]);
+
+    // Tự động dừng âm thanh khi mất phiên vé hoặc phiên vé hết hạn
+    useEffect(() => {
+        if (!hasActiveSession && audioState.isPlaying) {
+            handleStopAudio();
+        }
+    }, [hasActiveSession, audioState.isPlaying, handleStopAudio]);
+
+    // Kiểm tra định kỳ hạn vé trong lúc người dùng đang nghe
+    useEffect(() => {
+        if (!hasActiveSession || !currentSession?.expiresAt) return;
+        const interval = setInterval(() => {
+            const now = new Date();
+            const exp = new Date(currentSession.expiresAt);
+            if (now >= exp) {
+                clearSession();
+                handleCloseAudio();
+                showToast('Phiên vé của bạn đã hết hạn. Đã dừng thuyết minh.', 'error');
+            }
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [hasActiveSession, currentSession, clearSession, handleCloseAudio, showToast]);
+
     const resumeAudioPlayback = () => {
+        if (!hasActiveSession || !currentSession?.sessionId) {
+            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để nghe thuyết minh.', 'error');
+            pauseAudioPlayback();
+            setIsTicketModalOpen(true);
+            return;
+        }
         if (!audioState.narration?.audioSrc) {
             showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
             return;
@@ -276,53 +338,72 @@ export default function VisitorPortal() {
     }, []);
 
     const playPoiAudio = useCallback(async (poiId, startAutoplay = true) => {
+        if (!hasActiveSession || !currentSession?.sessionId) {
+            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            pauseAudioPlayback();
+            setIsTicketModalOpen(true);
+            return;
+        }
+
         try {
-            const res = await ZooApi.getPoiPublicNarration(poiId, currentLang);
+            const res = await ZooApi.getPoiPublicNarration(poiId, currentLang, currentSession.sessionId);
             if (!res.success) {
-                showToast(res.message || 'Chưa có bài thuyết minh cho điểm tham quan này.', 'error');
+                if (res.unauthorized) {
+                    showToast(res.message || 'Phiên tham quan đã hết hạn hoặc không hợp lệ. Vui lòng kích hoạt lại vé.', 'error');
+                    clearSession();
+                    pauseAudioPlayback();
+                    setIsTicketModalOpen(true);
+                } else {
+                    showToast(res.message || 'Chưa có bài thuyết minh cho điểm tham quan này.', 'error');
+                }
                 return;
             }
             const data = res.data;
             const poiObj = {
-                id: `poi_${data.poiId}`,
+                id: 'poi_' + data.poiId,
                 name: data.poiName,
                 nameVi: data.poiName,
                 imageUrl: data.imageUrl || '',
-                scientificName: `Điểm tham quan (${data.category || 'POI'})`
+                scientificName: 'Điểm tham quan (' + (data.category || 'POI') + ')'
             };
             const duration = data.durationSeconds || 60;
+            const audioSource = data.streamUrl || data.audioUrl;
+            const mins = Math.floor(duration / 60);
+            const secs = (duration % 60).toString().padStart(2, '0');
             const narrationData = {
                 title: data.title || data.poiName,
                 narrator: 'ZooGuide Audio',
-                audioSrc: data.audioUrl,
+                audioSrc: audioSource,
                 publicUrl: data.audioUrl,
+                streamUrl: data.streamUrl,
                 content: data.content,
                 transcript: data.content,
-                durationFormatted: `${Math.floor(duration / 60)}:${(duration % 60).toString().padStart(2, '0')}`,
+                durationFormatted: mins + ':' + secs,
                 durationSec: duration,
-                hasAudio: Boolean(data.audioUrl)
+                hasAudio: Boolean(audioSource)
             };
             setAudioState({
                 animal: poiObj,
                 narration: narrationData,
-                isPlaying: Boolean(data.audioUrl && startAutoplay),
+                isPlaying: Boolean(audioSource && startAutoplay),
                 currentTime: 0,
                 duration,
                 playbackRate: 1.0,
                 isVisible: true
             });
             if (data.isFallbackLanguage) {
-                showToast(data.fallbackMessage || `Đang phát thuyết minh bằng ngôn ngữ dự phòng (${data.languageCode?.toUpperCase()}).`, 'info');
+                showToast(data.fallbackMessage || ('Đang phát thuyết minh bằng ngôn ngữ dự phòng (' + (data.languageCode || '').toUpperCase() + ').'), 'info');
             }
-            if (startAutoplay && data.audioUrl) {
+            if (startAutoplay && audioSource) {
                 startAudioPlayback(narrationData, 1.0);
-            } else if (!data.audioUrl) {
+            } else if (!audioSource) {
                 showToast('Điểm tham quan này hiện chưa có file âm thanh thuyết minh.', 'info');
             }
         } catch (err) {
             showToast('Không thể phát thuyết minh: ' + err.message, 'error');
         }
-    }, [currentLang, setAudioState, showToast, startAudioPlayback]);
+    }, [clearSession, currentLang, currentSession, hasActiveSession, pauseAudioPlayback, setAudioState, setIsTicketModalOpen, showToast, startAudioPlayback]);
+
 
     const handleLocateMap = (entity) => {
         if (entity) {
@@ -376,6 +457,8 @@ export default function VisitorPortal() {
                 onSkip={handleSkip}
                 onSeek={handleSeek}
                 onChangeSpeed={handleChangeSpeed}
+                onStop={handleStopAudio}
+                onClose={handleCloseAudio}
             />
 
             <MobileBottomNav />

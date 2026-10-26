@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 
-export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeSpeed }) {
+export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeSpeed, onStop, onClose }) {
     const { audioState, setIsTranscriptModalOpen } = useApp();
     const { animal, narration, isPlaying, currentTime, duration, playbackRate, isVisible } = audioState;
 
@@ -68,8 +68,10 @@ export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeS
                     </button>
 
                     <button 
+                        id="btn-audio-toggle-play"
                         className="btn-audio-circle btn-audio-toggle-play" 
-                        aria-label="Phát hoặc dừng"
+                        aria-label="Phát hoặc tạm dừng"
+                        title={isPlaying ? "Tạm dừng" : "Phát tiếp"}
                         onClick={onTogglePlay}
                     >
                         {isPlaying ? (
@@ -82,6 +84,20 @@ export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeS
                                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
                             </svg>
                         )}
+                    </button>
+
+                    {/* NÚT DỪNG (STOP) */}
+                    <button 
+                        id="btn-audio-stop" 
+                        className="btn btn-icon btn-sm" 
+                        title="Dừng phát và quay về đầu" 
+                        aria-label="Dừng thuyết minh"
+                        onClick={onStop}
+                        style={{ color: '#EF4444' }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                            <rect x="5" y="5" width="14" height="14" rx="2"></rect>
+                        </svg>
                     </button>
 
                     <button 
@@ -126,6 +142,32 @@ export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeS
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                         </svg>
                         <span>Lời thoại</span>
+                    </button>
+
+                    {/* NÚT ĐÓNG / THU GỌN (CLOSE) */}
+                    <button
+                        id="btn-close-audio-bar"
+                        className="btn btn-icon btn-sm"
+                        title="Đóng trình phát thuyết minh"
+                        aria-label="Đóng trình phát thuyết minh"
+                        onClick={onClose}
+                        style={{
+                            background: 'rgba(255, 255, 255, 0.1)',
+                            borderRadius: '50%',
+                            width: '32px',
+                            height: '32px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginLeft: '6px',
+                            cursor: 'pointer',
+                            color: '#94A3B8'
+                        }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
                     </button>
                 </div>
             </div>
