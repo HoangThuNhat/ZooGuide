@@ -508,7 +508,7 @@ export default function AdminDashboardPage() {
                             {isLoading ? '...' : (loadError ? 'Lỗi' : (stats.activeTicketBuyers ?? 0))}
                         </div>
                         <div className="metric-footer">
-                            <span>Khách mua vé thành công & phiên đang mở (timeout 45s)</span>
+                            <span>Khách mua vé thành công & đang kết nối</span>
                         </div>
                     </div>
 
@@ -529,10 +529,10 @@ export default function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* 3. Thiết Bị / Phiên Đang Hoạt Động */}
+                    {/* 3. Thiết Bị Đang Truy Cập (Online - Persisted Heartbeats) */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
                         <div className="metric-header">
-                            <span className="metric-label">Thiết Bị / Phiên Hoạt Động</span>
+                            <span className="metric-label">Thiết Bị Đang Truy Cập (Online)</span>
                             <span className="badge badge-primary text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8B5CF6', display: 'inline-block' }}></span>
                                 {isLiveSignalR ? 'SignalR Trực Tiếp' : 'Thời gian thực'}
@@ -542,11 +542,11 @@ export default function AdminDashboardPage() {
                             {isLoading ? '...' : (loadError ? 'Lỗi' : (stats.activeDevices ?? stats.activeDevices5Min ?? 0))}
                         </div>
                         <div className="metric-footer">
-                            <span>Phiên/thiết bị đang mở website (cả khách & người mua vé, timeout 45s)</span>
+                            <span>Cài đặt web đang truy cập (vãng lai & có vé, ngưỡng 60s)</span>
                         </div>
                     </div>
 
-                    {/* 5. Phiên Tham Quan Mở Khóa */}
+                    {/* 4. Phiên Tham Quan Mở Khóa */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #0284C7' }}>
                         <div className="metric-header">
                             <span className="metric-label">Phiên Tham Quan Mở Khóa</span>

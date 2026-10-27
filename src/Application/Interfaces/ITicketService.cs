@@ -5,7 +5,7 @@ namespace ZooGuide.Application.Interfaces;
 
 public interface ITicketService
 {
-    Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null);
+    Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null, int? page = null, int? pageSize = null);
     Task<TicketDto?> GetByIdAsync(int id);
     Task<TicketDto> CreateAsync(TicketCreateRequest request);
     Task<TicketDto?> UpdateAsync(int id, TicketUpdateRequest request);

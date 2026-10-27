@@ -106,17 +106,25 @@ export default function TicketsTab() {
         setCartQuantities(prev => {
             const current = prev[typeId] || 0;
             const next = Math.max(0, Math.min(20, current + delta));
-            return { ...prev, [typeId]: next };
+            // Đơn hàng gắn với một hạng vé cụ thể để đảm bảo tính toàn vẹn giá và vé xuất bản
+            const updated = {};
+            Object.keys(prev).forEach(k => { updated[k] = 0; });
+            updated[typeId] = next;
+            return updated;
         });
     };
 
     // 3. Tạo Đơn Hàng Thanh Toán VietQR
     const handleCheckoutOrder = async (e) => {
         e.preventDefault();
-        if (totalTicketsCount <= 0) {
+        const selectedEntry = Object.entries(cartQuantities).find(([_, qty]) => Number(qty) > 0);
+        if (!selectedEntry || Number(selectedEntry[1]) <= 0) {
             showToast("Vui lòng chọn ít nhất 1 vé để tiếp tục.", "error");
             return;
         }
+        const ticketTypeId = Number(selectedEntry[0]);
+        const quantity = Number(selectedEntry[1]);
+
         if (!customerInfo.name.trim() || !customerInfo.phone.trim() || !customerInfo.email.trim()) {
             showToast("Vui lòng điền đầy đủ họ tên, số điện thoại và email.", "error");
             return;
@@ -128,16 +136,13 @@ export default function TicketsTab() {
             return;
         }
 
-        const items = Object.entries(cartQuantities)
-            .filter(([_, qty]) => qty > 0)
-            .map(([typeId, qty]) => ({
-                ticketTypeId: Number(typeId),
-                quantity: qty
-            }));
+        const items = [{ ticketTypeId, quantity }];
 
         setIsCreatingOrder(true);
         try {
             const res = await ZooApi.createOrder({
+                ticketTypeId,
+                quantity,
                 customerName: customerInfo.name.trim(),
                 customerEmail: customerInfo.email.trim(),
                 customerPhone: customerInfo.phone.trim(),

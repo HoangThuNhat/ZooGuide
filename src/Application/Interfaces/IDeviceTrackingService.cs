@@ -6,6 +6,7 @@ namespace ZooGuide.Application.Interfaces;
 public interface IDeviceTrackingService
 {
     Task<DeviceHeartbeatResponseDto> RecordHeartbeatAsync(string installationId, string? userAgent = null, string? ipAddress = null);
-    Task<int> GetActiveDevicesCountAsync(int recentMinutes = 5);
-    Task<ActiveDevicesSummaryDto> GetSummaryAsync();
+    Task<bool> RecordDisconnectAsync(string installationId);
+    Task<int> GetActiveDevicesCountAsync(int thresholdSeconds = 60);
+    Task<ActiveDevicesSummaryDto> GetSummaryAsync(int thresholdSeconds = 60);
 }

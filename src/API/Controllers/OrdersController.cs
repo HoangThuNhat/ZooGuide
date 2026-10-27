@@ -1,3 +1,7 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.DTOs.Order;
@@ -97,15 +101,17 @@ public class OrdersController : ControllerBase
     }
 
     /// <summary>
-    /// Danh sách tất cả đơn hàng (Dành cho trang Quản trị Admin / Đối soát tài chính)
+    /// Danh sách tất cả đơn hàng (Hỗ trợ tìm kiếm, lọc trạng thái, phân trang máy chủ)
     /// </summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<OrderDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? search = null,
-        [FromQuery] PaymentStatus? status = null)
+        [FromQuery] PaymentStatus? status = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
-        var orders = await _orderService.GetAllOrdersAsync(search, status);
+        var orders = await _orderService.GetAllOrdersAsync(search, status, page, pageSize);
         return Ok(ApiResponse<IEnumerable<OrderDto>>.Ok(orders));
     }
 }

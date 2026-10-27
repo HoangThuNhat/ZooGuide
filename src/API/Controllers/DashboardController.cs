@@ -37,7 +37,7 @@ public class DashboardController : ControllerBase
     }
 
     /// <summary>
-    /// Lấy số lượng người mua vé đang online theo thời gian thực (chỉ tính khách đã mua vé thành công)
+    /// Lấy số lượng người mua vé và thiết bị đang hoạt động theo thời gian thực (được tính từ cơ sở dữ liệu và tracker)
     /// </summary>
     [HttpGet("online-users")]
     [HttpGet("/api/admin/dashboard/online-users")]
@@ -59,9 +59,12 @@ public class DashboardController : ControllerBase
             .SumAsync(o => (int?)o.Quantity) ?? 0;
 
         var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
-var activeBuyerDevices = onlineTracker.GetActiveTicketBuyerDevicesCount();
-var activeDevices = onlineTracker.GetActiveDevicesCount();
-var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
+        var activeBuyerDevices = onlineTracker.GetActiveTicketBuyerDevicesCount();
+        // Calculate active devices truthfully from persisted database heartbeats within 60 seconds
+        var activeDevices = await dbContext.DeviceActivities
+            .AsNoTracking()
+            .CountAsync(d => d.LastSeenAt >= DateTime.UtcNow.AddSeconds(-60));
+        var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
 
         var summary = new OnlineUsersSummaryDto
         {
@@ -98,6 +101,6 @@ var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
             return NotFound(ApiResponse<DashboardHealthLogDto>.Fail($"Không tìm thấy cá thể động vật ID = {dto.AnimalId}."));
         }
 
-        return Ok(ApiResponse<DashboardHealthLogDto>.Ok(result, "Đã lưu hồ sơ khám sức khỏe thú y vào cơ sở dữ liệu!"));
+        return Ok(ApiResponse<DashboardHealthLogDto>.Ok(result, "Đã lưu bản ghi kiểm tra sức khỏe cá thể thành công."));
     }
 }

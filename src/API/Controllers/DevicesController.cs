@@ -86,6 +86,7 @@ public class DevicesController : ControllerBase
         if (!string.IsNullOrWhiteSpace(request?.InstallationId))
         {
             var deviceId = request.InstallationId.Trim();
+            await _deviceTrackingService.RecordDisconnectAsync(deviceId);
             var deviceWentOffline = onlineTracker.RemoveDeviceConnection(deviceId, "beacon");
 
             // Backward compatibility
@@ -96,7 +97,7 @@ public class DevicesController : ControllerBase
             onlineTracker.RemoveConnection($"vis:{deviceId}", "beacon");
 
             var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
-            var activeDevs = onlineTracker.GetActiveDevicesCount();
+            var activeDevs = await _deviceTrackingService.GetActiveDevicesCountAsync(60);
             var activeConn = onlineTracker.GetActiveBuyerConnectionsCount();
 
             await hubContext.Clients.Group("Admins").SendAsync("ActiveBuyersUpdated", new
@@ -115,18 +116,13 @@ public class DevicesController : ControllerBase
     }
 
     /// <summary>
-    /// Thống kê số lượng thiết bị đang hoạt động thực tế
+    /// Thống kê số lượng thiết bị đang hoạt động thực tế từ cơ sở dữ liệu Supabase
     /// </summary>
     [HttpGet("active-count")]
     [ProducesResponseType(typeof(ApiResponse<ActiveDevicesSummaryDto>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetActiveDevicesSummary(
-        [FromServices] IOnlineUserTracker? onlineTracker = null)
+    public async Task<IActionResult> GetActiveDevicesSummary([FromQuery] int thresholdSeconds = 60)
     {
-        var summary = await _deviceTrackingService.GetSummaryAsync();
-        if (onlineTracker != null)
-        {
-            summary.ActiveCount5Minutes = onlineTracker.GetActiveDevicesCount();
-        }
+        var summary = await _deviceTrackingService.GetSummaryAsync(thresholdSeconds);
         return Ok(ApiResponse<ActiveDevicesSummaryDto>.Ok(summary));
     }
 }

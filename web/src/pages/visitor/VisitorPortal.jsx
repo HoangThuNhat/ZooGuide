@@ -89,17 +89,9 @@ export default function VisitorPortal() {
             };
 
             audio.onerror = () => {
-                if (narration.publicUrl && audio.src !== narration.publicUrl) {
-                    console.warn('Primary audio stream failed, falling back to publicUrl:', narration.publicUrl);
-                    audio.src = narration.publicUrl;
-                    audio.play().catch(err => {
-                        console.warn('Fallback public audio playback failed:', err.message);
-                        showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh.', 'error');
-                        pauseAudioPlayback();
-                    });
-                    return;
-                }
-                showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh.', 'error');
+                console.warn('Audio playback error for stream:', audio.src);
+                // Loại bỏ hoàn toàn fallback publicUrl đối với audio yêu cầu phiên vé hợp lệ
+                showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.', 'error');
                 pauseAudioPlayback();
             };
 

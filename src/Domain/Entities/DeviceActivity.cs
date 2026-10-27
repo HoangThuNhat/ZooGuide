@@ -17,4 +17,6 @@ public class DeviceActivity
     public int HeartbeatCount { get; set; } = 1;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime? DisconnectedAt { get; set; }
 }

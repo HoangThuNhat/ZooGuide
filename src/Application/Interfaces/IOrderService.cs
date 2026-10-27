@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using ZooGuide.Application.DTOs.Order;
 using ZooGuide.Domain.Enums;
 
@@ -7,7 +9,7 @@ public interface IOrderService
 {
     Task<OrderDto> CreateOrderAsync(CreateOrderRequest request);
     Task<OrderDto?> GetByOrderCodeAsync(string orderCode);
-    Task<IEnumerable<OrderDto>> GetAllOrdersAsync(string? search = null, PaymentStatus? status = null);
+    Task<IEnumerable<OrderDto>> GetAllOrdersAsync(string? search = null, PaymentStatus? status = null, int? page = null, int? pageSize = null);
     Task<bool> ProcessPaymentWebhookAsync(PaymentWebhookPayload payload, string? signature = null);
     Task<OrderDto> SimulateSandboxPaymentAsync(SimulatePaymentRequest request);
     Task<OrderDto> ResendTicketEmailAsync(string orderCode, string? recipientEmail = null);

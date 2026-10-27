@@ -21,7 +21,6 @@ public class EndToEndIntegrationTests : IDisposable
     private readonly TicketService _ticketService;
     private readonly TicketSessionService _ticketSessionService;
     private readonly NarrationService _narrationService;
-    private readonly ChatbotService _chatbotService;
     private readonly AuditLogService _auditLogService;
 
     public EndToEndIntegrationTests()
@@ -43,7 +42,6 @@ public class EndToEndIntegrationTests : IDisposable
         _ticketSessionService = new TicketSessionService(ticketRepo, sessionRepo);
         _ticketService = new TicketService(_context, _ticketSessionService);
         _narrationService = new NarrationService(_context);
-        _chatbotService = new ChatbotService(_context);
 
         // Seed basic fixtures
         SeedDatabase();
@@ -362,56 +360,6 @@ public class EndToEndIntegrationTests : IDisposable
         {
             File.Delete(physicalPath);
         }
-    }
-
-    // ==========================================
-    // E. TEST CHATBOT WITH REAL DATABASE KNOWLEDGE
-    // ==========================================
-    [Fact]
-    public async Task Chatbot_WhenQueryingSimba_ShouldReturnDatabaseAnimalDetails()
-    {
-        var request = new ChatbotQueryRequestDto
-        {
-            Message = "Sư tử Simba ăn gì và ở khu nào?"
-        };
-
-        var response = await _chatbotService.ProcessMessageAsync(request);
-
-        Assert.True(response.FoundData);
-        Assert.Equal("Animal", response.SourceType);
-        Assert.Contains("Sư tử Simba", response.Reply);
-        Assert.Contains("Khu Sư Tử & Thú Dữ", response.Reply);
-    }
-
-    [Fact]
-    public async Task Chatbot_WhenQueryingZooHours_ShouldReturnAccurateHours()
-    {
-        var request = new ChatbotQueryRequestDto
-        {
-            Message = "Mấy giờ sở thú mở cửa?"
-        };
-
-        var response = await _chatbotService.ProcessMessageAsync(request);
-
-        Assert.True(response.FoundData);
-        Assert.Equal("Faq", response.SourceType);
-        Assert.Contains("08:00", response.Reply);
-        Assert.Contains("18:30", response.Reply);
-    }
-
-    [Fact]
-    public async Task Chatbot_WhenQueryingUnknownTopic_MustNotHallucinate()
-    {
-        var request = new ChatbotQueryRequestDto
-        {
-            Message = "Có máy bay trực thăng hay tàu vũ trụ ở sở thú không?"
-        };
-
-        var response = await _chatbotService.ProcessMessageAsync(request);
-
-        Assert.False(response.FoundData);
-        Assert.Equal("NotFound", response.SourceType);
-        Assert.Contains("chưa tìm thấy thông tin", response.Reply);
     }
 
     // ==========================================

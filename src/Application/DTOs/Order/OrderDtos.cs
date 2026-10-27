@@ -1,15 +1,22 @@
+using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using ZooGuide.Domain.Enums;
 
 namespace ZooGuide.Application.DTOs.Order;
 
+public class OrderItemRequest
+{
+    public int TicketTypeId { get; set; }
+    public int Quantity { get; set; } = 1;
+}
+
 public class CreateOrderRequest
 {
-    [Required]
     public int TicketTypeId { get; set; }
 
-    [Range(1, 50, ErrorMessage = "Số lượng vé phải từ 1 đến 50.")]
     public int Quantity { get; set; } = 1;
+
+    public List<OrderItemRequest>? Items { get; set; }
 
     [Required(ErrorMessage = "Vui lòng nhập họ và tên.")]
     [StringLength(100)]
@@ -24,6 +31,20 @@ public class CreateOrderRequest
     [Phone(ErrorMessage = "Số điện thoại không hợp lệ.")]
     [StringLength(20)]
     public string CustomerPhone { get; set; } = string.Empty;
+
+    public int GetEffectiveTicketTypeId()
+    {
+        if (TicketTypeId > 0) return TicketTypeId;
+        if (Items != null && Items.Count > 0 && Items[0].TicketTypeId > 0) return Items[0].TicketTypeId;
+        return 0;
+    }
+
+    public int GetEffectiveQuantity()
+    {
+        if (Quantity > 0 && TicketTypeId > 0) return Quantity;
+        if (Items != null && Items.Count > 0 && Items[0].Quantity > 0) return Items[0].Quantity;
+        return Quantity > 0 ? Quantity : 1;
+    }
 }
 
 public class OrderDto

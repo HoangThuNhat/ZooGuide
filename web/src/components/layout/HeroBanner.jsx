@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
+import { ZooApi } from '../../services/api';
+import { ZOO_OPERATIONAL_INFO } from '../../services/operationalData';
 
 const HERO_SLIDES = [
     {
@@ -51,7 +53,23 @@ export default function HeroBanner() {
 
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
+    const [ticketPriceSummary, setTicketPriceSummary] = useState('120.000đ (Người lớn) • 60.000đ (Trẻ em)');
     const timerRef = useRef(null);
+
+    // Load authoritative ticket types from database
+    useEffect(() => {
+        let isMounted = true;
+        ZooApi.getTicketTypes().then(res => {
+            if (isMounted && res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+                const adult = res.data.find(t => t.name.toLowerCase().includes('người lớn') || t.name.toLowerCase().includes('adult'));
+                const child = res.data.find(t => t.name.toLowerCase().includes('trẻ em') || t.name.toLowerCase().includes('child'));
+                const adultPrice = adult ? `${Number(adult.price).toLocaleString('vi-VN')}đ (Người lớn)` : '120.000đ (Người lớn)';
+                const childPrice = child ? `${Number(child.price).toLocaleString('vi-VN')}đ (Trẻ em)` : '60.000đ (Trẻ em)';
+                setTicketPriceSummary(`${adultPrice} • ${childPrice}`);
+            }
+        }).catch(() => {});
+        return () => { isMounted = false; };
+    }, []);
 
     // Preload all slide images on mount to prevent any delay during transitions
     useEffect(() => {
@@ -68,83 +86,58 @@ export default function HeroBanner() {
         }
     }, []);
 
-    const nextSlide = useCallback(() => {
+    const goToNextSlide = useCallback(() => {
         setCurrentSlideIndex(prev => (prev + 1) % HERO_SLIDES.length);
     }, []);
 
-    const prevSlide = useCallback(() => {
+    const goToPrevSlide = useCallback(() => {
         setCurrentSlideIndex(prev => (prev - 1 + HERO_SLIDES.length) % HERO_SLIDES.length);
     }, []);
 
-    const goToSlide = useCallback((index) => {
-        setCurrentSlideIndex(index);
-    }, []);
-
-    // Set up auto-rotation interval
+    // Automatic smooth crossfade slideshow timer
     useEffect(() => {
-        resetTimer();
-
-        const handleVisibilityChange = () => {
-            if (document.hidden) {
-                resetTimer();
-            } else if (!isPaused) {
-                timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
-            }
-        };
-
-        if (!isPaused) {
-            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
+        if (isPaused) {
+            resetTimer();
+            return;
         }
 
-        document.addEventListener('visibilitychange', handleVisibilityChange);
+        resetTimer();
+        timerRef.current = setInterval(() => {
+            goToNextSlide();
+        }, SLIDE_INTERVAL_MS);
 
-        return () => {
-            resetTimer();
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-        };
-    }, [isPaused, nextSlide, resetTimer]);
+        return () => resetTimer();
+    }, [isPaused, goToNextSlide, resetTimer]);
 
     const handleManualNext = () => {
-        nextSlide();
         resetTimer();
-        if (!isPaused) {
-            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
-        }
+        goToNextSlide();
     };
 
     const handleManualPrev = () => {
-        prevSlide();
         resetTimer();
-        if (!isPaused) {
-            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
-        }
+        goToPrevSlide();
     };
 
     const handleManualSelect = (index) => {
-        goToSlide(index);
         resetTimer();
-        if (!isPaused) {
-            timerRef.current = setInterval(nextSlide, SLIDE_INTERVAL_MS);
-        }
+        setCurrentSlideIndex(index);
     };
 
     return (
-        <section 
-            className="hero-banner" 
-            role="region" 
-            aria-label="Thông tin du khách và điều hướng chính"
-        >
-            <div className="container">
-                <div className="hero-editorial-grid">
-                    {/* Left: Editorial Intro & Actions */}
-                    <div className="hero-intro-column">
-                        <div className="hero-eyebrow">
-                            <span className="eyebrow-dot"></span>
-                            <span>Thảo Cầm Viên Sài Gòn • Thành Lập 1864</span>
+        <section className="hero-banner-master" aria-label="Giới thiệu hệ thống ZooGuide Thảo Cầm Viên Sài Gòn">
+            <div className="hero-inner-container">
+                <div className="hero-content-grid">
+                    {/* Left: Authority Brand & Value Proposition Column */}
+                    <div className="hero-text-column">
+                        <div className="hero-tag-badge">
+                            <span className="badge-pulse-dot" aria-hidden="true"></span>
+                            <span>HỆ THỐNG THUYẾT MINH TỰ ĐỘNG THẢO CẦM VIÊN</span>
                         </div>
 
                         <h1 className="hero-headline">
-                            Khám Phá Thiên Nhiên Hoang Dã & Thuyết Minh Tương Tác
+                            Thảo Cầm Viên Sài Gòn
+                            <span className="hero-subheadline">Khám phá thiên nhiên di sản 160 năm</span>
                         </h1>
 
                         <p className="hero-description">
@@ -289,14 +282,12 @@ export default function HeroBanner() {
                                     >
                                         <img 
                                             src={slide.imageSrc} 
-                                            alt={slide.alt} 
-                                            className="hero-photography-img"
+                                            alt={slide.alt}
+                                            className="hero-slide-image"
                                             loading={idx === 0 ? "eager" : "lazy"}
                                             onError={(e) => {
-                                                // Graceful fallback to default tiger photo if any local asset is missing
-                                                if (e.target.src !== '/assets/hero-tiger.jpg') {
-                                                    e.target.src = '/assets/hero-tiger.jpg';
-                                                }
+                                                e.target.onerror = null;
+                                                e.target.src = 'https://images.unsplash.com/photo-1534188753412-3e26d0d618d6?auto=format&fit=crop&w=1200&q=80';
                                             }}
                                         />
                                         <div className="hero-photography-overlay">
@@ -322,7 +313,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">Giờ mở cửa hàng ngày</span>
-                            <span className="strip-val">07:00 – 18:30 (Kể cả Lễ, Tết)</span>
+                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.openingHours}</span>
                         </div>
                     </div>
 
@@ -337,7 +328,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">Địa chỉ sở thú</span>
-                            <span className="strip-val">Số 2 Nguyễn Bỉnh Khiêm, P. Bến Nghé, Q.1</span>
+                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.address}</span>
                         </div>
                     </div>
 
@@ -353,7 +344,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">Giá vé vào cổng</span>
-                            <span className="strip-val">60.000đ (Người lớn) • 40.000đ (Trẻ em)</span>
+                            <span className="strip-val">{ticketPriceSummary}</span>
                         </div>
                     </div>
 
@@ -368,8 +359,8 @@ export default function HeroBanner() {
                             </svg>
                         </div>
                         <div className="strip-content">
-                            <span className="strip-label">4 Cổng đón khách</span>
-                            <span className="strip-val">Cổng A (Lê Duẩn), Cổng B, Cổng C, Cổng E</span>
+                            <span className="strip-label">Cổng đón khách</span>
+                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.gates}</span>
                         </div>
                     </div>
                 </div>

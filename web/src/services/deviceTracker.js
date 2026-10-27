@@ -3,7 +3,21 @@ import { ZooApi, API_CONFIG } from './api';
 
 const STORAGE_KEY = 'zooguide_device_installation_id';
 const BUYER_STORAGE_KEY = 'zooguide_buyer_identity';
-const HEARTBEAT_INTERVAL_MS = 15000; // 15 seconds
+
+/**
+ * Cấu hình chu kỳ Heartbeat và ngưỡng Online thống nhất toàn hệ thống:
+ * - Chu kỳ gửi heartbeat phía client: 25 giây (HEARTBEAT_INTERVAL_MS = 25000).
+ * - Ngưỡng phân loại thiết bị đang trực tuyến (Online) trên server: 60 giây (ONLINE_THRESHOLD_SECONDS = 60).
+ * 
+ * Lưu ý nghiệp vụ & Giới hạn kỹ thuật:
+ * - Mã định danh cài đặt (InstallationId) là chuỗi UUID ngẫu nhiên được lưu trữ trong localStorage của trình duyệt.
+ * - KHÔNG yêu cầu quyền định vị GPS hay thông tin cá nhân của người dùng để theo dõi thiết bị.
+ * - Khách truy cập ẩn danh (chưa mua vé, chưa kích hoạt vé) vẫn được theo dõi và đếm chính xác.
+ * - Giới hạn: Nếu người dùng xóa dữ liệu duyệt web/localStorage, hoặc mở trình duyệt ở chế độ ẩn danh (Incognito),
+ *   hoặc sử dụng hai trình duyệt khác nhau trên cùng một máy, hệ thống sẽ cấp một InstallationId độc lập mới.
+ */
+export const HEARTBEAT_INTERVAL_MS = 25000; // 25 seconds
+export const ONLINE_THRESHOLD_SECONDS = 60; // 60 seconds online cutoff on server
 
 export function getOrCreateInstallationId() {
     try {

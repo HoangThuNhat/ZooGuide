@@ -11,7 +11,7 @@ public class DeviceActivityConfiguration : IEntityTypeConfiguration<DeviceActivi
         builder.ToTable("DEVICE_ACTIVITIES");
 
         builder.HasKey(d => d.DeviceActivityId);
-        builder.Property(d => d.DeviceActivityId).UseIdentityColumn();
+        builder.Property(d => d.DeviceActivityId).UseIdentityByDefaultColumn();
 
         builder.Property(d => d.InstallationId)
             .IsRequired()
@@ -50,5 +50,15 @@ public class DeviceActivityConfiguration : IEntityTypeConfiguration<DeviceActivi
 
         builder.Property(d => d.UpdatedAt)
             .IsRequired(false);
+
+        builder.Property(d => d.IsActive)
+            .IsRequired()
+            .HasDefaultValue(true);
+
+        builder.Property(d => d.DisconnectedAt)
+            .IsRequired(false);
+
+        builder.HasIndex(d => new { d.IsActive, d.LastSeenAt })
+            .HasDatabaseName("IX_DeviceActivities_IsActive_LastSeenAt");
     }
 }

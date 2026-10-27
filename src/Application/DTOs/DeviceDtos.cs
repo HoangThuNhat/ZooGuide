@@ -20,8 +20,10 @@ public class DeviceHeartbeatResponseDto
 
 public class ActiveDevicesSummaryDto
 {
+    public int ActiveCount60Seconds { get; set; }
     public int ActiveCount5Minutes { get; set; }
     public int TotalTrackedInstallations { get; set; }
     public int HeartbeatsLastHour { get; set; }
+    public int OnlineThresholdSeconds { get; set; } = 60;
     public DateTime CalculatedAtUtc { get; set; }
 }

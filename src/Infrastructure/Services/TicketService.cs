@@ -24,7 +24,7 @@ public class TicketService : ITicketService
         _emailService = emailService;
     }
 
-    public async Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null)
+    public async Task<IEnumerable<TicketDto>> GetAllAsync(string? search = null, int? ticketTypeId = null, TicketStatus? status = null, int? page = null, int? pageSize = null)
     {
         var query = _context.Tickets
             .Include(t => t.TicketType)
@@ -57,8 +57,14 @@ public class TicketService : ITicketService
             query = query.Where(t => t.Status == status.Value);
         }
 
+        query = query.OrderByDescending(t => t.CreatedAt);
+
+        if (page.HasValue && pageSize.HasValue && page.Value > 0 && pageSize.Value > 0)
+        {
+            query = query.Skip((page.Value - 1) * pageSize.Value).Take(pageSize.Value);
+        }
+
         return await query
-            .OrderByDescending(t => t.CreatedAt)
             .Select(t => new TicketDto
             {
                 TicketId = t.TicketId,

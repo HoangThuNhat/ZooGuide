@@ -84,13 +84,11 @@ builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDeviceTrackingService, ZooGuide.Infrastructure.Services.DeviceTrackingService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IPoiService, ZooGuide.Infrastructure.Services.PoiService>();
 
-// Register Services for Dashboard, Narration, Chatbot, Audit
+// Register Services for Dashboard, Narration, Audit
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IOnlineUserTracker, ZooGuide.Infrastructure.Services.OnlineUserTracker>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IAuditLogService, ZooGuide.Infrastructure.Services.AuditLogService>();
-builder.Services.AddSingleton<ZooGuide.Application.Interfaces.IGuestChatLimiterService, ZooGuide.Infrastructure.Services.GuestChatLimiterService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDashboardService, ZooGuide.Infrastructure.Services.DashboardService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.INarrationService, ZooGuide.Infrastructure.Services.NarrationService>();
-builder.Services.AddScoped<ZooGuide.Application.Interfaces.IChatbotService, ZooGuide.Infrastructure.Services.ChatbotService>();
 
 // Register Session Filter
 builder.Services.AddScoped<RequireTicketSessionFilter>();

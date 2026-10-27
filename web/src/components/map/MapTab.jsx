@@ -219,12 +219,29 @@ const REAL_MAP_LANDMARKS = [
     }
 ];
 
+// Tính khoảng cách Haversine (đơn vị: mét) giữa 2 tọa độ GPS WGS84
+function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) return 999999;
+    const R = 6371000; // Bán kính Trái Đất (mét)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
 export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration, onPlayPoiAudio }) {
     const { 
         showToast, 
         navTargetAnimal,
         setNavTargetAnimal,
-        currentLang 
+        currentLang,
+        hasActiveSession,
+        setIsTicketModalOpen,
+        audioState,
+        t
     } = useApp();
 
     // Dữ liệu từ Supabase API
@@ -257,6 +274,21 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const markersLayerRef = useRef(null);
     const routeLayerRef = useRef(null);
     const userLocationLayerRef = useRef(null);
+
+    // --- STATE THUYẾT MINH TỰ ĐỘNG THEO GPS (Task E) ---
+    const [isAutoNarrationActive, setIsAutoNarrationActive] = useState(false);
+    const [autoNarrationStatus, setAutoNarrationStatus] = useState('');
+    const [lastTriggeredTarget, setLastTriggeredTarget] = useState(null);
+    const [showGpsPermissionModal, setShowGpsPermissionModal] = useState(false);
+    const [currentGpsAccuracy, setCurrentGpsAccuracy] = useState(null);
+
+    const watchIdRef = useRef(null);
+    const audioCooldownMapRef = useRef(new Map());
+    const isPlayingRef = useRef(false);
+
+    useEffect(() => {
+        isPlayingRef.current = Boolean(audioState?.isPlaying);
+    }, [audioState?.isPlaying]);
 
     // 1. Tải dữ liệu thực tế từ Supabase API
     const loadMapData = useCallback(async (lang = currentLang) => {
@@ -711,6 +743,155 @@ tileLayer.addTo(map);
         );
     };
 
+    // --- LOGIC THUYẾT MINH TỰ ĐỘNG THEO GPS (Task E) ---
+    const updateUserGpsMarker = useCallback((userLat, userLng, accuracy) => {
+        if (!mapInstanceRef.current || !userLocationLayerRef.current) return;
+        userLocationLayerRef.current.clearLayers();
+
+        const userIcon = L.divIcon({
+            className: 'user-gps-marker',
+            html: `
+                <div style="
+                    width: 18px;
+                    height: 18px;
+                    background: #15803D;
+                    border: 3px solid #FFFFFF;
+                    border-radius: 50%;
+                    box-shadow: 0 0 12px rgba(21,128,61,0.8);
+                "></div>
+            `,
+            iconSize: [18, 18],
+            iconAnchor: [9, 9]
+        });
+
+        L.marker([userLat, userLng], { icon: userIcon }).addTo(userLocationLayerRef.current);
+        L.circle([userLat, userLng], { 
+            radius: Math.min(accuracy, 60), 
+            color: '#15803D', 
+            fillColor: '#86EFAC', 
+            fillOpacity: 0.15 
+        }).addTo(userLocationLayerRef.current);
+    }, []);
+
+    const evaluateAutoNarrationTrigger = useCallback((userLat, userLng, accuracy) => {
+        if (!mergedMarkers || mergedMarkers.length === 0) return;
+
+        // Lọc các điểm có audio hoặc bài thuyết minh
+        const eligibleTargets = mergedMarkers.filter(m => {
+            if (!m.lat || !m.lng) return false;
+            const isPoiWithAudio = m.poiId && m.hasAudio;
+            const isEnclosureWithAnimals = m.residentAnimals && m.residentAnimals.length > 0;
+            return isPoiWithAudio || isEnclosureWithAnimals;
+        }).map(m => {
+            const dist = calculateHaversineDistance(userLat, userLng, m.lat, m.lng);
+            return { ...m, dist };
+        }).filter(m => m.dist <= 25); // Ngưỡng bán kính kích hoạt: 25 mét
+
+        if (eligibleTargets.length === 0) return;
+
+        // Ưu tiên điểm gần du khách nhất
+        eligibleTargets.sort((a, b) => a.dist - b.dist);
+
+        const now = Date.now();
+        const candidate = eligibleTargets.find(t => {
+            const lastTime = audioCooldownMapRef.current.get(t.id) || 0;
+            return (now - lastTime) > 120000; // Cooldown 120s (2 phút) để tránh lặp âm thanh
+        });
+
+        if (!candidate) return;
+
+        // Kiểm tra quyền nghe thuyết minh (yêu cầu phiên vé)
+        if (!hasActiveSession) {
+            showToast(`Bạn đang ở gần "${candidate.name}". Vui lòng kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
+            setIsTicketModalOpen(true);
+            return;
+        }
+
+        // Kích hoạt audio thuyết minh
+        audioCooldownMapRef.current.set(candidate.id, now);
+        setLastTriggeredTarget({ id: candidate.id, name: candidate.name, dist: Math.round(candidate.dist) });
+
+        if (candidate.poiId && onPlayPoiAudio) {
+            onPlayPoiAudio(candidate.poiId);
+            showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
+        } else if (candidate.residentAnimals && candidate.residentAnimals.length > 0) {
+            if (onOpenSpeciesNarration) {
+                onOpenSpeciesNarration(candidate.residentAnimals[0]);
+            } else if (onPlayAudio) {
+                onPlayAudio(candidate.residentAnimals[0]);
+            }
+            showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
+        }
+    }, [mergedMarkers, hasActiveSession, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast, setIsTicketModalOpen]);
+
+    const startAutoNarrationTracking = useCallback(() => {
+        if (!navigator.geolocation) {
+            showToast("Trình duyệt của bạn không hỗ trợ định vị GPS.", "error");
+            return;
+        }
+
+        setIsAutoNarrationActive(true);
+        setAutoNarrationStatus("Đang định vị GPS...");
+        setShowGpsPermissionModal(false);
+
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+        }
+
+        watchIdRef.current = navigator.geolocation.watchPosition(
+            (pos) => {
+                const userLat = pos.coords.latitude;
+                const userLng = pos.coords.longitude;
+                const accuracy = pos.coords.accuracy;
+                setCurrentGpsAccuracy(accuracy);
+
+                updateUserGpsMarker(userLat, userLng, accuracy);
+
+                if (accuracy > 50) {
+                    setAutoNarrationStatus(`GPS đang ổn định (±${Math.round(accuracy)}m). Cần độ chính xác <50m để định vị chuồng...`);
+                    return;
+                }
+
+                setAutoNarrationStatus(`Đang quét thuyết minh tự động (±${Math.round(accuracy)}m)`);
+                evaluateAutoNarrationTrigger(userLat, userLng, accuracy);
+            },
+            (err) => {
+                console.warn("watchPosition error:", err);
+                if (err.code === 1) {
+                    showToast("Quyền truy cập vị trí bị từ chối. Vui lòng cho phép quyền vị trí trong trình duyệt.", "error");
+                    stopAutoNarrationTracking();
+                } else if (err.code === 2) {
+                    setAutoNarrationStatus("Mất tín hiệu GPS. Đang đợi kết nối lại...");
+                } else if (err.code === 3) {
+                    setAutoNarrationStatus("Đang làm mới tín hiệu GPS...");
+                }
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+        );
+
+        showToast("Đã bật chế độ thuyết minh tự động theo GPS.", "success");
+    }, [evaluateAutoNarrationTrigger, showToast, updateUserGpsMarker]);
+
+    const stopAutoNarrationTracking = useCallback(() => {
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        setIsAutoNarrationActive(false);
+        setAutoNarrationStatus("");
+        setCurrentGpsAccuracy(null);
+        showToast("Đã tắt chế độ thuyết minh tự động.", "info");
+    }, [showToast]);
+
+    useEffect(() => {
+        return () => {
+            if (watchIdRef.current) {
+                navigator.geolocation.clearWatch(watchIdRef.current);
+                watchIdRef.current = null;
+            }
+        };
+    }, []);
+
     // 9. Nút đặt lại toàn cảnh sở thú (Reset View to Zoo Bounds)
     const handleResetZooBounds = () => {
         if (mapInstanceRef.current) {
@@ -885,6 +1066,59 @@ tileLayer.addTo(map);
                 </div>
             )}
 
+            {/* Thanh Kích Hoạt Thuyết Minh Tự Động (Task E) */}
+            <div style={{
+                marginBottom: '12px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '10px 16px',
+                borderRadius: '10px',
+                background: isAutoNarrationActive ? '#F0FDF4' : '#F8FAFC',
+                border: `1.5px solid ${isAutoNarrationActive ? '#86EFAC' : '#E2E8F0'}`,
+                flexWrap: 'wrap',
+                gap: '10px'
+            }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        background: isAutoNarrationActive ? '#15803D' : '#94A3B8',
+                        display: 'inline-block'
+                    }}></span>
+                    <div>
+                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A' }}>
+                            {isAutoNarrationActive ? 'Thuyết minh tự động (GPS) đang bật' : 'Chế độ thuyết minh tự động (GPS)'}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
+                            {isAutoNarrationActive 
+                                ? (autoNarrationStatus || 'Đang theo dõi vị trí thực tế của bạn tại Thảo Cầm Viên...') 
+                                : 'Tự động phát audio khi đến gần chuồng thú hoặc điểm tham quan (< 25m)'}
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    onClick={isAutoNarrationActive ? stopAutoNarrationTracking : () => setShowGpsPermissionModal(true)}
+                    style={{
+                        minHeight: '44px',
+                        padding: '8px 18px',
+                        borderRadius: '8px',
+                        fontWeight: 700,
+                        fontSize: '0.85rem',
+                        cursor: 'pointer',
+                        border: 'none',
+                        background: isAutoNarrationActive ? '#DC2626' : '#15803D',
+                        color: '#FFFFFF',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
+                    }}
+                >
+                    {isAutoNarrationActive ? 'Tắt Thuyết Minh Tự Động' : 'Bật Thuyết Minh Tự Động (GPS)'}
+                </button>
+            </div>
+
             {/* Khung chứa Bản Đồ Địa Lý Thực Tế Leaflet */}
             <div style={{
                 position: 'relative',
@@ -957,8 +1191,124 @@ tileLayer.addTo(map);
                                 <line x1="18" y1="12" x2="22" y2="12"></line>
                             </svg>
                         </button>
+
+                        {/* Nút Bật/Tắt Thuyết Minh Tự Động GPS */}
+                        <button
+                            type="button"
+                            className="btn btn-icon btn-sm"
+                            title={isAutoNarrationActive ? "Tắt thuyết minh tự động" : "Bật thuyết minh tự động (GPS)"}
+                            onClick={isAutoNarrationActive ? stopAutoNarrationTracking : () => setShowGpsPermissionModal(true)}
+                            style={{
+                                width: '36px',
+                                height: '36px',
+                                background: isAutoNarrationActive ? '#15803D' : '#FFF',
+                                color: isAutoNarrationActive ? '#FFF' : '#15803D',
+                                border: isAutoNarrationActive ? '1px solid #15803D' : 'none'
+                            }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+                                <line x1="12" y1="19" x2="12" y2="22"></line>
+                            </svg>
+                        </button>
                     </div>
                 </div>
+
+                {/* Floating Status Pill khi Thuyết Minh Tự Động Đang Bật */}
+                {isAutoNarrationActive && (
+                    <div style={{
+                        position: 'absolute',
+                        top: '16px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        zIndex: 1000,
+                        background: 'rgba(21, 128, 61, 0.95)',
+                        color: '#FFFFFF',
+                        padding: '8px 18px',
+                        borderRadius: '24px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                        fontSize: '0.82rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '10px',
+                        backdropFilter: 'blur(8px)',
+                        maxWidth: '90%'
+                    }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#86EFAC' }}></span>
+                        <span>{autoNarrationStatus || 'Đang quét điểm tham quan gần bạn (<25m)...'}</span>
+                        <button
+                            type="button"
+                            onClick={stopAutoNarrationTracking}
+                            style={{
+                                background: 'rgba(255,255,255,0.2)',
+                                border: 'none',
+                                color: '#FFF',
+                                borderRadius: '50%',
+                                width: '20px',
+                                height: '20px',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                fontSize: '0.75rem',
+                                marginLeft: '4px'
+                            }}
+                            title="Tắt chế độ tự động"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                )}
+
+                {/* Hộp Thoại Giải Thích & Xin Quyền GPS (Task E) */}
+                {showGpsPermissionModal && (
+                    <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 2000 }}>
+                        <div className="modal-backdrop" onClick={() => setShowGpsPermissionModal(false)}></div>
+                        <div className="modal-dialog" style={{ maxWidth: '480px', borderRadius: '18px', overflow: 'hidden' }}>
+                            <div style={{ background: '#15803D', color: '#FFF', padding: '20px', textAlign: 'center' }}>
+                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                                    Thuyết Minh Tự Động (GPS)
+                                </h3>
+                                <p style={{ margin: '6px 0 0', fontSize: '0.85rem', opacity: 0.9 }}>
+                                    Trải nghiệm hướng dẫn viên số thông minh
+                                </p>
+                            </div>
+                            <div style={{ padding: '20px', background: '#FFF' }}>
+                                <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
+                                    <p style={{ margin: '0 0 10px' }}>
+                                        Khi bạn kích hoạt chế độ này, ZooGuide sẽ theo dõi vị trí GPS của bạn trên thực địa tại Thảo Cầm Viên:
+                                    </p>
+                                    <ul style={{ paddingLeft: '20px', margin: '0 0 12px', fontSize: '0.85rem', color: '#475569' }}>
+                                        <li>Tự động kích hoạt bài thuyết minh khi bạn tiến lại gần chuồng nuôi thú hoặc di tích trong phạm vi <strong>25 mét</strong>.</li>
+                                        <li>Tránh phát trùng lặp hoặc chồng âm thanh khi bạn đang đứng xem thú.</li>
+                                        <li>Chức năng do chính bạn chủ động kích hoạt và có thể tắt bất kỳ lúc nào.</li>
+                                        <li>Yêu cầu có phiên vé tham quan hợp lệ để nghe trọn vẹn toàn bộ các bài thuyết minh.</li>
+                                    </ul>
+                                </div>
+                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline"
+                                        style={{ minHeight: '44px', padding: '10px 16px', borderRadius: '8px' }}
+                                        onClick={() => setShowGpsPermissionModal(false)}
+                                    >
+                                        Để sau
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn-primary"
+                                        style={{ minHeight: '44px', padding: '10px 20px', borderRadius: '8px', background: '#15803D', color: '#FFF', fontWeight: 700 }}
+                                        onClick={startAutoNarrationTracking}
+                                    >
+                                        Cho Phép & Bắt Đầu
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {/* Chú giải trạng thái (Legend) */}
                 <div style={{

@@ -922,9 +922,14 @@ export const ZooApi = {
     async createOrder(data) {
         try {
             const primaryItem = (data.items && data.items.length > 0) ? data.items[0] : null;
+            const ticketTypeId = parseInt(data.ticketTypeId || (primaryItem ? primaryItem.ticketTypeId : 1));
+            const quantity = parseInt(data.quantity || (primaryItem ? primaryItem.quantity : 1));
             const reqData = {
-                ticketTypeId: parseInt(data.ticketTypeId || (primaryItem ? primaryItem.ticketTypeId : 1)),
-                quantity: parseInt(data.quantity || (primaryItem ? primaryItem.quantity : 1)),
+                ticketTypeId,
+                quantity,
+                items: (data.items && data.items.length > 0)
+                    ? data.items.map(it => ({ ticketTypeId: parseInt(it.ticketTypeId), quantity: parseInt(it.quantity) }))
+                    : [{ ticketTypeId, quantity }],
                 customerName: data.customerName || 'Khách Tham Quan',
                 customerEmail: data.customerEmail || 'visitor@zooguide.vn',
                 customerPhone: data.customerPhone || '0900000000'
@@ -1501,54 +1506,7 @@ export const ZooApi = {
         }
     },
 
-    // 18. CHATBOT LIVE INTERACTION
-    async getChatbotStatus(sessionId = null) {
-        try {
-            const headers = {};
-            if (sessionId) headers['X-Session-Id'] = sessionId;
-            const res = await fetch(`${API_CONFIG.BASE_URL}/chatbot/status?sessionId=${encodeURIComponent(sessionId || '')}`, {
-                headers
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            return { success: true, data: data.data || data };
-        } catch (err) {
-            console.error('getChatbotStatus error:', err);
-            return {
-                success: false,
-                data: {
-                    hasValidTicket: Boolean(sessionId),
-                    remainingQuestions: 0,
-                    maxQuestions: 3,
-                    isLimitReached: false
-                }
-            };
-        }
-    },
 
-    async sendChatMessage(message, sessionId = null) {
-        try {
-            const headers = { 'Content-Type': 'application/json' };
-            if (sessionId) headers['X-Session-Id'] = sessionId;
-            const res = await fetch(`${API_CONFIG.BASE_URL}/chatbot/message`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({ message, sessionId })
-            });
-            const data = await res.json().catch(() => null);
-            if (!res.ok) {
-                throw new Error(data?.message || `HTTP ${res.status}`);
-            }
-            return { success: true, data: data.data || data };
-        } catch (err) {
-            console.error('sendChatMessage error:', err);
-            return {
-                success: false,
-                error: err.message || 'Không thể kết nối đến trợ lý ZooBot.'
-            };
-        }
-    }
-    ,
     // 19. DEVICE HEARTBEAT & MONITORING
     async sendDeviceHeartbeat(installationId, buyerInfo = null) {
         try {

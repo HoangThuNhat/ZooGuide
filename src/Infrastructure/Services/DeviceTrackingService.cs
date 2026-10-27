@@ -43,6 +43,7 @@ public class DeviceTrackingService : IDeviceTrackingService
             ? userAgent.Substring(0, 255)
             : userAgent;
 
+        // Privacy-conscious IP hash (never store or log raw IP address)
         string? ipHash = null;
         if (!string.IsNullOrWhiteSpace(ipAddress))
         {
@@ -66,27 +67,41 @@ public class DeviceTrackingService : IDeviceTrackingService
                 UserAgent = sanitizedUserAgent,
                 IpAddressHash = ipHash,
                 HeartbeatCount = 1,
-                CreatedAt = now
+                CreatedAt = now,
+                IsActive = true,
+                DisconnectedAt = null
             };
             _context.DeviceActivities.Add(newDevice);
-            await _context.SaveChangesAsync();
 
-            return new DeviceHeartbeatResponseDto
+            try
             {
-                Success = true,
-                InstallationId = normalizedId,
-                ServerTimeUtc = now,
-                HeartbeatCount = 1,
-                Message = "Thiết bị mới đã được ghi nhận."
-            };
+                await _context.SaveChangesAsync();
+                return new DeviceHeartbeatResponseDto
+                {
+                    Success = true,
+                    InstallationId = normalizedId,
+                    ServerTimeUtc = now,
+                    HeartbeatCount = 1,
+                    Message = "Thiết bị mới đã được ghi nhận."
+                };
+            }
+            catch (DbUpdateException)
+            {
+                // Xử lý race condition khi 2 request đầu tiên tới đồng thời
+                _context.Entry(newDevice).State = EntityState.Detached;
+                existing = await _context.DeviceActivities
+                    .FirstOrDefaultAsync(d => d.InstallationId == normalizedId);
+            }
         }
 
-        // Deduplicate rapid heartbeats within 10 seconds to avoid flooding
-        if ((now - existing.LastSeenAt).TotalSeconds >= 10)
+        if (existing != null)
         {
             existing.LastSeenAt = now;
             existing.HeartbeatCount += 1;
             existing.UpdatedAt = now;
+            existing.IsActive = true;
+            existing.DisconnectedAt = null;
+
             if (!string.IsNullOrWhiteSpace(sanitizedUserAgent))
             {
                 existing.UserAgent = sanitizedUserAgent;
@@ -95,32 +110,67 @@ public class DeviceTrackingService : IDeviceTrackingService
             {
                 existing.IpAddressHash = ipHash;
             }
+
             await _context.SaveChangesAsync();
+
+            return new DeviceHeartbeatResponseDto
+            {
+                Success = true,
+                InstallationId = normalizedId,
+                ServerTimeUtc = now,
+                HeartbeatCount = existing.HeartbeatCount,
+                Message = "Heartbeat ghi nhận thành công."
+            };
         }
 
         return new DeviceHeartbeatResponseDto
         {
-            Success = true,
+            Success = false,
             InstallationId = normalizedId,
             ServerTimeUtc = now,
-            HeartbeatCount = existing.HeartbeatCount,
-            Message = "Heartbeat ghi nhận thành công."
+            Message = "Không thể ghi nhận heartbeat cho thiết bị."
         };
     }
 
-    public async Task<int> GetActiveDevicesCountAsync(int recentMinutes = 5)
+    public async Task<bool> RecordDisconnectAsync(string installationId)
     {
-        var cutoff = DateTime.UtcNow.AddMinutes(-recentMinutes);
+        if (string.IsNullOrWhiteSpace(installationId)) return false;
+
+        var normalizedId = installationId.Trim();
+        var existing = await _context.DeviceActivities
+            .FirstOrDefaultAsync(d => d.InstallationId == normalizedId);
+
+        if (existing != null)
+        {
+            var now = DateTime.UtcNow;
+            existing.DisconnectedAt = now;
+            existing.IsActive = false;
+            existing.UpdatedAt = now;
+            await _context.SaveChangesAsync();
+            return true;
+        }
+
+        return false;
+    }
+
+    public async Task<int> GetActiveDevicesCountAsync(int thresholdSeconds = 60)
+    {
+        var cutoff = DateTime.UtcNow.AddSeconds(-thresholdSeconds);
         return await _context.DeviceActivities
             .AsNoTracking()
             .CountAsync(d => d.LastSeenAt >= cutoff);
     }
 
-    public async Task<ActiveDevicesSummaryDto> GetSummaryAsync()
+    public async Task<ActiveDevicesSummaryDto> GetSummaryAsync(int thresholdSeconds = 60)
     {
         var now = DateTime.UtcNow;
+        var cutoffThreshold = now.AddSeconds(-thresholdSeconds);
         var cutoff5Min = now.AddMinutes(-5);
         var cutoff1Hour = now.AddHours(-1);
+
+        var activeThreshold = await _context.DeviceActivities
+            .AsNoTracking()
+            .CountAsync(d => d.LastSeenAt >= cutoffThreshold);
 
         var active5Min = await _context.DeviceActivities
             .AsNoTracking()
@@ -136,9 +186,11 @@ public class DeviceTrackingService : IDeviceTrackingService
 
         return new ActiveDevicesSummaryDto
         {
+            ActiveCount60Seconds = activeThreshold,
             ActiveCount5Minutes = active5Min,
             TotalTrackedInstallations = total,
             HeartbeatsLastHour = heartbeats1Hour,
+            OnlineThresholdSeconds = thresholdSeconds,
             CalculatedAtUtc = now
         };
     }

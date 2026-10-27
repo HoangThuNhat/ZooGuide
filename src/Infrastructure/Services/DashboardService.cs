@@ -38,20 +38,15 @@ public class DashboardService : IDashboardService
             utcTo = utcTo.Value.Date.AddDays(1).AddTicks(-1);
         }
 
-        // 1. Truthful active-device monitoring (last 5 minutes)
+        // 1. Truthful active-device monitoring from persisted database heartbeats (60-second threshold)
+        var cutoff60Sec = now.AddSeconds(-60);
         var cutoff5Min = now.AddMinutes(-5);
-        var deviceStats = await _context.DeviceActivities
-            .AsNoTracking()
-            .GroupBy(d => 1)
-            .Select(g => new
-            {
-                Total = g.Count(),
-                Active5Min = g.Count(d => d.LastSeenAt >= cutoff5Min)
-            })
-            .FirstOrDefaultAsync();
 
-        var totalTrackedDevices = deviceStats?.Total ?? 0;
-        var activeDevices5Min = deviceStats?.Active5Min ?? 0;
+        var totalTrackedDevices = await _context.DeviceActivities.AsNoTracking().CountAsync();
+        var activeDevices60Sec = await _context.DeviceActivities.AsNoTracking()
+            .CountAsync(d => d.LastSeenAt >= cutoff60Sec);
+        var activeDevices5Min = await _context.DeviceActivities.AsNoTracking()
+            .CountAsync(d => d.LastSeenAt >= cutoff5Min);
 
         // 2. Dữ liệu vé và giao dịch thanh toán thành công theo bộ lọc thời gian
         var paidOrdersQuery = _context.TicketOrders
@@ -81,7 +76,8 @@ public class DashboardService : IDashboardService
             .SumAsync(o => (int?)o.Quantity) ?? 0;
 
         var activeTicketBuyers = _onlineTracker?.GetActiveTicketBuyersCount() ?? 0;
-        var activeDevices = _onlineTracker?.GetActiveDevicesCount() ?? activeDevices5Min;
+        // Truthful active devices strictly derived from persisted database heartbeats within 60 seconds
+        var activeDevices = activeDevices60Sec;
         var activeBuyerConnections = _onlineTracker?.GetActiveBuyerConnectionsCount() ?? 0;
 
         var totalTickets = await ticketQuery.CountAsync();
@@ -155,7 +151,7 @@ public class DashboardService : IDashboardService
             AudioFilesCount = audiosByLang.TryGetValue(l.Code.ToLower(), out var ac) ? ac : 0
         }).ToList();
 
-        // 6. Phiên khách tham quan trong kỳ
+        // 6. Phiên khách tham quan trong kỳ (Task C: Status==Active, EndedAt==null, ExpiredAt > now)
         var sessionQuery = _context.TicketSessions.AsQueryable();
         if (utcFrom.HasValue)
         {
@@ -166,7 +162,10 @@ public class DashboardService : IDashboardService
             sessionQuery = sessionQuery.Where(s => s.StartedAt <= utcTo.Value);
         }
 
-        var activeSessions = await sessionQuery.CountAsync(s => s.Status == SessionStatus.Active && (s.ExpiredAt > now || !utcFrom.HasValue));
+        var activeSessions = await sessionQuery.CountAsync(s => 
+            s.Status == SessionStatus.Active && 
+            s.EndedAt == null && 
+            s.ExpiredAt > now);
 
         // 7. Lấy danh sách kiểm tra sức khỏe
         var animalQuery = _context.Animals

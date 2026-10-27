@@ -1,4 +1,8 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs.Order;
 using ZooGuide.Application.Interfaces;
@@ -32,20 +36,28 @@ public class OrderService : IOrderService
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
 
-        var ticketType = await _context.TicketTypes.FindAsync(request.TicketTypeId);
+        var effectiveTicketTypeId = request.GetEffectiveTicketTypeId();
+        var effectiveQuantity = request.GetEffectiveQuantity();
+
+        if (effectiveTicketTypeId <= 0)
+        {
+            throw new ArgumentException("Hạng vé tham quan không tồn tại hoặc không hợp lệ.");
+        }
+
+        if (effectiveQuantity <= 0 || effectiveQuantity > 50)
+        {
+            throw new ArgumentException("Số lượng vé phải từ 1 đến 50.");
+        }
+
+        var ticketType = await _context.TicketTypes.FindAsync(effectiveTicketTypeId);
         if (ticketType == null || !ticketType.IsActive)
         {
             throw new ArgumentException("Hạng vé tham quan không tồn tại hoặc đã ngừng cung cấp.");
         }
 
-        if (request.Quantity <= 0)
-        {
-            throw new ArgumentException("Số lượng vé phải lớn hơn 0.");
-        }
-
         // Giá vé lấy tuyệt đối từ cơ sở dữ liệu phía máy chủ (Nguyên tắc bảo mật 6.2)
         var unitPrice = ticketType.Price;
-        var totalAmount = unitPrice * request.Quantity;
+        var totalAmount = unitPrice * effectiveQuantity;
 
         // Sinh mã đối soát chuyển khoản duy nhất và mã đơn hàng ngẫu nhiên an toàn
         var randSuffix = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
@@ -64,7 +76,7 @@ public class OrderService : IOrderService
             CustomerEmail = request.CustomerEmail.Trim().ToLower(),
             CustomerPhone = request.CustomerPhone.Trim(),
             TicketTypeId = ticketType.TicketTypeId,
-            Quantity = request.Quantity,
+            Quantity = effectiveQuantity,
             UnitPrice = unitPrice,
             TotalAmount = totalAmount,
             PaymentStatus = PaymentStatus.Pending,
@@ -104,7 +116,7 @@ public class OrderService : IOrderService
         return MapToDto(order, order.TicketType, order.Tickets?.ToList() ?? new List<Ticket>());
     }
 
-    public async Task<IEnumerable<OrderDto>> GetAllOrdersAsync(string? search = null, PaymentStatus? status = null)
+    public async Task<IEnumerable<OrderDto>> GetAllOrdersAsync(string? search = null, PaymentStatus? status = null, int? page = null, int? pageSize = null)
     {
         var query = _context.TicketOrders
             .Include(o => o.TicketType)
@@ -129,7 +141,16 @@ public class OrderService : IOrderService
             query = query.Where(o => o.PaymentStatus == status.Value);
         }
 
-        var list = await query.OrderByDescending(o => o.CreatedAt).ToListAsync();
+        query = query.OrderByDescending(o => o.CreatedAt);
+
+        if (page.HasValue && pageSize.HasValue)
+        {
+            var p = Math.Max(1, page.Value);
+            var ps = Math.Clamp(pageSize.Value, 1, 100);
+            query = query.Skip((p - 1) * ps).Take(ps);
+        }
+
+        var list = await query.ToListAsync();
         return list.Select(o => MapToDto(o, o.TicketType, o.Tickets?.ToList() ?? new List<Ticket>()));
     }
 
@@ -185,8 +206,6 @@ public class OrderService : IOrderService
         // 6. Tự động phát hành vé điện tử cho đơn hàng
         await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
 
-        // Lưu ý: Đã bỏ chức năng gửi vé qua email theo yêu cầu nghiệp vụ mới.
-        // Khách hàng nhận và xem vé điện tử/mã QR trực tiếp trên website.
         return true;
     }
 
@@ -244,8 +263,6 @@ public class OrderService : IOrderService
             .Where(t => t.OrderId == order.OrderId)
             .ToListAsync();
 
-        // Đã bỏ chức năng gửi vé qua email theo yêu cầu nghiệp vụ mới.
-        // Khách hàng nhận và xem vé điện tử/mã QR trực tiếp trên website.
         var dto = MapToDto(order, order.TicketType, ticketsList);
         dto.EmailSent = null;
         dto.EmailStatusMessage = null;

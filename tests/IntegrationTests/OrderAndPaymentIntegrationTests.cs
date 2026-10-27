@@ -98,6 +98,30 @@ public class OrderAndPaymentIntegrationTests : IDisposable
         Assert.Empty(order.IssuedTickets); // Chưa thanh toán -> Chưa có vé
     }
 
+    [Fact]
+    public async Task CreateOrder_WithItemsArray_ShouldMapTicketTypeAndQuantity()
+    {
+        var request = new CreateOrderRequest
+        {
+            CustomerName = "Nguyễn Văn Client Items",
+            CustomerEmail = "items@zooguide.vn",
+            CustomerPhone = "0901234567",
+            Items = new List<OrderItemRequest>
+            {
+                new OrderItemRequest { TicketTypeId = 1, Quantity = 2 }
+            }
+        };
+
+        var order = await _orderService.CreateOrderAsync(request);
+
+        Assert.NotNull(order);
+        Assert.Equal(1, order.TicketTypeId);
+        Assert.Equal(2, order.Quantity);
+        Assert.Equal(120000m, order.UnitPrice);
+        Assert.Equal(240000m, order.TotalAmount);
+        Assert.Equal(PaymentStatus.Pending, order.PaymentStatus);
+    }
+
     // =========================================================================
     // 2. KIỂM THỬ XÁC MINH WEBHOOK VÀ TỰ ĐỘNG CẤP VÉ AN TOÀN (YÊU CẦU 6.3 & 6.4)
     // =========================================================================

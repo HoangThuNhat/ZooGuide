@@ -29,9 +29,11 @@ public class TicketsController : ControllerBase
     public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll(
         [FromQuery] string? search = null,
         [FromQuery] int? ticketTypeId = null,
-        [FromQuery] TicketStatus? status = null)
+        [FromQuery] TicketStatus? status = null,
+        [FromQuery] int? page = null,
+        [FromQuery] int? pageSize = null)
     {
-        var tickets = await _ticketService.GetAllAsync(search, ticketTypeId, status);
+        var tickets = await _ticketService.GetAllAsync(search, ticketTypeId, status, page, pageSize);
         return Ok(tickets);
     }
 

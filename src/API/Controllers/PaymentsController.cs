@@ -1,3 +1,8 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs.Common;
 using ZooGuide.Application.DTOs.Order;
@@ -50,6 +55,23 @@ public class PaymentsController : ControllerBase
         [FromQuery] string? orderCode = null)
     {
         var targetOrderCode = !string.IsNullOrWhiteSpace(request?.OrderCode) ? request.OrderCode : orderCode;
+        if (string.IsNullOrWhiteSpace(targetOrderCode))
+        {
+            // Fallback reading raw body if sent as raw JSON string
+            if (Request.ContentLength.HasValue && Request.ContentLength.Value > 0)
+            {
+                Request.EnableBuffering();
+                Request.Body.Position = 0;
+                using var reader = new StreamReader(Request.Body);
+                var raw = await reader.ReadToEndAsync();
+                var clean = raw?.Trim().Trim('"');
+                if (!string.IsNullOrWhiteSpace(clean) && clean.StartsWith("ZG", StringComparison.OrdinalIgnoreCase))
+                {
+                    targetOrderCode = clean;
+                }
+            }
+        }
+
         if (string.IsNullOrWhiteSpace(targetOrderCode))
         {
             return BadRequest(ApiResponse<object>.Fail("Mã đơn hàng (OrderCode) không được để trống."));
