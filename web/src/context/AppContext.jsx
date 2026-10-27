@@ -912,6 +912,10 @@ export function AppProvider({ children }) {
         }, 3600);
     }, []);
 
+    const removeToast = useCallback((id) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
+
     // Load active languages from Supabase API
     useEffect(() => {
         let isMounted = true;
@@ -1057,6 +1061,7 @@ export function AppProvider({ children }) {
             setFilterZone,
             toasts,
             showToast,
+            removeToast,
             t: mergedT
         }}>
             {children}

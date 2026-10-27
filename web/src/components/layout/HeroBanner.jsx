@@ -125,18 +125,18 @@ export default function HeroBanner() {
     };
 
     return (
-        <section className="hero-banner-master" aria-label="Giới thiệu hệ thống ZooGuide Thảo Cầm Viên Sài Gòn">
-            <div className="hero-inner-container">
-                <div className="hero-content-grid">
+        <section className="hero-banner hero-banner-master" aria-label="Giới thiệu hệ thống ZooGuide Thảo Cầm Viên Sài Gòn">
+            <div className="container hero-inner-container">
+                <div className="hero-editorial-grid hero-content-grid">
                     {/* Left: Authority Brand & Value Proposition Column */}
-                    <div className="hero-text-column">
-                        <div className="hero-tag-badge">
-                            <span className="badge-pulse-dot" aria-hidden="true"></span>
+                    <div className="hero-intro-column hero-text-column">
+                        <div className="hero-eyebrow hero-tag-badge">
+                            <span className="eyebrow-dot badge-pulse-dot" aria-hidden="true"></span>
                             <span>HỆ THỐNG THUYẾT MINH TỰ ĐỘNG THẢO CẦM VIÊN</span>
                         </div>
 
                         <h1 className="hero-headline">
-                            Thảo Cầm Viên Sài Gòn
+                            <span className="hero-main-title">Thảo Cầm Viên Sài Gòn</span>
                             <span className="hero-subheadline">Khám phá thiên nhiên di sản 160 năm</span>
                         </h1>
 
@@ -283,7 +283,7 @@ export default function HeroBanner() {
                                         <img 
                                             src={slide.imageSrc} 
                                             alt={slide.alt}
-                                            className="hero-slide-image"
+                                            className="hero-slide-image hero-photography-img"
                                             loading={idx === 0 ? "eager" : "lazy"}
                                             onError={(e) => {
                                                 e.target.onerror = null;
