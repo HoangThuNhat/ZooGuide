@@ -45,9 +45,9 @@ public class PointOfInterestConfiguration : IEntityTypeConfiguration<PointOfInte
             .HasPrecision(10, 7);
 
             builder.Property(p => p.RadiusMeters)
-    .IsRequired()
-    .HasPrecision(8, 2)
-    .HasDefaultValue(50m);
+                .IsRequired()
+                .HasPrecision(8, 2)
+                .HasDefaultValue(50m);
 
         builder.Property(p => p.IsActive)
             .IsRequired()
