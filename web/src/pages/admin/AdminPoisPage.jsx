@@ -174,6 +174,9 @@ export default function AdminPoisPage() {
 
             mapInstanceRef.current = map;
             markerRef.current = marker;
+            setTimeout(() => {
+                if (map) map.invalidateSize();
+            }, 250);
         }, 150);
 
         return () => {
@@ -224,6 +227,22 @@ export default function AdminPoisPage() {
         if (!formData.name.trim()) {
             showToast('Vui lòng nhập tên điểm tham quan.', 'error');
             return;
+        }
+
+        const lat = Number(formData.latitude);
+        const lng = Number(formData.longitude);
+        if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
+            showToast('Vui lòng nhập tọa độ địa lý WGS84 hợp lệ.', 'error');
+            return;
+        }
+
+        // Kiểm tra ranh giới Thảo Cầm Viên Sài Gòn (vĩ độ ~10.7830 - 10.7930, kinh độ ~106.7000 - 106.7120)
+        const isWithinZoo = lat >= 10.7830 && lat <= 10.7930 && lng >= 106.7000 && lng <= 106.7120;
+        if (!isWithinZoo) {
+            const confirmSave = window.confirm(
+                `Cảnh báo tọa độ: Tọa độ (${lat.toFixed(6)}, ${lng.toFixed(6)}) có vẻ nằm ngoài ranh giới khuôn viên Thảo Cầm Viên Sài Gòn (vĩ độ ~10.787, kinh độ ~106.705).\nBạn có chắc chắn muốn lưu điểm tham quan này không?`
+            );
+            if (!confirmSave) return;
         }
 
         setIsSaving(true);
@@ -304,7 +323,11 @@ export default function AdminPoisPage() {
     };
 
     const handleDeletePoi = async (poi) => {
-        if (!window.confirm(`Bạn có chắc chắn muốn xóa điểm tham quan "${poi.name}" (${poi.code})? Hành động này sẽ xóa cả các bài thuyết minh liên kết.`)) {
+        const narrCount = poi.narrationCount || 0;
+        const msg = narrCount > 0
+            ? `Điểm tham quan "${poi.name}" (${poi.code}) hiện có ${narrCount} bài thuyết minh liên kết.\nBạn có chắc chắn muốn xóa không? Thao tác này sẽ xóa điểm và toàn bộ dữ liệu thuyết minh liên quan.`
+            : `Bạn có chắc chắn muốn xóa điểm tham quan "${poi.name}" (${poi.code})? Thao tác này không thể hoàn tác.`;
+        if (!window.confirm(msg)) {
             return;
         }
 
@@ -705,22 +728,25 @@ export default function AdminPoisPage() {
 
             {/* Modal: Create or Edit POI */}
             {isEditModalOpen && (
-                <div className="modal-overlay" onClick={() => !isSaving && setIsEditModalOpen(false)}>
-                    <div className="modal-content" style={{ maxWidth: '780px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" style={{ zIndex: 1200 }} role="dialog" aria-modal="true">
+                    <div className="modal-backdrop" onClick={() => !isSaving && setIsEditModalOpen(false)}></div>
+                    <div className="modal-dialog" style={{ maxWidth: '780px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
-                            <h3 className="modal-title">
+                            <h3 className="modal-title font-bold text-base">
                                 {editingPoi ? `Sửa Điểm Tham Quan: ${editingPoi.name}` : 'Thêm Mới Điểm Tham Quan (POI)'}
                             </h3>
                             <button 
                                 type="button"
-                                className="modal-close-btn"
+                                className="btn btn-icon btn-sm"
                                 onClick={() => !isSaving && setIsEditModalOpen(false)}
+                                aria-label="Đóng"
                             >
                                 ✕
                             </button>
                         </div>
 
-                        <form onSubmit={handleSavePoi}>
+                        <div className="modal-body" style={{ padding: '20px' }}>
+                            <form onSubmit={handleSavePoi}>
                             <div className="form-grid-2">
                                 <div className="form-group">
                                     <label className="form-label" htmlFor="poi-input-code">Mã điểm tham quan (Unique Code) *</label>
@@ -895,17 +921,19 @@ export default function AdminPoisPage() {
                                 </button>
                             </div>
                         </form>
+                        </div>
                     </div>
                 </div>
             )}
 
             {/* Modal: Manage Multilingual Narrations for POI */}
             {isNarrationModalOpen && selectedPoiForNarration && (
-                <div className="modal-overlay" onClick={() => setIsNarrationModalOpen(false)}>
-                    <div className="modal-content" style={{ maxWidth: '880px', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+                <div className="modal-overlay" style={{ zIndex: 1200 }} role="dialog" aria-modal="true">
+                    <div className="modal-backdrop" onClick={() => setIsNarrationModalOpen(false)}></div>
+                    <div className="modal-dialog" style={{ maxWidth: '880px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
                         <div className="modal-header">
                             <div>
-                                <h3 className="modal-title">
+                                <h3 className="modal-title font-bold text-base">
                                     Thuyết Minh Đa Ngôn Ngữ: {selectedPoiForNarration.name}
                                 </h3>
                                 <span className="text-xs text-muted">
@@ -914,12 +942,15 @@ export default function AdminPoisPage() {
                             </div>
                             <button 
                                 type="button"
-                                className="modal-close-btn"
+                                className="btn btn-icon btn-sm"
                                 onClick={() => setIsNarrationModalOpen(false)}
+                                aria-label="Đóng"
                             >
                                 ✕
                             </button>
                         </div>
+
+                        <div className="modal-body" style={{ padding: '20px' }}>
 
                         {/* List of existing narrations */}
                         <div style={{ marginBottom: '20px' }}>
@@ -1127,6 +1158,7 @@ export default function AdminPoisPage() {
                                 </button>
                             </div>
                         </form>
+                        </div>
                     </div>
                 </div>
             )}

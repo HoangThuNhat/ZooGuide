@@ -243,420 +243,414 @@ public static class ZooGuideDataSeeder
         };
         context.UserLoyalties.Add(userLoyalty);
 
-        // 9. Seed SPECIES (Bộ dữ liệu sinh thái đa dạng 27 loài trên thế giới)
-        var spLion = new Species
+        // 9. Seed SPECIES (Dữ liệu 22 loài sinh thái thực tế của Thảo Cầm Viên Sài Gòn)
+        var spElephant = new Species
         {
-            Name = "Sư tử Châu Phi",
-            ScientificName = "Panthera leo",
-            Description = "Loài mèo lớn săn mồi hàng đầu tại các đồng cỏ xavan châu Phi, sống theo cấu trúc bầy đàn có tính xã hội cao.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1614027164847-1b28cfe1df60?w=800"
+            Name = "Voi Châu Á",
+            ScientificName = "Elephas maximus",
+            Description = "Loài thú ăn cỏ trên cạn lớn nhất khu vực Châu Á. Đàn voi tại Thảo Cầm Viên Sài Gòn luôn thu hút sự quan tâm đặc biệt của du khách.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/z7140293588104-8e47e8df88406e1c32fc5c5b77635903.jpg"
         };
 
         var spTiger = new Species
         {
             Name = "Hổ Bengal",
             ScientificName = "Panthera tigris tigris",
-            Description = "Phân loài hổ lớn thứ hai thế giới, sinh sống ở Nam Á và Đông Nam Á, bơi lội giỏi và thích ngâm mình dưới nước.",
+            Description = "Phân loài hổ lớn phân bố tại Nam Á. Thảo Cầm Viên Sài Gòn đã nhân giống thành công hổ trắng Bengal và bảo tồn nhiều cá thể khỏe mạnh.",
             ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/cay-va-loai-vat/bao-hoa-mai/z7342043335000-164034e3e1c286c255bec1bddf6cc023.jpg"
         };
 
-        var spElephant = new Species
+        var spLion = new Species
         {
-            Name = "Voi Châu Á",
-            ScientificName = "Elephas maximus",
-            Description = "Loài thú ăn cỏ trên cạn lớn nhất khu vực Châu Á, có vai trò sinh thái và văn hóa quan trọng trong các khu rừng nhiệt đới.",
-            ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800"
-        };
-
-        var spEagle = new Species
-        {
-            Name = "Đại bàng Hoàng Gia",
-            ScientificName = "Aquila heliaca",
-            Description = "Loài chim săn mồi dũng mãnh với sải cánh rộng hơn 2 mét và tầm nhìn siêu việt gấp 8 lần con người.",
+            Name = "Sư Tử Châu Phi",
+            ScientificName = "Panthera leo",
+            Description = "Loài mèo lớn săn mồi hàng đầu tại các đồng cỏ xavan châu Phi, sống theo bầy đàn có tính xã hội cao.",
             ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=800"
-        };
-
-        var spPanda = new Species
-        {
-            Name = "Gấu Trúc Khổng Lồ",
-            ScientificName = "Ailuropoda melanoleuca",
-            Description = "Loài gấu đặc hữu của vùng núi rừng tre trúc Trung Quốc, với chế độ ăn tới 99% là các loài tre nứa.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1564349683136-77e08dba1ef6?w=800"
-        };
-
-        var spIndochinaTiger = new Species
-        {
-            Name = "Hổ Đông Dương",
-            ScientificName = "Panthera tigris corbetti",
-            Description = "Phân loài hổ bản địa bán đảo Đông Dương, hiện đang đối mặt nguy cơ tuyệt chủng nghiêm trọng do mất sinh cảnh.",
-            ConservationStatus = "CR - Cực kỳ nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1549480017-d76466a4b7e8?w=800"
-        };
-
-        var spLeopard = new Species
-        {
-            Name = "Báo hoa mai",
-            ScientificName = "Panthera pardus",
-            Description = "Một trong năm loài lớn thuộc chi Báo, nổi bật với khả năng leo trèo điêu luyện và hoa văn đốm hoa mai đặc trưng.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1456926631375-92c8ce872def?w=800"
-        };
-
-        var spSnowLeopard = new Species
-        {
-            Name = "Báo tuyết",
-            ScientificName = "Panthera uncia",
-            Description = "Loài mèo lớn sống tại các vùng núi cao Trung và Nam Á, có bộ lông dày màu xám khói và đuôi dài giúp thăng bằng trên vách đá.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1541781774459-bb2af2f05b55?w=800"
-        };
-
-        var spAfricanElephant = new Species
-        {
-            Name = "Voi châu Phi",
-            ScientificName = "Loxodonta africana",
-            Description = "Động vật trên cạn lớn nhất hành tinh, có đôi tai hình lục địa châu Phi và cặp ngà lớn ấn tượng.",
-            ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800"
-        };
-
-        var spGiraffe = new Species
-        {
-            Name = "Hươu cao cổ",
-            ScientificName = "Giraffa camelopardalis",
-            Description = "Loài động vật có vú trên cạn cao nhất thế giới, cổ dài thích nghi ăn lá cây keo trên tầng cao thảo nguyên châu Phi.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1534567153574-2b12153a87f0?w=800"
-        };
-
-        var spRhino = new Species
-        {
-            Name = "Tê giác trắng",
-            ScientificName = "Ceratotherium simum",
-            Description = "Loài động vật có vú trên cạn lớn thứ hai thế giới, đặc trưng bởi chiếc miệng rộng thích nghi ăn cỏ trên các đồng bằng xavan.",
-            ConservationStatus = "NT - Sắp bị đe dọa",
-            ImageUrl = "https://images.unsplash.com/photo-1575550959106-5a7defe28b56?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/image-1-1.png"
         };
 
         var spHippo = new Species
         {
-            Name = "Hà mã",
+            Name = "Hà Mã",
             ScientificName = "Hippopotamus amphibius",
-            Description = "Động vật bán thủy sinh khổng lồ ở châu Phi hạ Sahara, dành phần lớn ban ngày ngâm mình dưới nước hoặc đầm lầy bùn.",
+            Description = "Động vật bán thủy sinh khổng lồ ở châu Phi hạ Sahara, dành phần lớn ban ngày ngâm mình dưới nước hoặc đầm bùn.",
             ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1534188753412-3e26d0d618d6?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/z7382686431535-ea0719e14b8c3dc7c0db83b066d73cef.jpg"
         };
 
-        var spChimp = new Species
+        var spRhino = new Species
         {
-            Name = "Tinh tinh",
-            ScientificName = "Pan troglodytes",
-            Description = "Loài linh trưởng thông minh có quan hệ di truyền gần gũi nhất với loài người, biết chế tạo và sử dụng công cụ tinh vi.",
+            Name = "Tê Giác Trắng",
+            ScientificName = "Ceratotherium simum",
+            Description = "Loài thú móng guốc trên cạn lớn thứ hai thế giới, đặc trưng bởi chiếc miệng rộng thích nghi ăn cỏ trên các đồng bằng xavan.",
+            ConservationStatus = "NT - Sắp bị đe dọa",
+            ImageUrl = "https://saigonzoo.vn/uploads/z7384023045171-e79b841ad199c4acd5cea4af3be9a33d.jpg"
+        };
+
+        var spGiraffe = new Species
+        {
+            Name = "Hươu Cao Cổ",
+            ScientificName = "Giraffa camelopardalis",
+            Description = "Động vật có vú cao nhất thế giới với cổ dài đặc trưng thích nghi ăn lá cây keo trên tầng cao thảo nguyên châu Phi.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/image-1-4.png"
+        };
+
+        var spZebra = new Species
+        {
+            Name = "Ngựa Vằn",
+            ScientificName = "Equus quagga",
+            Description = "Loài thú móng guốc có sọc đen trắng đặc trưng sinh sống tại các trảng cỏ và thảo nguyên Đông và Nam Phi.",
+            ConservationStatus = "NT - Sắp bị đe dọa",
+            ImageUrl = "https://saigonzoo.vn/uploads/sony-ilce-1-5664x3768-000797-dxo-deepprime-xd2s-xd.jpg"
+        };
+
+        var spHogDeer = new Species
+        {
+            Name = "Hươu Vàng",
+            ScientificName = "Hyelaphus porcinus",
+            Description = "Loài hươu nhỏ quý hiếm của vùng Đông Nam Á, thân thiện và được chăm sóc bảo tồn nguồn gen tại Thảo Cầm Viên.",
             ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1540573133985-87b6da6d54a9?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/image-1.png"
         };
 
-        var spGorilla = new Species
+        var spLeopard = new Species
         {
-            Name = "Khỉ đột",
-            ScientificName = "Gorilla gorilla",
-            Description = "Loài linh trưởng lớn nhất thế giới, sinh sống tại các khu rừng nhiệt đới xích đạo châu Phi với cấu trúc gia đình lưng bạc bảo vệ đàn.",
-            ConservationStatus = "CR - Cực kỳ nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1535083783855-76ae62b2914e?w=800"
+            Name = "Báo Hoa Mai",
+            ScientificName = "Panthera pardus",
+            Description = "Loài thú ăn thịt họ Mèo lớn có khả năng leo trèo điêu luyện và hoa văn đốm hoa mai đặc trưng khắp cơ thể.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/cay-va-loai-vat/bao-hoa-mai/z7342043335000-164034e3e1c286c255bec1bddf6cc023.jpg"
+        };
+
+        var spCloudedLeopard = new Species
+        {
+            Name = "Báo Gấm",
+            ScientificName = "Neofelis nebulosa",
+            Description = "Loài thú ăn thịt kích thước trung bình với hoa văn mai rùa lớn hình đám mây, sở hữu răng nanh dài nhất so với kích thước sọ trong họ Mèo.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/cay-va-loai-vat/bao-gam/img-7106.jpg"
+        };
+
+        var spGoldenCat = new Species
+        {
+            Name = "Báo Lửa",
+            ScientificName = "Catopuma temminckii",
+            Description = "Loài mèo hoang dã bí ẩn với bộ lông màu vàng đỏ hung đặc trưng, sinh sống trong các khu rừng rậm Đông Nam Á.",
+            ConservationStatus = "NT - Sắp bị đe dọa",
+            ImageUrl = "https://saigonzoo.vn/uploads/z7342043177913-83bd655fa361a73223199848bbac149f.jpg"
         };
 
         var spOrangutan = new Species
         {
-            Name = "Đười ươi Bornean",
+            Name = "Đười Ươi Bornean",
             ScientificName = "Pongo pygmaeus",
-            Description = "Loài vượn người lớn đặc hữu đảo Borneo, dành phần lớn cuộc đời trên cây với bộ lông màu nâu đỏ và cánh tay dài khỏe khoắn.",
+            Description = "Loài vượn người lớn đặc hữu đảo Borneo, dành phần lớn cuộc đời trên cây với bộ lông màu nâu đỏ và trí thông minh vượt trội.",
             ConservationStatus = "CR - Cực kỳ nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1579888944880-d9834124570c?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/anh-khach-gui/quoc-hung/dsc03722.jpg"
         };
 
-        var spPolarBear = new Species
+        var spGibbon = new Species
         {
-            Name = "Gấu Bắc Cực",
-            ScientificName = "Ursus maritimus",
-            Description = "Loài thú ăn thịt trên cạn lớn nhất, sống ở vùng băng tuyết Bắc Cực, chuyên săn hải cẩu trên các tảng băng trôi.",
+            Name = "Vượn Má Vàng",
+            ScientificName = "Nomascus gabriellae",
+            Description = "Loài linh trưởng đặc hữu bán đảo Đông Dương, tiếng hót vang vọng khắp rừng vào buổi sáng sớm, con đực đen tuyền má vàng, con cái lông vàng kim.",
+            ConservationStatus = "EN - Nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/z7310455867226-8bc6124408a5d50657bd4ea33f7daccd.jpg"
+        };
+
+        var spGreyShankedDouc = new Species
+        {
+            Name = "Chà Vá Chân Xám",
+            ScientificName = "Pygathrix cinerea",
+            Description = "Loài linh trưởng đặc hữu của Việt Nam, được mệnh danh là 'nữ hoàng linh trưởng' với màu sắc bộ lông tuyệt mỹ.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/anh-khach-gui/quoc-hung/z7636302149795-c7e2be129ab9ed78c667208bfa210ea5.jpg"
+        };
+
+        var spBlackShankedDouc = new Species
+        {
+            Name = "Chà Vá Chân Đen",
+            ScientificName = "Pygathrix nigripes",
+            Description = "Loài khỉ ăn lá độc đáo của miền Nam Việt Nam và Campuchia với khuôn mặt xám xanh và đôi chân đen tuyền.",
+            ConservationStatus = "CR - Cực kỳ nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/image-1-1.png"
+        };
+
+        var spHornbill = new Species
+        {
+            Name = "Chim Hồng Hoàng",
+            ScientificName = "Buceros bicornis",
+            Description = "Loài chim mỏ sừng khổng lồ với sải cánh rộng và chiếc mũ sừng màu vàng cam rực rỡ trên đỉnh mỏ.",
             ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1589656966895-2f33e7653819?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/z7342043177904-72a038f501819d104529a3e36a245be8.jpg"
         };
 
-        var spBrownBear = new Species
+        var spWreathedHornbill = new Species
         {
-            Name = "Gấu nâu",
-            ScientificName = "Ursus arctos",
-            Description = "Loài gấu ăn tạp phân bố rộng khắp Bắc Mỹ và lục địa Á - Âu, sở hữu sức mạnh cơ bắp phi thường và giác quan nhạy bén.",
+            Name = "Niệc Mỏ Vằn",
+            ScientificName = "Rhyticeros undulatus",
+            Description = "Loài chim mỏ sừng lớn với túi họng màu vàng hoặc xanh dương nổi bật, phát ra âm thanh vỗ cánh vang như tiếng tàu lượn.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/tin-tuc/hinh-bai-viet-sach-tcv/z7946874971112-6db2f2eb27acfa473610917b5574dd3c.jpg"
+        };
+
+        var spOrientalPiedHornbill = new Species
+        {
+            Name = "Cao Cát Bụng Trắng",
+            ScientificName = "Anthracoceros albirostris",
+            Description = "Loài chim mỏ sừng nhỏ hơn với bộ lông đen trắng tương phản và mỏ ngà có chóp sừng nhọn.",
             ConservationStatus = "LC - Ít quan tâm",
-            ImageUrl = "https://images.unsplash.com/photo-1530595467537-0b5996c41f2d?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/tin-tuc/hinh-bai-viet-sach-tcv/z7948355036160-b343a9673c7ef65a6d097a2fd9d6d283.jpg"
         };
 
-        var spBaldEagle = new Species
+        var spSpotBilledPelican = new Species
         {
-            Name = "Đại bàng đầu trắng",
-            ScientificName = "Haliaeetus leucocephalus",
-            Description = "Loài chim săn mồi biểu tượng Bắc Mỹ, nổi tiếng với đầu lông trắng muốt, sải cánh rộng và khả năng bắt cá điêu luyện trên mặt nước.",
-            ConservationStatus = "LC - Ít quan tâm",
-            ImageUrl = "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=800"
-        };
-
-        var spFlamingo = new Species
-        {
-            Name = "Hồng hạc",
-            ScientificName = "Phoenicopterus roseus",
-            Description = "Loài chim lội nước có bộ lông hồng phấn rực rỡ từ sắc tố carotenoid, đôi chân dài mảnh khảnh và chiếc mỏ chuyên lọc sinh vật phù du.",
-            ConservationStatus = "LC - Ít quan tâm",
-            ImageUrl = "https://images.unsplash.com/photo-1539418561314-565804e349c0?w=800"
-        };
-
-        var spPenguin = new Species
-        {
-            Name = "Chim cánh cụt Hoàng đế",
-            ScientificName = "Aptenodytes forsteri",
-            Description = "Loài chim cánh cụt cao và nặng nhất còn sống, sinh sản trong mùa đông băng giá khắc nghiệt tại Nam Cực.",
+            Name = "Bồ Nông Chân Xám",
+            ScientificName = "Pelecanus philippensis",
+            Description = "Loài chim nước lớn có chiếc túi họng co giãn tuyệt vời chuyên dùng để hớt và bắt cá ngọt.",
             ConservationStatus = "NT - Sắp bị đe dọa",
-            ImageUrl = "https://images.unsplash.com/photo-1598439210625-5067c578f3f6?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/cay-va-loai-vat/bo-nong-chan-xam/z7942383153395-17cc1f362491c518de1850c0d0e565c3.jpg"
         };
 
-        var spCrocodile = new Species
+        var spCrestedArgus = new Species
         {
-            Name = "Cá sấu nước mặn",
-            ScientificName = "Crocodylus porosus",
-            Description = "Loài bò sát còn sống lớn nhất hành tinh, có lực cắn mạnh hàng đầu thế giới tự nhiên và phân bố khắp Ấn Độ Dương - Thái Bình Dương.",
-            ConservationStatus = "LC - Ít quan tâm",
-            ImageUrl = "https://images.unsplash.com/photo-1522069169874-c58ec4b76be5?w=800"
-        };
-
-        var spSeaTurtle = new Species
-        {
-            Name = "Rùa biển xanh",
-            ScientificName = "Chelonia mydas",
-            Description = "Loài rùa biển lớn ăn thực vật tại các vùng biển nhiệt đới, đóng vai trò then chốt trong việc duy trì sức khỏe các đồng cỏ biển.",
-            ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800"
-        };
-
-        var spKomodo = new Species
-        {
-            Name = "Kỳ đà Komodo",
-            ScientificName = "Varanus komodoensis",
-            Description = "Loài thằn lằn lớn nhất thế giới đặc hữu các đảo của Indonesia, sở hữu nọc độc và khả năng phục kích hạ gục con mồi to lớn.",
-            ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1584824486509-112e4181ff6b?w=800"
-        };
-
-        var spPoisonFrog = new Species
-        {
-            Name = "Ếch phi tiêu độc",
-            ScientificName = "Dendrobatidae",
-            Description = "Họ ếch nhỏ mang màu sắc cảnh báo rực rỡ ở rừng mưa Trung và Nam Mỹ, da tiết chất độc alkaloid cực mạnh để phòng vệ.",
-            ConservationStatus = "LC - Ít quan tâm",
-            ImageUrl = "https://images.unsplash.com/photo-1563810022204-c36b48baec57?w=800"
-        };
-
-        var spAxolotl = new Species
-        {
-            Name = "Kỳ giông Axolotl",
-            ScientificName = "Ambystoma mexicanum",
-            Description = "Loài lưỡng cư độc đáo giữ lại hình thái ấu trùng suốt đời với các chùm mang ngoài và khả năng tái tạo tế bào, chi cơ thể hoàn hảo.",
+            Name = "Trĩ Sao",
+            ScientificName = "Rheinardia ocellata",
+            Description = "Loài chim trĩ quý hiếm với chiếc đuôi dài nhất trong giới tự nhiên, lông điểm vô vàn đốm sao tinh tế.",
             ConservationStatus = "CR - Cực kỳ nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1516467508483-a7212febe31a?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/tcv24.jpg"
         };
 
-        var spGreatWhiteShark = new Species
+        var spWhiteCockatoo = new Species
         {
-            Name = "Cá mập trắng lớn",
-            ScientificName = "Carcharodon carcharias",
-            Description = "Loài cá săn mồi đầu bảng tại các vùng biển ven bờ đại dương ôn đới, có tốc độ bơi vượt trội và hàm răng tam giác sắc lẹm.",
-            ConservationStatus = "VU - Sắp nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1560275619-4662e36fa65c?w=800"
-        };
-
-        var spMantaRay = new Species
-        {
-            Name = "Cá đuối manta",
-            ScientificName = "Mobula birostris",
-            Description = "Loài cá đuối đại dương khổng lồ có sải vây tới 7 mét, bơi lội duyên dáng trong làn nước xanh và lọc ăn sinh vật phù du bằng mang.",
+            Name = "Vẹt Trắng Mào Trắng",
+            ScientificName = "Cacatua alba",
+            Description = "Loài vẹt có bộ lông trắng muốt với chiếc mào hình quạt bung xòe lộng lẫy và giọng hót huyên náo.",
             ConservationStatus = "EN - Nguy cấp",
-            ImageUrl = "https://images.unsplash.com/photo-1544551763-77ef2d0cfc6c?w=800"
+            ImageUrl = "https://saigonzoo.vn/uploads/vet-mao-trang/z7556906059204-fbbad9be234fe1d785aa2816d84e7d63.jpg"
+        };
+
+        var spKingCobra = new Species
+        {
+            Name = "Rắn Hổ Chúa",
+            ScientificName = "Ophiophagus hannah",
+            Description = "Loài rắn độc dài nhất thế giới, có khả năng nâng cao thân mình và bành mang ấn tượng khi cảm thấy bị đe dọa.",
+            ConservationStatus = "VU - Sắp nguy cấp",
+            ImageUrl = "https://saigonzoo.vn/uploads/z7654932087652-a87e61b1a46dc733497df1b2c14256a7.jpg"
         };
 
         context.Species.AddRange(
-            spLion, spTiger, spElephant, spEagle, spPanda, spIndochinaTiger,
-            spLeopard, spSnowLeopard, spAfricanElephant, spGiraffe, spRhino, spHippo,
-            spChimp, spGorilla, spOrangutan, spPolarBear, spBrownBear, spBaldEagle,
-            spFlamingo, spPenguin, spCrocodile, spSeaTurtle, spKomodo, spPoisonFrog,
-            spAxolotl, spGreatWhiteShark, spMantaRay
+            spElephant, spTiger, spLion, spHippo, spRhino, spGiraffe,
+            spZebra, spHogDeer, spLeopard, spCloudedLeopard, spGoldenCat,
+            spOrangutan, spGibbon, spGreyShankedDouc, spBlackShankedDouc,
+            spHornbill, spWreathedHornbill, spOrientalPiedHornbill,
+            spSpotBilledPelican, spCrestedArgus, spWhiteCockatoo, spKingCobra
         );
         await context.SaveChangesAsync();
 
-        // 10. Seed AREAS (Khu Sư tử, Khu Hổ, Khu Voi, Khu Chim)
-        var areaLion = new Area
+        // 10. Seed AREAS (7 Phân khu sinh thái chuẩn thực tế Thảo Cầm Viên Sài Gòn)
+        var areaReptile = new Area
         {
-            Name = "Khu Sư Tử (Lion Savannah)",
-            Description = "Khuôn viên mô phỏng thảo nguyên xavan mở cho đàn sư tử hoàng gia.",
-            Latitude = 10.787520m,
-            Longitude = 106.705250m,
-            RadiusMeters = 35.0m,
-            MapImageUrl = "/assets/maps/zone_lion.png",
+            Code = "AREA-REPTILE",
+            Name = "Khu Bảo Tồn Bò Sát & Lưỡng Cư",
+            Description = "Khu nhà kính bảo tồn các loài rắn hổ chúa, trăn gấm, kỳ đà và rùa cạn nhiệt đới.",
+            Latitude = 10.788000m,
+            Longitude = 106.706500m,
+            RadiusMeters = 40.0m,
+            MapX = 58.0m,
+            MapY = 45.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Khu bò sát",
             Status = AreaStatus.Active
         };
 
-        var areaTiger = new Area
+        var areaPetting = new Area
         {
-            Name = "Khu Hổ (Tiger Habitat)",
-            Description = "Khu rừng mưa nhiệt đới có hồ tắm dành riêng cho loài hổ bơi lội.",
-            Latitude = 10.788640m,
-            Longitude = 106.706180m,
-            RadiusMeters = 30.0m,
-            MapImageUrl = "/assets/maps/zone_tiger.png",
+            Code = "AREA-PETTING",
+            Name = "Khu Vườn Thú Thiếu Nhi & Thân Thiện",
+            Description = "Khuôn viên sinh thái dành cho trẻ em tương tác trực tiếp với capybara, dê lùn, cừu và thỏ kiểng.",
+            Latitude = 10.786200m,
+            Longitude = 106.707200m,
+            RadiusMeters = 45.0m,
+            MapX = 89.0m,
+            MapY = 89.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Vườn thú thân thiện cổng B",
             Status = AreaStatus.Active
         };
 
-        var areaElephant = new Area
+        var areaHerbivore = new Area
         {
-            Name = "Khu Voi (Elephant Valley)",
-            Description = "Thung lũng đồng cỏ rộng lớn với bãi tắm bùn tự nhiên cho đàn voi.",
-            Latitude = 10.789500m,
-            Longitude = 106.707300m,
-            RadiusMeters = 50.0m,
-            MapImageUrl = "/assets/maps/zone_elephant.png",
+            Code = "AREA-HERBIVORE",
+            Name = "Khu Động Vật Ăn Cỏ & Móng Guốc",
+            Description = "Thung lũng đồng cỏ bán hoang dã dành cho voi, hà mã, tê giác trắng, hươu cao cổ, ngựa vằn và hươu vàng.",
+            Latitude = 10.789200m,
+            Longitude = 106.706800m,
+            RadiusMeters = 60.0m,
+            MapX = 65.0m,
+            MapY = 22.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Phân khu ăn cỏ Đông Bắc",
             Status = AreaStatus.Active
         };
 
-        var areaBird = new Area
+        var areaAviary = new Area
         {
-            Name = "Khu Chim (Aviary Paradise)",
-            Description = "Nhà lồng vòm không gian mở cho các loài chim bay lượn tự do.",
+            Code = "AREA-AVIARY",
+            Name = "Khu Vườn Chim & Đầm Nước Nhiệt Đới",
+            Description = "Quần xã lồng vòm sinh thái cao 15m nuôi dưỡng chim hồng hoàng, niệc mỏ vằn, cao cát, bồ nông, trĩ sao và vẹt mào.",
             Latitude = 10.786900m,
             Longitude = 106.704200m,
-            RadiusMeters = 40.0m,
-            MapImageUrl = "/assets/maps/zone_bird.png",
+            RadiusMeters = 45.0m,
+            MapX = 35.5m,
+            MapY = 74.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Khu lồng chim vòm Tây Nam",
             Status = AreaStatus.Active
         };
 
-        context.Areas.AddRange(areaLion, areaTiger, areaElephant, areaBird);
+        var areaHeritage = new Area
+        {
+            Code = "AREA-HERITAGE",
+            Name = "Khu Di Tích, Cảnh Quan & Cây Di Sản",
+            Description = "Trục cảnh quan văn hóa lịch sử trung tâm quy tụ Đền Thờ Vua Hùng (1926), Bảo Tàng Lịch Sử TP.HCM, Hồ Sen Thủy Tạ và cổ thụ sọ khỉ hơn 130 năm tuổi.",
+            Latitude = 10.786800m,
+            Longitude = 106.704800m,
+            RadiusMeters = 50.0m,
+            MapX = 48.0m,
+            MapY = 55.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Quần thể di tích lịch sử và cây di sản",
+            Status = AreaStatus.Active
+        };
+
+        var areaPrimate = new Area
+        {
+            Code = "AREA-PRIMATE",
+            Name = "Khu Đảo Vượn & Linh Trưởng Quý Hiếm",
+            Description = "Hệ thống cù lao ốc đảo sinh thái giữa hồ nuôi dưỡng đười ươi Bornean, vượn má vàng, voọc chà vá chân xám và voọc chà vá chân đen.",
+            Latitude = 10.787100m,
+            Longitude = 106.705800m,
+            RadiusMeters = 50.0m,
+            MapX = 57.0m,
+            MapY = 64.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Đảo vượn má hung",
+            Status = AreaStatus.Active
+        };
+
+        var areaCarnivore = new Area
+        {
+            Code = "AREA-CARNIVORE",
+            Name = "Khu Động Vật Ăn Thịt Hoàng Gia",
+            Description = "Khu vực bán hoang dã kiên cố bảo tồn các loài thú săn mồi: Hổ Bengal, Hổ Siberia, Sư tử châu Phi, Báo hoa mai, Báo gấm và Báo lửa.",
+            Latitude = 10.788500m,
+            Longitude = 106.705800m,
+            RadiusMeters = 55.0m,
+            MapX = 63.0m,
+            MapY = 30.0m,
+            ReferenceSource = "Thảo Cầm Viên Sài Gòn - Khu thú dữ Tây Bắc",
+            Status = AreaStatus.Active
+        };
+
+        context.Areas.AddRange(areaReptile, areaPetting, areaHerbivore, areaAviary, areaHeritage, areaPrimate, areaCarnivore);
         await context.SaveChangesAsync();
 
-        // 11. Seed ANIMALS (8 cá thể thuộc 4 loài và 4 khu)
+        // 10.5 Seed ENCLOSURES (Chuồng thú thực tế tại Thảo Cầm Viên Sài Gòn)
+        var encTigerBengal = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-TIG-01", Name = "Chuồng Hổ Bengal", Latitude = 10.788500m, Longitude = 106.706100m, Status = "Active" };
+        var encTigerSiberia = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-TIG-02", Name = "Chuồng Hổ Siberia & Hổ Trắng", Latitude = 10.788700m, Longitude = 106.706400m, Status = "Active" };
+        var encLion = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-LIO-01", Name = "Chuồng Sư Tử Hoàng Gia", Latitude = 10.788200m, Longitude = 106.705100m, Status = "Active" };
+        var encLeopard = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-LEO-01", Name = "Chuồng Nuôi Báo Hoa Mai", Latitude = 10.788400m, Longitude = 106.705600m, Status = "Active" };
+        var encCloudedLeopard = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-CLO-01", Name = "Chuồng Bảo Tồn Báo Gấm", Latitude = 10.788600m, Longitude = 106.705400m, Status = "Active" };
+        var encGoldenCat = new Enclosure { AreaId = areaCarnivore.AreaId, Code = "ENC-GCA-01", Name = "Chuồng Nuôi Dưỡng Báo Lửa", Latitude = 10.788750m, Longitude = 106.705200m, Status = "Active" };
+
+        var encElephant = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-ELE-01", Name = "Bãi Thả Voi Châu Á", Latitude = 10.789200m, Longitude = 106.706800m, Status = "Active" };
+        var encHippo = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-HIP-01", Name = "Bãi Thả Hà Mã", Latitude = 10.789450m, Longitude = 106.707300m, Status = "Active" };
+        var encRhino = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-RHI-01", Name = "Khu Vực Tê Giác Trắng", Latitude = 10.789600m, Longitude = 106.706500m, Status = "Active" };
+        var encGiraffe = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-GIR-01", Name = "Đồng Cỏ Hươu Cao Cổ", Latitude = 10.788950m, Longitude = 106.707100m, Status = "Active" };
+        var encZebra = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-ZEB-01", Name = "Khu Thảo Nguyên Ngựa Vằn", Latitude = 10.788800m, Longitude = 106.707450m, Status = "Active" };
+        var encHogDeer = new Enclosure { AreaId = areaHerbivore.AreaId, Code = "ENC-HOG-01", Name = "Chuồng Bảo Tồn Hươu Vàng", Latitude = 10.789100m, Longitude = 106.706100m, Status = "Active" };
+
+        var encAviaryDome = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-BIR-01", Name = "Lồng Vòm Chim Nhiệt Đới", Latitude = 10.786900m, Longitude = 106.704200m, Status = "Active" };
+        var encWreathedHornbill = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-WRE-01", Name = "Chuồng Chim Niệc Mỏ Vằn", Latitude = 10.787100m, Longitude = 106.704000m, Status = "Active" };
+        var encPiedHornbill = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-HOR-01", Name = "Khu Vực Cao Cát Bụng Trắng", Latitude = 10.787250m, Longitude = 106.704300m, Status = "Active" };
+        var encPelican = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-PEL-01", Name = "Hồ Thủy Điểu & Bồ Nông", Latitude = 10.786700m, Longitude = 106.704500m, Status = "Active" };
+        var encArgus = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-ARG-01", Name = "Khu Vực Trĩ Sao Bản Địa", Latitude = 10.786850m, Longitude = 106.703800m, Status = "Active" };
+        var encCockatoo = new Enclosure { AreaId = areaAviary.AreaId, Code = "ENC-COC-01", Name = "Nhà Lưới Vẹt Trắng Mào Vàng", Latitude = 10.787350m, Longitude = 106.704500m, Status = "Active" };
+
+        var encOrangutan = new Enclosure { AreaId = areaPrimate.AreaId, Code = "ENC-ORA-01", Name = "Ngôi Nhà Đười Ươi Bornean", Latitude = 10.787300m, Longitude = 106.705900m, Status = "Active" };
+        var encGibbon = new Enclosure { AreaId = areaPrimate.AreaId, Code = "ENC-GIB-01", Name = "Đảo Vượn Má Vàng", Latitude = 10.787100m, Longitude = 106.705800m, Status = "Active" };
+        var encDouc = new Enclosure { AreaId = areaPrimate.AreaId, Code = "ENC-DOU-01", Name = "Khu Bán Hoang Dã Voọc Chà Vá", Latitude = 10.786950m, Longitude = 106.706100m, Status = "Active" };
+
+        var encPetting = new Enclosure { AreaId = areaPetting.AreaId, Code = "ENC-PET-01", Name = "Khuôn Viên Thú Nhỏ Thân Thiện", Latitude = 10.786200m, Longitude = 106.707200m, Status = "Active" };
+        var encReptile = new Enclosure { AreaId = areaReptile.AreaId, Code = "ENC-REP-01", Name = "Nhà Trưng Bày Rắn Hổ Chúa & Bò Sát", Latitude = 10.788000m, Longitude = 106.706500m, Status = "Active" };
+
+        context.Enclosures.AddRange(
+            encTigerBengal, encTigerSiberia, encLion, encLeopard, encCloudedLeopard, encGoldenCat,
+            encElephant, encHippo, encRhino, encGiraffe, encZebra, encHogDeer,
+            encAviaryDome, encWreathedHornbill, encPiedHornbill, encPelican, encArgus, encCockatoo,
+            encOrangutan, encGibbon, encDouc, encPetting, encReptile
+        );
+        await context.SaveChangesAsync();
+
+        // 11. Seed ANIMALS (Cá thể động vật thực tế tại Thảo Cầm Viên Sài Gòn kèm Chuồng)
         var animals = new List<Animal>
         {
             new Animal
             {
                 SpeciesId = spLion.SpeciesId,
-                AreaId = areaLion.AreaId,
-                Name = "Simba",
-                Description = "Sư tử đực đầu đàn dũng mãnh, có bờm đen sẫm đặc trưng.",
+                AreaId = areaCarnivore.AreaId,
+                EnclosureId = encLion.EnclosureId,
+                Name = "Sư tử trắng Mimi",
+                Description = "Cá thể sư tử trắng cái gắn bó 16 năm tại Thảo Cầm Viên Sài Gòn, đạt tuổi thọ cao kỷ lục 18 tuổi.",
+                Gender = AnimalGender.Female,
+                DateOfBirth = new DateOnly(2008, 9, 1),
+                Origin = "Thảo Cầm Viên Sài Gòn",
+                HealthStatus = "Đã qua đời do tuổi già - Lưu trữ hồ sơ bảo tồn",
+                ConservationNote = "Cá thể sư tử trắng biểu tượng được du khách và nhân viên yêu mến",
+                ImageUrl = "https://saigonzoo.vn/uploads/image-1-1.png",
+                Status = AnimalStatus.Active
+            },
+            new Animal
+            {
+                SpeciesId = spTiger.SpeciesId,
+                AreaId = areaCarnivore.AreaId,
+                EnclosureId = encTigerBengal.EnclosureId,
+                Name = "Hổ trắng Ngộ Không",
+                Description = "Cá thể hổ trắng Bengal sinh ngày 08/07/2015 tại Thảo Cầm Viên Sài Gòn, biểu tượng được hàng triệu du khách yêu mến.",
                 Gender = AnimalGender.Male,
-                DateOfBirth = new DateOnly(2019, 5, 12),
-                Origin = "Vườn quốc gia Serengeti, Tanzania",
+                DateOfBirth = new DateOnly(2015, 7, 8),
+                Origin = "Thảo Cầm Viên Sài Gòn",
                 HealthStatus = "Khỏe mạnh, sung mãn",
-                ConservationNote = "Tham gia chương trình bảo tồn nhân giống quốc tế",
-                ImageUrl = "https://images.unsplash.com/photo-1546182990-dffeafbe841d?w=800",
-                Status = AnimalStatus.Active
-            },
-            new Animal
-            {
-                SpeciesId = spLion.SpeciesId,
-                AreaId = areaLion.AreaId,
-                Name = "Nala",
-                Description = "Sư tử cái nhanh nhẹn, là bạn đời của Simba.",
-                Gender = AnimalGender.Female,
-                DateOfBirth = new DateOnly(2020, 8, 20),
-                Origin = "Khu bảo tồn Masai Mara, Kenya",
-                HealthStatus = "Khỏe mạnh - Đang nuôi 1 con nhỏ",
-                ConservationNote = "Sinh sản thành công lứa đầu tiên tháng 02/2026",
-                ImageUrl = "https://images.unsplash.com/photo-1534188753412-3e26d0d618d6?w=800",
-                Status = AnimalStatus.Active
-            },
-            new Animal
-            {
-                SpeciesId = spTiger.SpeciesId,
-                AreaId = areaTiger.AreaId,
-                Name = "Lâm Nhi",
-                Description = "Hổ cái Bengal rất thích đùa giỡn dưới nước.",
-                Gender = AnimalGender.Female,
-                DateOfBirth = new DateOnly(2021, 3, 15),
-                Origin = "Trung tâm cứu hộ động vật hoang dã Cát Tiên",
-                HealthStatus = "Khỏe mạnh, định kỳ kiểm tra móng",
-                ConservationNote = "Nằm trong danh mục bảo vệ nghiêm ngặt",
-                ImageUrl = "https://images.unsplash.com/photo-1500463959177-e0869687df26?w=800",
-                Status = AnimalStatus.Active
-            },
-            new Animal
-            {
-                SpeciesId = spTiger.SpeciesId,
-                AreaId = areaTiger.AreaId,
-                Name = "Cường Đô",
-                Description = "Hổ đực Bengal trưởng thành, trọng lượng trên 220kg.",
-                Gender = AnimalGender.Male,
-                DateOfBirth = new DateOnly(2018, 11, 4),
-                Origin = "Vườn thú Singapore (trao đổi giống)",
-                HealthStatus = "Khỏe mạnh",
-                ConservationNote = "Gen thuần chủng F1",
-                ImageUrl = "https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=800",
+                ConservationNote = "Cá thể hổ trắng đầu tiên nhân giống thành công tại Thảo Cầm Viên",
+                ImageUrl = "https://saigonzoo.vn/uploads/cay-va-loai-vat/bao-hoa-mai/z7342043335000-164034e3e1c286c255bec1bddf6cc023.jpg",
                 Status = AnimalStatus.Active
             },
             new Animal
             {
                 SpeciesId = spElephant.SpeciesId,
-                AreaId = areaElephant.AreaId,
-                Name = "Bác Tai To",
-                Description = "Voi đực đầu đàn thân thiện, rất thích ăn mía và chuối từ du khách.",
-                Gender = AnimalGender.Male,
-                DateOfBirth = new DateOnly(2010, 7, 1),
-                Origin = "Buôn Đôn, Đắk Lắk",
-                HealthStatus = "Ổn định - Khám nha khoa định kỳ",
-                ConservationNote = "Voi cứu hộ từ khu du lịch cũ",
-                ImageUrl = "https://images.unsplash.com/photo-1557050543-4d5f4e07ef46?w=800",
-                Status = AnimalStatus.Active
-            },
-            new Animal
-            {
-                SpeciesId = spElephant.SpeciesId,
-                AreaId = areaElephant.AreaId,
-                Name = "Bé Na",
-                Description = "Voi cái hiền lành, luôn quấn quýt bên đàn voi trưởng thành.",
+                AreaId = areaHerbivore.AreaId,
+                EnclosureId = encElephant.EnclosureId,
+                Name = "Đàn Voi Châu Á",
+                Description = "Đàn voi Châu Á sinh sống tại bãi thả rộng lớn với sân vận động và hồ tắm bùn tự nhiên.",
                 Gender = AnimalGender.Female,
-                DateOfBirth = new DateOnly(2022, 12, 10),
-                Origin = "Sở thú ZooGuide (sinh sản tự nhiên)",
-                HealthStatus = "Rất tốt, tăng cân đều đặn",
-                ConservationNote = "Cá thể voi con sinh ra đầu tiên tại vườn thú",
-                ImageUrl = "https://images.unsplash.com/photo-1581852017103-68ac65504071?w=800",
+                DateOfBirth = new DateOnly(2005, 1, 1),
+                Origin = "Thảo Cầm Viên Sài Gòn",
+                HealthStatus = "Khỏe mạnh, ăn uống tốt",
+                ConservationNote = "Được chăm sóc theo quy chuẩn vườn thú quốc tế WAZA",
+                ImageUrl = "https://saigonzoo.vn/uploads/z7140293588104-8e47e8df88406e1c32fc5c5b77635903.jpg",
                 Status = AnimalStatus.Active
             },
             new Animal
             {
-                SpeciesId = spEagle.SpeciesId,
-                AreaId = areaBird.AreaId,
-                Name = "Phong Thần",
-                Description = "Đại bàng hoàng gia với sải cánh dài hơn 2 mét.",
+                SpeciesId = spHornbill.SpeciesId,
+                AreaId = areaAviary.AreaId,
+                EnclosureId = encAviaryDome.EnclosureId,
+                Name = "Chim Hồng Hoàng",
+                Description = "Cặp chim Hồng Hoàng tại nhà lồng chim vòm mở Thảo Cầm Viên Sài Gòn.",
                 Gender = AnimalGender.Male,
-                DateOfBirth = new DateOnly(2021, 6, 25),
-                Origin = "Dãy núi Altai, Mông Cổ",
+                DateOfBirth = new DateOnly(2018, 5, 15),
+                Origin = "Thảo Cầm Viên Sài Gòn",
                 HealthStatus = "Khỏe mạnh, thị lực hoàn hảo",
-                ConservationNote = "Được theo dõi hành vi bay lượn định kỳ",
-                ImageUrl = "https://images.unsplash.com/photo-1611689342806-0863700ce1e4?w=800",
-                Status = AnimalStatus.Active
-            },
-            new Animal
-            {
-                SpeciesId = spEagle.SpeciesId,
-                AreaId = areaBird.AreaId,
-                Name = "Kim Ưng",
-                Description = "Đại bàng cái kiêu hãnh với bộ lông óng ánh màu nâu vàng.",
-                Gender = AnimalGender.Female,
-                DateOfBirth = new DateOnly(2022, 4, 18),
-                Origin = "Khu bảo tồn Thiên Sơn",
-                HealthStatus = "Khỏe mạnh",
-                ConservationNote = "Đang trong độ tuổi sinh sản",
-                ImageUrl = "https://images.unsplash.com/photo-1533738363-b7f9aef128ce?w=800",
+                ConservationNote = "Loài chim bảo tồn nghiêm ngặt thuộc Phụ lục I CITES",
+                ImageUrl = "https://saigonzoo.vn/uploads/z7342043177904-72a038f501819d104529a3e36a245be8.jpg",
                 Status = AnimalStatus.Active
             }
         };
@@ -664,162 +658,156 @@ public static class ZooGuideDataSeeder
         context.Animals.AddRange(animals);
         await context.SaveChangesAsync();
 
-        // 12. Seed NARRATIONS & AUDIOS (Multi-language per animal)
-        var simba = animals[0];
-        var lamNhi = animals[2];
-        var taiTo = animals[4];
-        var phongThan = animals[6];
+        // 12. Seed NARRATIONS & AUDIOS (Verified Thảo Cầm Viên audio trên Supabase)
+        var mimi = animals[0];
+        var ngoKhong = animals[1];
+        var voiChauA = animals[2];
+        var hongHoang = animals[3];
 
-        // Simba narrations
-        var nSimbaVi = new Narration
-        {
-            AnimalId = simba.AnimalId,
-            LanguageId = langVi.LanguageId,
-            Title = "Sư Tử Simba - Chúa Tể Thảo Nguyên Xavan",
-            Content = "Chào mừng quý khách đến với phân khu Sư tử. Trước mắt quý khách là Simba, chú sư tử đực 7 tuổi với bộ bờm đen dày đặc - dấu hiệu của sức mạnh và thể lực sung mãn. Sư tử là loài duy nhất trong họ Mèo sống theo bầy đàn có tính xã hội cao.",
-            AudioUrl = "/assets/audio/simba_vi.mp3",
-            DurationSeconds = 120,
-            Status = NarrationStatus.Published,
-            CreatedBy = staffUser.UserId
-        };
-
-        var nSimbaEn = new Narration
-        {
-            AnimalId = simba.AnimalId,
-            LanguageId = langEn.LanguageId,
-            Title = "Simba the African Lion - King of the Savannah",
-            Content = "Welcome to the African Lion habitat. Meet Simba, our magnificent 7-year-old male lion. Lions are uniquely social among all wild felids, living in structured prides where females hunt cooperatively.",
-            AudioUrl = "/assets/audio/simba_en.mp3",
-            DurationSeconds = 115,
-            Status = NarrationStatus.Published,
-            CreatedBy = staffUser.UserId
-        };
-
-        var nSimbaZh = new Narration
-        {
-            AnimalId = simba.AnimalId,
-            LanguageId = langZh.LanguageId,
-            Title = "非洲狮辛巴 - 草原之王",
-            Content = "欢迎来到非洲狮展区。展现在您眼前的是辛巴，一只7岁的成年雄狮。狮子是猫科动物中唯一过着高度群居生活的物种。",
-            AudioUrl = "/assets/audio/simba_zh.mp3",
-            DurationSeconds = 110,
-            Status = NarrationStatus.Published,
-            CreatedBy = staffUser.UserId
-        };
-
-        // Lâm Nhi (Tiger) narrations
-        var nTigerVi = new Narration
-        {
-            AnimalId = lamNhi.AnimalId,
-            LanguageId = langVi.LanguageId,
-            Title = "Hổ Bengal Lâm Nhi - Sát Thủ Rừng Rậm",
-            Content = "Hổ Bengal là một trong những loài săn mồi uy nghi nhất hành tinh. Không giống như hầu hết các loài mèo sợ nước, hổ Bengal bơi lội cự phách và thường xuyên ngâm mình dưới hồ nước vào những ngày nắng nóng.",
-            AudioUrl = "/assets/audio/tiger_vi.mp3",
-            DurationSeconds = 95,
-            Status = NarrationStatus.Published,
-            CreatedBy = staffUser.UserId
-        };
-
-        var nTigerEn = new Narration
-        {
-            AnimalId = lamNhi.AnimalId,
-            LanguageId = langEn.LanguageId,
-            Title = "Lam Nhi the Bengal Tiger - Majestic Predator",
-            Content = "Bengal tigers are among the world's most iconic predators. Unlike many other felines, tigers love swimming and frequently bathe in cool water pools during hot afternoons.",
-            AudioUrl = "/assets/audio/tiger_en.mp3",
-            DurationSeconds = 90,
-            Status = NarrationStatus.Published,
-            CreatedBy = staffUser.UserId
-        };
-
-        // Bác Tai To (Elephant) narrations
         var nElephantVi = new Narration
         {
-            AnimalId = taiTo.AnimalId,
+            AnimalId = voiChauA.AnimalId,
             LanguageId = langVi.LanguageId,
-            Title = "Voi Bác Tai To - Người Khổng Lồ Hiền Lành",
-            Content = "Voi Châu Á có đôi tai nhỏ hơn voi Châu Phi và lưng có hình vòm cung. Chiếc vòi voi chứa hơn 40.000 bó cơ, giúp chúng cầm nắm vật nhỏ như hạt đậu hoặc nhấc bổng thân cây nặng hàng trăm kilogram.",
-            AudioUrl = "/assets/audio/elephant_vi.mp3",
-            DurationSeconds = 130,
+            Title = "Voi Châu Á - Elephas maximus",
+            Content = "Chào mừng quý khách đến với khu vực Voi Châu Á tại Thảo Cầm Viên Sài Gòn. Voi Châu Á, tên khoa học là Elephas maximus, là loài thú ăn cỏ trên cạn lớn nhất tại khu vực Châu Á. Chúng có đôi tai nhỏ hơn voi Châu Phi và lưng có hình vòm cong đặc trưng. Chiếc vòi linh hoạt với hàng ngàn bó cơ cho phép voi nhặt nhạnh thức ăn, uống nước và giao tiếp.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/vi/animal_1_vi.mp3",
+            DurationSeconds = 34,
             Status = NarrationStatus.Published,
             CreatedBy = adminUser.UserId
         };
 
         var nElephantEn = new Narration
         {
-            AnimalId = taiTo.AnimalId,
+            AnimalId = voiChauA.AnimalId,
             LanguageId = langEn.LanguageId,
-            Title = "Big Ears the Asian Elephant - Gentle Giant",
-            Content = "Asian elephants are characterized by their smaller ears and arched back. An elephant's trunk features more than 40,000 muscles, capable of grasping delicate leaves or lifting massive tree trunks.",
-            AudioUrl = "/assets/audio/elephant_en.mp3",
-            DurationSeconds = 125,
+            Title = "Asian Elephant - Elephas maximus",
+            Content = "Welcome to the Asian Elephant habitat at Saigon Zoo. The Asian Elephant, Elephas maximus, is the largest land herbivore across Asia. Distinct from African elephants, they feature smaller ears and a curved dorsal spine.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/en/animal_1_en.mp3",
+            DurationSeconds = 38,
             Status = NarrationStatus.Published,
             CreatedBy = adminUser.UserId
         };
 
-        // Phong Thần (Eagle) narrations
-        var nEagleVi = new Narration
+        var nTigerVi = new Narration
         {
-            AnimalId = phongThan.AnimalId,
+            AnimalId = ngoKhong.AnimalId,
             LanguageId = langVi.LanguageId,
-            Title = "Đại Bàng Phong Thần - Chúa Tể Bầu Trời",
-            Content = "Đại bàng hoàng gia sở hữu thị lực gấp 8 lần con người, cho phép chúng phát hiện con mồi nhỏ từ khoảng cách hơn 3 kilomet trên bầu trời.",
-            AudioUrl = "/assets/audio/eagle_vi.mp3",
-            DurationSeconds = 85,
+            Title = "Hổ Bengal Ngộ Không - Panthera tigris tigris",
+            Content = "Trước mắt quý khách là hổ trắng Bengal, một biến thể màu sắc quý hiếm của loài Panthera tigris tigris. Tại Thảo Cầm Viên Sài Gòn, chú hổ Ngộ Không chào đời năm 2015 đã trở thành một biểu tượng nhân giống bảo tồn động vật hoang dã quý hiếm.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/vi/animal_2_vi.mp3",
+            DurationSeconds = 29,
             Status = NarrationStatus.Published,
             CreatedBy = staffUser.UserId
         };
 
-        var nEagleEn = new Narration
+        var nTigerEn = new Narration
         {
-            AnimalId = phongThan.AnimalId,
+            AnimalId = ngoKhong.AnimalId,
             LanguageId = langEn.LanguageId,
-            Title = "Sky Lord the Imperial Eagle - Ruler of the Skies",
-            Content = "The imperial eagle possesses eyesight up to eight times sharper than a human's, allowing it to spot small prey from over three kilometers away in mid-flight.",
-            AudioUrl = "/assets/audio/eagle_en.mp3",
-            DurationSeconds = 80,
+            Title = "Bengal White Tiger Ngo Khong - Panthera tigris tigris",
+            Content = "Before you is the majestic white Bengal tiger, Panthera tigris tigris. Born in July 2015 right here at Saigon Zoo, tiger cub Ngo Khong became an iconic symbol of wildlife preservation and successful captive breeding.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/en/animal_2_en.mp3",
+            DurationSeconds = 34,
             Status = NarrationStatus.Published,
             CreatedBy = staffUser.UserId
         };
 
-        context.Narrations.AddRange(nSimbaVi, nSimbaEn, nSimbaZh, nTigerVi, nTigerEn, nElephantVi, nElephantEn, nEagleVi, nEagleEn);
+        var nLionVi = new Narration
+        {
+            AnimalId = mimi.AnimalId,
+            LanguageId = langVi.LanguageId,
+            Title = "Sư Tử Mimi - Panthera leo",
+            Content = "Chào mừng quý khách đến với khu vực Sư tử Châu Phi, tên khoa học Panthera leo. Thảo Cầm Viên Sài Gòn từng là ngôi nhà thân thương của sư tử trắng Mimi trong suốt 16 năm với tuổi thọ kỷ lục 18 tuổi.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/vi/animal_3_vi.mp3",
+            DurationSeconds = 29,
+            Status = NarrationStatus.Published,
+            CreatedBy = staffUser.UserId
+        };
+
+        var nLionEn = new Narration
+        {
+            AnimalId = mimi.AnimalId,
+            LanguageId = langEn.LanguageId,
+            Title = "African Lion Mimi - Panthera leo",
+            Content = "Welcome to the African Lion exhibit featuring Panthera leo. For over 16 years, Saigon Zoo was proud home to Mimi the white lioness, living to an exceptional age of 18 years under attentive veterinary care.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/en/animal_3_en.mp3",
+            DurationSeconds = 31,
+            Status = NarrationStatus.Published,
+            CreatedBy = staffUser.UserId
+        };
+
+        var nBirdVi = new Narration
+        {
+            AnimalId = hongHoang.AnimalId,
+            LanguageId = langVi.LanguageId,
+            Title = "Chim Hồng Hoàng - Buceros bicornis",
+            Content = "Chào mừng quý khách đến với khu bảo tồn chim quý hiếm. Chim Hồng Hoàng, tên khoa học Buceros bicornis, nổi bật với chiếc mỏ cong lớn màu vàng cam và mũ sừng rực rỡ trên đỉnh đầu.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/vi/animal_16_vi.mp3",
+            DurationSeconds = 31,
+            Status = NarrationStatus.Published,
+            CreatedBy = staffUser.UserId
+        };
+
+        var nBirdEn = new Narration
+        {
+            AnimalId = hongHoang.AnimalId,
+            LanguageId = langEn.LanguageId,
+            Title = "Great Hornbill - Buceros bicornis",
+            Content = "Welcome to the aviary showcasing the magnificent Great Hornbill, Buceros bicornis. Known for its prominent yellow-and-black casque atop its enormous beak, this magnificent bird plays a vital ecological role as a seed disperser.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/en/animal_16_en.mp3",
+            DurationSeconds = 34,
+            Status = NarrationStatus.Published,
+            CreatedBy = staffUser.UserId
+        };
+
+        context.Narrations.AddRange(nElephantVi, nElephantEn, nTigerVi, nTigerEn, nLionVi, nLionEn, nBirdVi, nBirdEn);
         await context.SaveChangesAsync();
 
         // 13. Seed AUDIOS
         var audio1 = new Audio
         {
-            NarrationId = nSimbaVi.NarrationId,
-            FileUrl = "/assets/audio/simba_vi_studio.mp3",
-            FileName = "simba_vi_studio.mp3",
+            NarrationId = nElephantVi.NarrationId,
+            FileUrl = nElephantVi.AudioUrl!,
+            FileName = "animal_1_vi.mp3",
             MimeType = "audio/mpeg",
-            DurationSeconds = 120,
-            FileSize = 2450000,
+            DurationSeconds = 34,
+            FileSize = 545280,
+            VoiceName = "vi-VN-HoaiMyNeural",
+            TtsProvider = "EdgeTTS",
+            IsVerified = true,
             Status = AudioStatus.Active
         };
 
         var audio2 = new Audio
         {
-            NarrationId = nSimbaEn.NarrationId,
-            FileUrl = "/assets/audio/simba_en_studio.mp3",
-            FileName = "simba_en_studio.mp3",
+            NarrationId = nTigerVi.NarrationId,
+            FileUrl = nTigerVi.AudioUrl!,
+            FileName = "animal_2_vi.mp3",
             MimeType = "audio/mpeg",
-            DurationSeconds = 115,
-            FileSize = 2300000,
+            DurationSeconds = 29,
+            FileSize = 465120,
+            VoiceName = "vi-VN-HoaiMyNeural",
+            TtsProvider = "EdgeTTS",
+            IsVerified = true,
             Status = AudioStatus.Active
         };
 
         var audio3 = new Audio
         {
-            NarrationId = nTigerVi.NarrationId,
-            FileUrl = "/assets/audio/tiger_vi_studio.mp3",
-            FileName = "tiger_vi_studio.mp3",
+            NarrationId = nLionVi.NarrationId,
+            FileUrl = nLionVi.AudioUrl!,
+            FileName = "animal_3_vi.mp3",
             MimeType = "audio/mpeg",
-            DurationSeconds = 95,
-            FileSize = 1900000,
+            DurationSeconds = 29,
+            FileSize = 465120,
+            VoiceName = "vi-VN-HoaiMyNeural",
+            TtsProvider = "EdgeTTS",
+            IsVerified = true,
             Status = AudioStatus.Active
         };
 
         context.Audios.AddRange(audio1, audio2, audio3);
+        await context.SaveChangesAsync();
 
         // 14. Seed CHAT_SESSIONS & CHAT_MESSAGES (Sample chatbot for userSession)
         var chatSession = new ChatSession

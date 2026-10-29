@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 export default function TranscriptModal({ onSeek }) {
-    const { isTranscriptModalOpen, setIsTranscriptModalOpen, audioState } = useApp();
+    const { isTranscriptModalOpen, setIsTranscriptModalOpen, audioState, t } = useApp();
     const { narration } = audioState;
 
     if (!isTranscriptModalOpen || !narration) return null;
@@ -20,7 +20,7 @@ export default function TranscriptModal({ onSeek }) {
                 <div className="modal-header">
                     <div>
                         <h3 id="transcript-modal-title" className="font-bold text-base">{narration.title}</h3>
-                        <p id="transcript-modal-narrator" className="text-xs text-muted">Giọng đọc: {narration.narrator}</p>
+                        <p id="transcript-modal-narrator" className="text-xs text-muted">{t?.narratorLabel || 'Giọng đọc'}: {narration.narrator}</p>
                     </div>
                     <button 
                         id="btn-close-transcript" 

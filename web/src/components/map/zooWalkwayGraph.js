@@ -22,18 +22,49 @@ export const WALKWAY_NODES = {
     poi_lake: { id: 'poi_lake', name: 'Hồ Hoa Sen & Nhà Thủy Tạ', lat: 10.787800, lng: 106.705600, type: 'landmark' },
 
     // --- CỔNG VÀO PHÂN KHU (AREA GATEWAYS) ---
-    gate_area_7: { id: 'gate_area_7', name: 'Cổng Khu Ăn Thịt (Carnivore Safari)', lat: 10.788300, lng: 106.705700, type: 'gate', areaId: 7 },
+    gate_area_1: { id: 'gate_area_1', name: 'Khu Bò Sát & Lưỡng Cư', lat: 10.788000, lng: 106.706500, type: 'gate', areaId: 1 },
+    gate_area_2: { id: 'gate_area_2', name: 'Khu Vườn Thú Thiếu Nhi & Thân Thiện', lat: 10.786200, lng: 106.707200, type: 'gate', areaId: 2 },
     gate_area_3: { id: 'gate_area_3', name: 'Cổng Khu Động Vật Ăn Cỏ (Voi Châu Á)', lat: 10.788800, lng: 106.706500, type: 'gate', areaId: 3 },
     gate_area_4: { id: 'gate_area_4', name: 'Cổng Khu Chim & Lồng Vòm', lat: 10.786800, lng: 106.704000, type: 'gate', areaId: 4 },
+    gate_area_5: { id: 'gate_area_5', name: 'Trục Di Tích & Cây Di Sản', lat: 10.786800, lng: 106.704800, type: 'gate', areaId: 5 },
     gate_area_6: { id: 'gate_area_6', name: 'Khu Đảo Vượn & Linh Trưởng', lat: 10.787100, lng: 106.705800, type: 'gate', areaId: 6 },
+    gate_area_7: { id: 'gate_area_7', name: 'Cổng Khu Ăn Thịt (Carnivore Safari)', lat: 10.788300, lng: 106.705700, type: 'gate', areaId: 7 },
 
     // --- CHUỒNG THÚ LIÊN KẾT DATABASE SUPABASE ---
+    // Khu Động vật ăn thịt (Area 7)
     enc_node_2: { id: 'enc_node_2', name: 'Chuồng Hổ Bengal', lat: 10.788500, lng: 106.706100, type: 'enclosure', enclosureId: 2 },
     enc_node_3: { id: 'enc_node_3', name: 'Chuồng Hổ Siberia & Hổ Trắng', lat: 10.788700, lng: 106.706400, type: 'enclosure', enclosureId: 3 },
     enc_node_7: { id: 'enc_node_7', name: 'Chuồng Sư Tử Hoàng Gia', lat: 10.788200, lng: 106.705100, type: 'enclosure', enclosureId: 7 },
+    enc_node_9: { id: 'enc_node_9', name: 'Chuồng Nuôi Báo Hoa Mai', lat: 10.788400, lng: 106.705600, type: 'enclosure', enclosureId: 9 },
+    enc_node_10: { id: 'enc_node_10', name: 'Chuồng Bảo Tồn Báo Gấm', lat: 10.788600, lng: 106.705400, type: 'enclosure', enclosureId: 10 },
+    enc_node_11: { id: 'enc_node_11', name: 'Chuồng Nuôi Dưỡng Báo Lửa', lat: 10.788750, lng: 106.705200, type: 'enclosure', enclosureId: 11 },
+
+    // Khu Động vật ăn cỏ (Area 3)
     enc_node_4: { id: 'enc_node_4', name: 'Bãi Thả Voi Châu Á', lat: 10.789200, lng: 106.706800, type: 'enclosure', enclosureId: 4 },
-    enc_node_5: { id: 'enc_node_5', name: 'Lồng Vòm Chim & Hồng Hạc', lat: 10.786900, lng: 106.704200, type: 'enclosure', enclosureId: 5 },
+    enc_node_12: { id: 'enc_node_12', name: 'Bãi Thả Hà Mã', lat: 10.789450, lng: 106.707300, type: 'enclosure', enclosureId: 12 },
+    enc_node_13: { id: 'enc_node_13', name: 'Khu Vực Tê Giác Trắng', lat: 10.789600, lng: 106.706500, type: 'enclosure', enclosureId: 13 },
+    enc_node_14: { id: 'enc_node_14', name: 'Đồng Cỏ Hươu Cao Cổ', lat: 10.788950, lng: 106.707100, type: 'enclosure', enclosureId: 14 },
+    enc_node_15: { id: 'enc_node_15', name: 'Khu Thảo Nguyên Ngựa Vằn', lat: 10.788800, lng: 106.707450, type: 'enclosure', enclosureId: 15 },
+    enc_node_16: { id: 'enc_node_16', name: 'Chuồng Bảo Tồn Hươu Vàng', lat: 10.789100, lng: 106.706100, type: 'enclosure', enclosureId: 16 },
+
+    // Khu Vườn Chim (Area 4)
+    enc_node_5: { id: 'enc_node_5', name: 'Lồng Vòm Chim Nhiệt Đới', lat: 10.786900, lng: 106.704200, type: 'enclosure', enclosureId: 5 },
+    enc_node_17: { id: 'enc_node_17', name: 'Chuồng Chim Niệc Mỏ Vằn', lat: 10.787100, lng: 106.704000, type: 'enclosure', enclosureId: 17 },
+    enc_node_18: { id: 'enc_node_18', name: 'Khu Vực Cao Cát Bụng Trắng', lat: 10.787250, lng: 106.704300, type: 'enclosure', enclosureId: 18 },
+    enc_node_19: { id: 'enc_node_19', name: 'Hồ Thủy Điểu & Bồ Nông', lat: 10.786700, lng: 106.704500, type: 'enclosure', enclosureId: 19 },
+    enc_node_20: { id: 'enc_node_20', name: 'Khu Vực Trĩ Sao Bản Địa', lat: 10.786850, lng: 106.703800, type: 'enclosure', enclosureId: 20 },
+    enc_node_21: { id: 'enc_node_21', name: 'Nhà Lưới Vẹt Trắng Mào Vàng', lat: 10.787350, lng: 106.704500, type: 'enclosure', enclosureId: 21 },
+
+    // Khu Đảo Vượn & Linh Trưởng (Area 6)
+    enc_node_22: { id: 'enc_node_22', name: 'Ngôi Nhà Đười Ươi Bornean', lat: 10.787300, lng: 106.705900, type: 'enclosure', enclosureId: 22 },
+    enc_node_23: { id: 'enc_node_23', name: 'Đảo Vượn Má Vàng', lat: 10.787100, lng: 106.705800, type: 'enclosure', enclosureId: 23 },
+    enc_node_24: { id: 'enc_node_24', name: 'Khu Bán Hoang Dã Voọc Chà Vá', lat: 10.786950, lng: 106.706100, type: 'enclosure', enclosureId: 24 },
+
+    // Khu Vườn thú thiếu nhi (Area 2)
     enc_node_8: { id: 'enc_node_8', name: 'Khuôn Viên Thú Nhỏ Thân Thiện (Petting Zoo)', lat: 10.786200, lng: 106.707200, type: 'enclosure', enclosureId: 8 },
+
+    // Khu Bò Sát & Lưỡng Cư (Area 1)
+    enc_node_25: { id: 'enc_node_25', name: 'Nhà Trưng Bày Rắn Hổ Chúa & Bò Sát', lat: 10.788000, lng: 106.706500, type: 'enclosure', enclosureId: 25 },
 
     // --- CÁC NÚT GIAO LỐI ĐI BỘ NỘI BỘ (WALKWAY JUNCTIONS) ---
     j_avenue: { id: 'j_avenue', name: 'Đại Lộ Cổng Chính', lat: 10.786100, lng: 106.704600, type: 'junction' },
@@ -64,36 +95,61 @@ export const WALKWAY_EDGES = [
     // Nhánh Vườn Chim (Area 4)
     ['j_central', 'gate_area_4'],
     ['gate_area_4', 'enc_node_5'],
+    ['enc_node_5', 'enc_node_17'],
+    ['enc_node_17', 'enc_node_18'],
+    ['gate_area_4', 'enc_node_19'],
+    ['gate_area_4', 'enc_node_20'],
+    ['enc_node_18', 'enc_node_21'],
 
-    // Trục Cầu Hồ Sen và Cây Di Sản
-    ['j_central', 'j_bridge_west'],
+    // Trục Cầu Hồ Sen và Cây Di Sản (Area 5 Heritage)
+    ['j_central', 'gate_area_5'],
+    ['gate_area_5', 'j_bridge_west'],
     ['j_bridge_west', 'poi_tree'],
     ['j_bridge_west', 'poi_lake'],
     ['poi_lake', 'j_bridge_east'],
     ['poi_tree', 'j_lake_north'],
 
-    // Nhánh Linh Trưởng và Đông Nam (Area 6)
+    // Nhánh Bò Sát & Lưỡng Cư (Area 1)
+    ['j_bridge_east', 'gate_area_1'],
+    ['gate_area_1', 'enc_node_25'],
+
+    // Nhánh Linh Trưởng (Area 6)
     ['j_bridge_east', 'gate_area_6'],
+    ['gate_area_6', 'enc_node_23'],
+    ['enc_node_23', 'enc_node_22'],
+    ['gate_area_6', 'enc_node_24'],
     ['gate_area_6', 'j_se_avenue'],
-    ['j_se_avenue', 'enc_node_8'],
+
+    // Nhánh Vườn Thú Thiếu Nhi & Thân Thiện (Area 2)
+    ['j_se_avenue', 'gate_area_2'],
+    ['gate_area_2', 'enc_node_8'],
 
     // Cổng B và Cổng E
     ['gate_b', 'j_gate_b'],
     ['j_gate_b', 'gate_area_6'],
+    ['j_gate_b', 'gate_area_2'],
     ['j_gate_b', 'j_gate_e'],
     ['gate_e', 'j_gate_e'],
     ['j_gate_e', 'j_central'],
 
-    // Khu Ăn Thịt (Area 7: Sư tử, Hổ Bengal, Hổ Siberia)
+    // Khu Ăn Thịt (Area 7: Sư tử, Hổ Bengal, Hổ Siberia, Báo)
     ['j_lake_north', 'enc_node_7'],
     ['j_lake_north', 'gate_area_7'],
     ['gate_area_7', 'j_carnivore_hub'],
     ['j_carnivore_hub', 'enc_node_2'],
     ['enc_node_2', 'enc_node_3'],
+    ['j_carnivore_hub', 'enc_node_9'],
+    ['enc_node_9', 'enc_node_10'],
+    ['enc_node_10', 'enc_node_11'],
 
     // Khu Ăn Cỏ & Bãi Thả Voi (Area 3)
     ['j_carnivore_hub', 'gate_area_3'],
     ['gate_area_3', 'enc_node_4'],
+    ['enc_node_4', 'enc_node_12'],
+    ['enc_node_12', 'enc_node_13'],
+    ['gate_area_3', 'enc_node_14'],
+    ['enc_node_14', 'enc_node_15'],
+    ['gate_area_3', 'enc_node_16'],
     ['gate_area_3', 'gate_area_6']
 ];
 

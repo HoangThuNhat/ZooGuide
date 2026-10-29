@@ -42,7 +42,14 @@ src/API/appsettings.Development.json
 ## Node
 node_modules/
 
-## Build output
+## Backups & Dumps
+backups/
+**/backups/
+*.dump
+*.sql.bak
+*.json.bak
+scratch/backups/
+
 dist/
 **/dist/
 

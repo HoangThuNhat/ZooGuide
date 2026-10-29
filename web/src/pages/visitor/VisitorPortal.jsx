@@ -110,7 +110,15 @@ export default function VisitorPortal() {
 
     const playSpeciesAudio = useCallback(async (speciesId, startAutoplay = true, lang = currentLang) => {
         if (!hasActiveSession || !currentSession?.sessionId) {
-            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            showToast(t?.ticketRequiredNarration || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            pauseAudioPlayback();
+            setIsTicketModalOpen(true);
+            return;
+        }
+
+        if (new Date(currentSession.expiresAt) <= new Date()) {
+            showToast(t?.ticketExpiredNarration || 'Phiên tham quan của bạn đã hết hạn. Vui lòng mua vé mới để tiếp tục nghe thuyết minh.', 'error');
+            clearSession();
             pauseAudioPlayback();
             setIsTicketModalOpen(true);
             return;
@@ -331,7 +339,15 @@ export default function VisitorPortal() {
 
     const playPoiAudio = useCallback(async (poiId, startAutoplay = true) => {
         if (!hasActiveSession || !currentSession?.sessionId) {
-            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            showToast(t?.ticketRequiredNarration || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            pauseAudioPlayback();
+            setIsTicketModalOpen(true);
+            return;
+        }
+
+        if (new Date(currentSession.expiresAt) <= new Date()) {
+            showToast(t?.ticketExpiredNarration || 'Phiên tham quan của bạn đã hết hạn. Vui lòng mua vé mới để tiếp tục nghe thuyết minh.', 'error');
+            clearSession();
             pauseAudioPlayback();
             setIsTicketModalOpen(true);
             return;

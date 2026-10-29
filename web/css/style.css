@@ -2799,6 +2799,49 @@ a:focus-visible {
     flex-wrap: wrap;
 }
 
+
+/* Audio Narration Modal Dialog */
+.narration-modal-dialog {
+    max-width: 760px;
+    width: 95%;
+    max-height: calc(100vh - 32px);
+    max-height: calc(100dvh - 32px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 0;
+    border-radius: var(--radius-xl, 16px);
+    box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
+    background-color: var(--color-surface, #ffffff);
+}
+
+.narration-modal-dialog .modal-header {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--color-border, #E2E8F0);
+    background-color: var(--color-surface, #ffffff);
+}
+
+.narration-modal-dialog .modal-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    background-color: var(--color-surface, #ffffff);
+}
+
+.narration-modal-dialog .modal-footer {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 14px 24px;
+    border-top: 1px solid var(--color-border, #E2E8F0);
+    background-color: var(--color-bg-secondary, #F8FAFC);
+}
+
 /* Health Log Cards */
 .health-log-card {
     background-color: var(--color-surface);

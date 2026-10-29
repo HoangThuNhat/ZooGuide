@@ -119,104 +119,6 @@ const REAL_MAP_LANDMARKS = [
         category: 'landmark',
         isVerified: true
     },
-
-    // --- 3. CÁC CHUỒNG THÚ TƯƠNG ỨNG DATABASE SUPABASE ---
-    {
-        id: 'enc_2',
-        enclosureId: 2,
-        areaId: 7,
-        code: 'ENC-TIG-01',
-        name: 'Chuồng Hổ Bengal',
-        description: 'Khu chuồng bán hoang dã dành cho loài hổ Bengal quý hiếm, trang bị suối tắm, vách đá nhân tạo và bãi cỏ tự nhiên.',
-        lat: 10.788500,
-        lng: 106.706100,
-        category: 'carnivore',
-        isVerified: true
-    },
-    {
-        id: 'enc_3',
-        enclosureId: 3,
-        areaId: 7,
-        code: 'ENC-TIG-02',
-        name: 'Chuồng Hổ Siberia & Hổ Trắng',
-        description: 'Khuôn viên nuôi dưỡng và bảo tồn loài hổ trắng kỳ vĩ cùng hổ Siberia to lớn.',
-        lat: 10.788700,
-        lng: 106.706400,
-        category: 'carnivore',
-        isVerified: true
-    },
-    {
-        id: 'enc_7',
-        enclosureId: 7,
-        areaId: 7,
-        code: 'ENC-LIO-01',
-        name: 'Chuồng Sư Tử Hoàng Gia',
-        description: 'Không gian mở rộng dành cho đàn sư tử châu Phi với gò đá cao đón nắng và khu vực nghỉ ngơi mát mẻ.',
-        lat: 10.788200,
-        lng: 106.705100,
-        category: 'carnivore',
-        isVerified: true
-    },
-    {
-        id: 'enc_4',
-        enclosureId: 4,
-        areaId: 3,
-        code: 'ENC-ELE-01',
-        name: 'Bãi Thả Voi Châu Á',
-        description: 'Khu bãi thả đất rộng rãi với hồ tắm bùn tự nhiên, nơi các cá thể voi châu Á sinh hoạt và giao lưu thân thiện cùng du khách.',
-        lat: 10.789200,
-        lng: 106.706800,
-        category: 'herbivore',
-        isVerified: true
-    },
-    {
-        id: 'enc_5',
-        enclosureId: 5,
-        areaId: 4,
-        code: 'ENC-BIR-01',
-        name: 'Lồng Vòm Chim Nhiệt Đới & Hồ Hồng Hạc',
-        description: 'Quần xã lồng vòm cao vút và hồ hồng hạc rực rỡ với hàng trăm loài chim quý hiếm của Việt Nam và thế giới.',
-        lat: 10.786900,
-        lng: 106.704200,
-        category: 'bird',
-        isVerified: true
-    },
-    {
-        id: 'enc_8',
-        enclosureId: 8,
-        areaId: 6,
-        code: 'ENC-PET-01',
-        name: 'Khuôn Viên Thú Nhỏ Thân Thiện (Petting Zoo)',
-        description: 'Khu vực thú thiếu nhi thân thiện, nơi các bé có thể tiếp xúc trực tiếp, vuốt ve và cho dê lùn, cừu, thỏ ăn rau cỏ tươi.',
-        lat: 10.786200,
-        lng: 106.707200,
-        category: 'petting',
-        isVerified: true
-    },
-    {
-        id: 'enc_primate',
-        enclosureId: 99,
-        areaId: 6,
-        code: 'ENC-PRI-01',
-        name: 'Khu Đảo Vượn & Linh Trưởng Quý Hiếm',
-        description: 'Khu vực đảo nổi giữa rặng cây nuôi dưỡng vượn má vàng, voọc chà vá chân nâu và khỉ đuôi dài.',
-        lat: 10.787100,
-        lng: 106.705800,
-        category: 'primate',
-        isVerified: true
-    },
-    {
-        id: 'enc_reptile',
-        enclosureId: 98,
-        areaId: 7,
-        code: 'ENC-REP-01',
-        name: 'Khu Bảo Tồn Bò Sát & Trăn Rắn',
-        description: 'Nhà trưng bày kính điều hòa nhiệt độ nuôi dưỡng cá sấu hoa cà, trăn gấm, kỳ đà và các loài rùa cạn.',
-        lat: 10.788000,
-        lng: 106.706500,
-        category: 'carnivore',
-        isVerified: true
-    }
 ];
 
 // Tính khoảng cách Haversine (đơn vị: mét) giữa 2 tọa độ GPS WGS84
@@ -318,54 +220,50 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         loadMapData(currentLang);
     }, [loadMapData, currentLang]);
 
-    // 2. Hợp nhất Marker chuẩn với dữ liệu động từ Supabase
+    // 2. Hợp nhất Marker chuẩn với dữ liệu thực tế từ Supabase
     const mergedMarkers = useMemo(() => {
         const markerList = [...REAL_MAP_LANDMARKS];
 
-        // Gắn danh sách động vật thực tế vào các chuồng tương ứng
-        markerList.forEach(m => {
-            if (m.enclosureId) {
-                m.residentAnimals = animals.filter(a => a.enclosureId === m.enclosureId || a.areaId === m.areaId);
-                m.animalCount = m.residentAnimals.length;
-
-                const dbEnc = enclosures.find(e => e.enclosureId === m.enclosureId);
-                if (dbEnc) {
-                    if (dbEnc.name) m.name = dbEnc.name;
-                    if (dbEnc.description) m.description = dbEnc.description;
-                    if (dbEnc.imageUrl) m.imageUrl = dbEnc.imageUrl;
-                    if (dbEnc.latitude && dbEnc.longitude) {
-                        m.lat = Number(dbEnc.latitude);
-                        m.lng = Number(dbEnc.longitude);
-                    }
-                }
-            } else {
-                m.residentAnimals = [];
-                m.animalCount = 0;
-            }
-        });
-
-        // Bổ sung các chuồng mới từ DB chưa có trong danh sách chuẩn (đánh dấu Unverified nếu thiếu tọa độ)
+        // Tạo marker từ toàn bộ chuồng thú thực tế được API trả về
         enclosures.forEach(dbEnc => {
-            const exists = markerList.some(m => m.enclosureId === dbEnc.enclosureId);
-            if (!exists) {
-                const parentArea = areas.find(a => a.areaId === dbEnc.areaId);
-                const hasLatLong = Boolean(dbEnc.latitude && dbEnc.longitude);
+            const areaId = Number(dbEnc.areaId);
+            const code = (dbEnc.code || '').toUpperCase();
 
-                markerList.push({
-                    id: `db_enc_${dbEnc.enclosureId}`,
-                    enclosureId: dbEnc.enclosureId,
-                    areaId: dbEnc.areaId,
-                    code: dbEnc.code || `ENC-${dbEnc.enclosureId}`,
-                    name: dbEnc.name,
-                    description: dbEnc.description || 'Chuồng đang được cập nhật thông tin thực địa.',
-                    lat: hasLatLong ? Number(dbEnc.latitude) : (parentArea?.latitude ? Number(parentArea.latitude) : 10.7876),
-                    lng: hasLatLong ? Number(dbEnc.longitude) : (parentArea?.longitude ? Number(parentArea.longitude) : 106.7053),
-                    category: 'enclosure',
-                    isVerified: hasLatLong, // Đánh dấu rõ ràng tình trạng xác minh tọa độ
-                    residentAnimals: animals.filter(a => a.enclosureId === dbEnc.enclosureId),
-                    animalCount: animals.filter(a => a.enclosureId === dbEnc.enclosureId).length
-                });
+            // Phân loại sinh thái chuẩn xác theo phân khu và mã chuồng
+            let category = 'enclosure';
+            if (areaId === 7 || code.startsWith('ENC-TIG') || code.startsWith('ENC-LIO') || code.startsWith('ENC-LEO') || code.startsWith('ENC-CLO') || code.startsWith('ENC-GCA')) {
+                category = 'carnivore';
+            } else if (areaId === 3 || code.startsWith('ENC-ELE') || code.startsWith('ENC-HIP') || code.startsWith('ENC-RHI') || code.startsWith('ENC-GIR') || code.startsWith('ENC-ZEB') || code.startsWith('ENC-HOG')) {
+                category = 'herbivore';
+            } else if (areaId === 4 || code.startsWith('ENC-BIR') || code.startsWith('ENC-WRE') || code.startsWith('ENC-HOR') || code.startsWith('ENC-PEL') || code.startsWith('ENC-ARG') || code.startsWith('ENC-COC')) {
+                category = 'bird';
+            } else if (areaId === 6 || code.startsWith('ENC-PRI') || code.startsWith('ENC-ORA') || code.startsWith('ENC-GIB') || code.startsWith('ENC-DOU')) {
+                category = 'primate';
+            } else if (areaId === 2 || code.startsWith('ENC-PET')) {
+                category = 'petting';
+            } else if (areaId === 1 || code.startsWith('ENC-REP')) {
+                category = 'reptile';
             }
+
+            const resident = animals.filter(a => a.enclosureId === dbEnc.enclosureId);
+            const hasLatLong = Boolean(dbEnc.latitude && dbEnc.longitude);
+
+            markerList.push({
+                id: `enc_${dbEnc.enclosureId}`,
+                nodeId: `enc_node_${dbEnc.enclosureId}`,
+                enclosureId: dbEnc.enclosureId,
+                areaId: dbEnc.areaId,
+                code: dbEnc.code || `ENC-${dbEnc.enclosureId}`,
+                name: dbEnc.name,
+                description: dbEnc.description || '',
+                lat: hasLatLong ? Number(dbEnc.latitude) : 10.7876,
+                lng: hasLatLong ? Number(dbEnc.longitude) : 106.7053,
+                category,
+                isVerified: hasLatLong,
+                imageUrl: dbEnc.imageUrl,
+                residentAnimals: resident,
+                animalCount: resident.length
+            });
         });
 
         // Bổ sung các điểm POI thực tế từ cơ sở dữ liệu
@@ -378,17 +276,25 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
                 if (matchIdx >= 0) {
                     markerList[matchIdx].poiId = poi.poiId;
-                    markerList[matchIdx].isVerified = poi.isVerified;
+                    markerList[matchIdx].isVerified = poi.isCoordinateVerified ?? poi.isVerified ?? markerList[matchIdx].isVerified;
                     if (poi.latitude && poi.longitude) {
                         markerList[matchIdx].lat = Number(poi.latitude);
                         markerList[matchIdx].lng = Number(poi.longitude);
                     }
-                    if (poi.description) markerList[matchIdx].description = poi.description;
-                    if (poi.category) markerList[matchIdx].category = poi.category;
+                    if (poi.description && !markerList[matchIdx].description) {
+                        markerList[matchIdx].description = poi.description;
+                    }
+                    // KHÔNG ghi đè category cụ thể của chuồng bằng 'Enclosure' chung chung
+                    if (markerList[matchIdx].category === 'gate' || markerList[matchIdx].category === 'landmark') {
+                        if (poi.category && poi.category.toLowerCase() !== 'enclosure') {
+                            markerList[matchIdx].category = poi.category.toLowerCase();
+                        }
+                    }
                     markerList[matchIdx].hasAudio = poi.hasAudio;
-                } else {
+                } else if ((poi.category || '').toLowerCase() !== 'enclosure') {
+                    // Tránh tạo thêm marker trùng lặp nếu là chuồng thú
                     markerList.push({
-                        id: `db_poi_${poi.poiId}`,
+                        id: `poi_${poi.poiId}`,
                         poiId: poi.poiId,
                         nodeId: `node_poi_${poi.poiId}`,
                         code: poi.code || `POI-${poi.poiId}`,
@@ -396,8 +302,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         description: poi.description || 'Điểm tham quan tại Thảo Cầm Viên Sài Gòn.',
                         lat: Number(poi.latitude) || 10.7876,
                         lng: Number(poi.longitude) || 106.7053,
-                        category: poi.category || 'landmark',
-                        isVerified: Boolean(poi.isVerified),
+                        category: (poi.category || 'landmark').toLowerCase(),
+                        isVerified: Boolean(poi.isCoordinateVerified),
                         hasAudio: Boolean(poi.hasAudio),
                         residentAnimals: [],
                         animalCount: 0
@@ -413,13 +319,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const filteredMarkers = useMemo(() => {
         return mergedMarkers.filter(m => {
             if (activeCategory !== 'all') {
-                if (activeCategory === 'gate' && m.category !== 'gate') return false;
-                if (activeCategory === 'landmark' && m.category !== 'landmark') return false;
-                if (activeCategory === 'carnivore' && m.category !== 'carnivore') return false;
-                if (activeCategory === 'herbivore' && m.category !== 'herbivore') return false;
-                if (activeCategory === 'bird' && m.category !== 'bird') return false;
-                if (activeCategory === 'primate' && m.category !== 'primate') return false;
-                if (activeCategory === 'petting' && m.category !== 'petting') return false;
+                if (activeCategory === 'landmark') {
+                    if (!['landmark', 'botanical', 'attraction'].includes(m.category)) return false;
+                } else if (m.category !== activeCategory) {
+                    return false;
+                }
             }
 
             if (searchKeyword.trim()) {
@@ -495,10 +399,13 @@ tileLayer.addTo(map);
         let label = marker.name?.split('(')[0]?.trim();
 
         if (marker.category === 'gate') bgColor = '#0284C7';
-        else if (marker.category === 'landmark') bgColor = '#B45309';
+        else if (marker.category === 'landmark' || marker.category === 'botanical' || marker.category === 'attraction') bgColor = '#B45309';
         else if (marker.category === 'carnivore') bgColor = '#DC2626';
+        else if (marker.category === 'herbivore') bgColor = '#16A34A';
         else if (marker.category === 'bird') bgColor = '#7C3AED';
+        else if (marker.category === 'primate') bgColor = '#EA580C';
         else if (marker.category === 'petting') bgColor = '#059669';
+        else if (marker.category === 'reptile') bgColor = '#0D9488';
 
         const verifiedDotColor = marker.isVerified ? '#4ADE80' : '#FCD34D';
 
@@ -802,8 +709,8 @@ tileLayer.addTo(map);
 
         // Kiểm tra quyền nghe thuyết minh (yêu cầu phiên vé)
         if (!hasActiveSession) {
-            showToast(`Bạn đang ở gần "${candidate.name}". Vui lòng kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
-            setIsTicketModalOpen(true);
+            audioCooldownMapRef.current.set(candidate.id, now);
+            showToast(`Bạn đang ở gần "${candidate.name}". Vui lòng mua hoặc kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
             return;
         }
 
@@ -1034,8 +941,9 @@ tileLayer.addTo(map);
                         { key: 'bird', label: 'Vườn chim', count: mergedMarkers.filter(m => m.category === 'bird').length },
                         { key: 'primate', label: 'Linh trưởng', count: mergedMarkers.filter(m => m.category === 'primate').length },
                         { key: 'petting', label: 'Thú thân thiện', count: mergedMarkers.filter(m => m.category === 'petting').length },
+                        { key: 'reptile', label: 'Bò sát & Lưỡng cư', count: mergedMarkers.filter(m => m.category === 'reptile').length },
                         { key: 'gate', label: 'Cổng ra vào', count: mergedMarkers.filter(m => m.category === 'gate').length },
-                        { key: 'landmark', label: 'Di tích & Cây cổ thụ', count: mergedMarkers.filter(m => m.category === 'landmark').length }
+                        { key: 'landmark', label: 'Di tích & Cảnh quan', count: mergedMarkers.filter(m => ['landmark', 'botanical', 'attraction'].includes(m.category)).length }
                     ].map(cat => (
                         <button
                             key={cat.key}
@@ -1482,7 +1390,7 @@ tileLayer.addTo(map);
                             </p>
 
                             {/* Phần hiển thị cá thể động vật trong chuồng (có Loading, Lỗi, Rỗng & Dữ liệu thực) */}
-                            {(selectedMarker.enclosureId || selectedMarker.category === 'enclosure') && (
+                            {(selectedMarker.enclosureId || ['carnivore', 'herbivore', 'bird', 'primate', 'petting', 'reptile', 'enclosure'].includes(selectedMarker.category)) && (
                                 <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', marginTop: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                                         <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#15803D' }}>

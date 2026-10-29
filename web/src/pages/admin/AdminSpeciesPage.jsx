@@ -80,13 +80,13 @@ export default function AdminSpeciesPage() {
     // Filtered & Sorted species
     const filteredSpecies = useMemo(() => {
         let result = speciesList.filter(s => {
-            // Search filter: Tên tiếng Việt, Tên tiếng Anh / khoa học, Mô tả
+            // Search filter: Tên thường gọi (name/nameVi), Tên khoa học (scientificName/nameEn), Mô tả
             if (searchTerm.trim()) {
                 const term = searchTerm.trim().toLowerCase();
-                const matchVi = (s.nameVi || '').toLowerCase().includes(term);
-                const matchEn = (s.nameEn || '').toLowerCase().includes(term);
-                const matchDesc = (s.description || '').toLowerCase().includes(term);
-                if (!matchVi && !matchEn && !matchDesc) {
+                const name = (s.name || s.nameVi || '').toLowerCase();
+                const sciName = (s.scientificName || s.nameEn || '').toLowerCase();
+                const desc = (s.description || '').toLowerCase();
+                if (!name.includes(term) && !sciName.includes(term) && !desc.includes(term)) {
                     return false;
                 }
             }
@@ -117,8 +117,8 @@ export default function AdminSpeciesPage() {
         };
 
         result.sort((a, b) => {
-            if (sortBy === 'name-asc') return (a.nameVi || '').localeCompare(b.nameVi || '', 'vi');
-            if (sortBy === 'name-desc') return (b.nameVi || '').localeCompare(a.nameVi || '', 'vi');
+            if (sortBy === 'name-asc') return (a.name || a.nameVi || '').localeCompare(b.name || b.nameVi || '', 'vi');
+            if (sortBy === 'name-desc') return (b.name || b.nameVi || '').localeCompare(a.name || a.nameVi || '', 'vi');
             if (sortBy === 'iucn-desc') {
                 const rankA = iucnRank[normalizeConservationStatus(a.conservationStatus)] ?? 0;
                 const rankB = iucnRank[normalizeConservationStatus(b.conservationStatus)] ?? 0;
@@ -150,10 +150,10 @@ export default function AdminSpeciesPage() {
 
     const handleEdit = (s) => {
         setEditMode(true);
-        setEditId(s.id);
+        setEditId(s.speciesId || s.id);
         setFormData({
-            nameVi: s.nameVi,
-            nameEn: s.nameEn || '',
+            nameVi: s.name || s.nameVi || '',
+            nameEn: s.scientificName || s.nameEn || '',
             conservationStatus: normalizeConservationStatus(s.conservationStatus),
             description: s.description || '',
             imageUrl: s.imageUrl || ''
@@ -361,10 +361,10 @@ export default function AdminSpeciesPage() {
                                                             style={{ width: '36px', height: '36px', borderRadius: '6px', objectFit: 'cover' }}
                                                         />
                                                     )}
-                                                    <span className="font-bold text-primary">{s.nameVi}</span>
+                                                    <span className="font-bold text-primary">{s.name || s.nameVi}</span>
                                                 </div>
                                             </td>
-                                            <td className="italic">{s.nameEn}</td>
+                                            <td className="italic">{s.scientificName || s.nameEn}</td>
                                             <td>
                                                 <span className={`badge ${getIucnBadgeClass(s.conservationStatus)}`}>
                                                     {s.conservationStatus}

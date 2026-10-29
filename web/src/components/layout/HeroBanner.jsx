@@ -49,7 +49,7 @@ const HERO_SLIDES = [
 const SLIDE_INTERVAL_MS = 6000;
 
 export default function HeroBanner() {
-    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, openElectronicTicketModal } = useApp();
+    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, openElectronicTicketModal, t } = useApp();
 
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
@@ -132,16 +132,16 @@ export default function HeroBanner() {
                     <div className="hero-intro-column hero-text-column">
                         <div className="hero-eyebrow hero-tag-badge">
                             <span className="eyebrow-dot badge-pulse-dot" aria-hidden="true"></span>
-                            <span>HỆ THỐNG THUYẾT MINH TỰ ĐỘNG THẢO CẦM VIÊN</span>
+                            <span>{t?.heroEyebrow || 'HỆ THỐNG THUYẾT MINH TỰ ĐỘNG THẢO CẦM VIÊN'}</span>
                         </div>
 
                         <h1 className="hero-headline">
-                            <span className="hero-main-title">Thảo Cầm Viên Sài Gòn</span>
-                            <span className="hero-subheadline">Khám phá thiên nhiên di sản 160 năm</span>
+                            <span className="hero-main-title">{t?.heroMainTitle || 'Thảo Cầm Viên Sài Gòn'}</span>
+                            <span className="hero-subheadline">{t?.heroSubheadline || 'Khám phá thiên nhiên di sản 160 năm'}</span>
                         </h1>
 
                         <p className="hero-description">
-                            Trải nghiệm hướng dẫn tham quan số với bản đồ địa lý thực tế (OpenStreetMap), thuyết minh âm thanh đa ngôn ngữ cho từng loài động vật quý hiếm và đặt vé trực tuyến VietQR tức thì.
+                            {t?.heroDescription || 'Trải nghiệm hướng dẫn tham quan số với bản đồ địa lý thực tế (OpenStreetMap), thuyết minh âm thanh đa ngôn ngữ cho từng loài động vật quý hiếm và đặt vé trực tuyến VietQR tức thì.'}
                         </p>
 
                         {/* Primary and Secondary Action Buttons */}
@@ -156,7 +156,7 @@ export default function HeroBanner() {
                                     <circle cx="12" cy="12" r="2"></circle>
                                     <path d="M6 12h.01M18 12h.01"></path>
                                 </svg>
-                                <span>Đặt Vé Tham Quan</span>
+                                <span>{t?.heroBtnBuyTicket || 'Đặt Vé Tham Quan'}</span>
                             </button>
 
                             <button
@@ -169,7 +169,7 @@ export default function HeroBanner() {
                                     <line x1="8" y1="2" x2="8" y2="18"></line>
                                     <line x1="16" y1="6" x2="16" y2="22"></line>
                                 </svg>
-                                <span>Bản Đồ Đi Lại</span>
+                                <span>{t?.heroBtnMap || 'Bản Đồ Đi Lại'}</span>
                             </button>
 
                             <button
@@ -181,7 +181,7 @@ export default function HeroBanner() {
                                     <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
                                     <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
                                 </svg>
-                                <span>Thuyết Minh Âm Thanh</span>
+                                <span>{t?.heroBtnAudio || 'Thuyết Minh Âm Thanh'}</span>
                             </button>
                         </div>
 
@@ -191,7 +191,7 @@ export default function HeroBanner() {
                                 <div className="hero-active-session-pill">
                                     <div className="session-status-indicator">
                                         <span className="live-dot"></span>
-                                        <span>Phiên tham quan đang hoạt động:</span>
+                                        <span>{t?.heroActiveSession || 'Phiên tham quan đang hoạt động:'}</span>
                                         <strong className="session-code font-mono">{currentSession.ticketCode}</strong>
                                         <span className="session-user">• {currentSession.customerName || 'Khách tham quan'}</span>
                                     </div>
@@ -200,7 +200,7 @@ export default function HeroBanner() {
                                         className="btn-view-pass"
                                         onClick={() => openElectronicTicketModal()}
                                     >
-                                        Xem Thẻ Điện Tử
+                                        {t?.heroViewPass || 'Xem Thẻ Điện Tử'}
                                     </button>
                                 </div>
                             ) : (
@@ -209,13 +209,13 @@ export default function HeroBanner() {
                                         <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                         <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                     </svg>
-                                    <span>Quý khách đã có vé giấy hoặc mã QR vào cổng?</span>
+                                    <span>{t?.heroHasPassPrompt || 'Quý khách đã có vé giấy hoặc mã QR vào cổng?'}</span>
                                     <button 
                                         type="button" 
                                         className="btn-link-activate"
                                         onClick={() => setIsTicketModalOpen(true)}
                                     >
-                                        Kích hoạt vé ngay →
+                                        {t?.heroActivateNow || 'Kích hoạt vé ngay →'}
                                     </button>
                                 </div>
                             )}
@@ -293,7 +293,7 @@ export default function HeroBanner() {
                                         <div className="hero-photography-overlay">
                                             <div className="photo-badge">{slide.statusLabel} • {slide.statusLevel}</div>
                                             <h3 className="photo-species-title">{slide.speciesName} • {slide.scientificName}</h3>
-                                            <p className="photo-species-subtitle">{slide.habitat} • Có sẵn bài thuyết minh âm thanh</p>
+                                            <p className="photo-species-subtitle">{slide.habitat} • {t?.slideAvailableAudio || 'Có sẵn bài thuyết minh âm thanh'}</p>
                                         </div>
                                     </div>
                                 );
@@ -312,7 +312,7 @@ export default function HeroBanner() {
                             </svg>
                         </div>
                         <div className="strip-content">
-                            <span className="strip-label">Giờ mở cửa hàng ngày</span>
+                            <span className="strip-label">{t?.openingHoursLabel || 'Giờ mở cửa hàng ngày'}</span>
                             <span className="strip-val">{ZOO_OPERATIONAL_INFO.openingHours}</span>
                         </div>
                     </div>
@@ -327,7 +327,7 @@ export default function HeroBanner() {
                             </svg>
                         </div>
                         <div className="strip-content">
-                            <span className="strip-label">Địa chỉ sở thú</span>
+                            <span className="strip-label">{t?.addressLabel || 'Địa chỉ sở thú'}</span>
                             <span className="strip-val">{ZOO_OPERATIONAL_INFO.address}</span>
                         </div>
                     </div>
@@ -343,7 +343,7 @@ export default function HeroBanner() {
                             </svg>
                         </div>
                         <div className="strip-content">
-                            <span className="strip-label">Giá vé vào cổng</span>
+                            <span className="strip-label">{t?.ticketPriceLabel || 'Giá vé vào cổng'}</span>
                             <span className="strip-val">{ticketPriceSummary}</span>
                         </div>
                     </div>
@@ -359,7 +359,7 @@ export default function HeroBanner() {
                             </svg>
                         </div>
                         <div className="strip-content">
-                            <span className="strip-label">Cổng đón khách</span>
+                            <span className="strip-label">{t?.gatesLabel || 'Cổng đón khách'}</span>
                             <span className="strip-val">{ZOO_OPERATIONAL_INFO.gates}</span>
                         </div>
                     </div>

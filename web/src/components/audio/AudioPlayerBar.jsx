@@ -2,7 +2,7 @@ import React from 'react';
 import { useApp } from '../../context/AppContext';
 
 export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeSpeed, onStop, onClose }) {
-    const { audioState, setIsTranscriptModalOpen } = useApp();
+    const { audioState, setIsTranscriptModalOpen, t } = useApp();
     const { animal, narration, isPlaying, currentTime, duration, playbackRate, isVisible } = audioState;
 
     if (!isVisible || !narration) return null;
@@ -48,7 +48,7 @@ export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeS
                     <div className="player-track-info">
                         <h5 id="player-track-title">{narration.title}</h5>
                         <p id="player-track-subtitle">
-                            {animal ? `${animal.nameVi} • ` : ''}{narration.narrator}
+                            {animal ? `${animal.name || animal.nameVi} • ` : ''}{narration.narrator}
                         </p>
                     </div>
                 </div>
@@ -141,7 +141,7 @@ export default function AudioPlayerBar({ onTogglePlay, onSkip, onSeek, onChangeS
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <span>Lời thoại</span>
+                        <span>{t?.transcriptBtn || 'Lời thoại'}</span>
                     </button>
 
                     {/* NÚT ĐÓNG / THU GỌN (CLOSE) */}

@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { ZooApi } from '../../services/api';
 
 export default function TicketModal() {
-    const { isTicketModalOpen, setIsTicketModalOpen, validateTicketCode, t } = useApp();
+    const { isTicketModalOpen, setIsTicketModalOpen, validateTicketCode, switchTab, t } = useApp();
     const [inputCode, setInputCode] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -80,11 +80,22 @@ export default function TicketModal() {
                         </button>
                     </form>
 
-                    {activeDbTickets.length > 0 && (
-                        <div>
-                                
-                        </div>
-                    )}
+                    <div style={{ marginTop: '16px', paddingTop: '12px', borderTop: '1px solid #E2E8F0', textAlign: 'center' }}>
+                        <p style={{ fontSize: '0.82rem', color: '#64748B', marginBottom: '8px' }}>
+                            {t?.heroHasNoTicketPrompt || 'Quý khách chưa có vé vào cổng Thảo Cầm Viên?'}
+                        </p>
+                        <button
+                            type="button"
+                            className="btn btn-outline btn-sm"
+                            style={{ width: '100%', borderColor: '#15803D', color: '#15803D', fontWeight: 600 }}
+                            onClick={() => {
+                                setIsTicketModalOpen(false);
+                                switchTab('tickets');
+                            }}
+                        >
+                            🛒 {t?.btnPurchaseTicket || 'Mua vé tham quan trực tuyến'}
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>

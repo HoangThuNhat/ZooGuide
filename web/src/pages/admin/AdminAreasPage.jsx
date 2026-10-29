@@ -22,8 +22,8 @@ export default function AdminAreasPage() {
         color: '#15803D',
         descriptionVi: '',
         descriptionEn: '',
-        latitude: '10.7875',
-        longitude: '106.7052',
+        latitude: '',
+        longitude: '',
         mapX: 400,
         mapY: 300,
         radiusMeters: '50'
@@ -39,6 +39,8 @@ export default function AdminAreasPage() {
         description: '',
         imageUrl: '',
         status: 'Active',
+        latitude: '',
+        longitude: '',
         mapX: 450,
         mapY: 320
     };
@@ -95,8 +97,8 @@ export default function AdminAreasPage() {
             descriptionVi: areaForm.descriptionVi.trim(),
             descriptionEn: areaForm.descriptionEn,
             color: areaForm.color,
-            latitude: parseFloat(areaForm.latitude) || 10.7875,
-            longitude: parseFloat(areaForm.longitude) || 106.7052,
+            latitude: areaForm.latitude !== '' ? parseFloat(areaForm.latitude) : null,
+            longitude: areaForm.longitude !== '' ? parseFloat(areaForm.longitude) : null,
             mapX: areaForm.mapX !== '' ? parseFloat(areaForm.mapX) : null,
             mapY: areaForm.mapY !== '' ? parseFloat(areaForm.mapY) : null,
             radiusMeters: parseFloat(areaForm.radiusMeters) || 50
@@ -140,8 +142,8 @@ export default function AdminAreasPage() {
             color: area.color || '#15803D',
             descriptionVi: area.descriptionVi || area.description || '',
             descriptionEn: area.descriptionEn || '',
-            latitude: String(area.latitude || '10.7875'),
-            longitude: String(area.longitude || '106.7052'),
+            latitude: area.latitude != null ? String(area.latitude) : '',
+            longitude: area.longitude != null ? String(area.longitude) : '',
             mapX: area.mapX != null ? area.mapX : 400,
             mapY: area.mapY != null ? area.mapY : 300,
             radiusMeters: String(area.radiusMeters || '50')
@@ -189,6 +191,8 @@ export default function AdminAreasPage() {
             description: enclosureForm.description.trim(),
             imageUrl: enclosureForm.imageUrl.trim(),
             status: enclosureForm.status,
+            latitude: enclosureForm.latitude !== '' ? parseFloat(enclosureForm.latitude) : null,
+            longitude: enclosureForm.longitude !== '' ? parseFloat(enclosureForm.longitude) : null,
             mapX: enclosureForm.mapX !== '' ? parseFloat(enclosureForm.mapX) : null,
             mapY: enclosureForm.mapY !== '' ? parseFloat(enclosureForm.mapY) : null
         };
@@ -224,6 +228,8 @@ export default function AdminAreasPage() {
             description: enc.description || '',
             imageUrl: enc.imageUrl || '',
             status: enc.status || 'Active',
+            latitude: enc.latitude != null ? String(enc.latitude) : '',
+            longitude: enc.longitude != null ? String(enc.longitude) : '',
             mapX: enc.mapX != null ? enc.mapX : 450,
             mapY: enc.mapY != null ? enc.mapY : 320
         });
@@ -411,6 +417,23 @@ export default function AdminAreasPage() {
                                                     <span>Số lượng cá thể thú:</span>
                                                     <strong>{area.animalCount ?? 0} cá thể</strong>
                                                 </div>
+                                                {/* Danh sách chuồng trực thuộc và số lượng cá thể trong từng chuồng */}
+                                                {enclosures.filter(e => e.areaId === (area.areaId || area.id)).length > 0 && (
+                                                    <div style={{ marginTop: '8px', padding: '6px 8px', background: '#F8FAFC', borderRadius: '6px', fontSize: '0.8rem', border: '1px solid #E2E8F0' }}>
+                                                        <div style={{ fontWeight: 700, color: '#475569', marginBottom: '4px' }}>Các chuồng trực thuộc ({enclosures.filter(e => e.areaId === (area.areaId || area.id)).length}):</div>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '120px', overflowY: 'auto' }}>
+                                                            {enclosures.filter(e => e.areaId === (area.areaId || area.id)).map(enc => {
+                                                                const count = animals.filter(a => a.enclosureId === (enc.enclosureId || enc.id)).length;
+                                                                return (
+                                                                    <div key={enc.enclosureId || enc.id} style={{ display: 'flex', justifyContent: 'space-between', color: '#334155' }}>
+                                                                        <span>• {enc.name}</span>
+                                                                        <span className="font-bold text-primary">{count} cá thể</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="admin-stat-row">
                                                     <span>Bán kính định vị GPS:</span>
                                                     <span className="text-xs font-mono">{area.radiusMeters || 50} mét</span>
@@ -770,6 +793,31 @@ export default function AdminAreasPage() {
                                         value={enclosureForm.name}
                                         onChange={(e) => setEnclosureForm({ ...enclosureForm, name: e.target.value })}
                                     />
+                                </div>
+
+                                <div className="form-grid-2">
+                                    <div className="form-group">
+                                        <label className="form-label">Vĩ độ GPS thực tế (Latitude)</label>
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            className="form-input"
+                                            placeholder="VD: 10.788500"
+                                            value={enclosureForm.latitude}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, latitude: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label className="form-label">Kinh độ GPS thực tế (Longitude)</label>
+                                        <input
+                                            type="number"
+                                            step="0.000001"
+                                            className="form-input"
+                                            placeholder="VD: 106.706100"
+                                            value={enclosureForm.longitude}
+                                            onChange={(e) => setEnclosureForm({ ...enclosureForm, longitude: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="form-grid-2">

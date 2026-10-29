@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
@@ -17,6 +17,7 @@ export default function SpeciesNarrationModal({
         hasActiveSession,
         currentSession,
         setIsTicketModalOpen,
+        switchTab,
         showToast,
         t
     } = useApp();
@@ -126,7 +127,7 @@ export default function SpeciesNarrationModal({
 
     const handlePlayClick = () => {
         if (!hasActiveSession) {
-            showToast('Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
+            showToast(t?.ticketRequiredNarration || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
             setIsTicketModalOpen(true);
             return;
         }
@@ -264,18 +265,32 @@ export default function SpeciesNarrationModal({
                                 {t?.ticketLockedTitle || 'Tính Năng Thuyết Minh Yêu Cầu Vé Tham Quan'}
                             </h4>
                             <p style={{ fontSize: '0.88rem', color: '#64748B', margin: '0 0 16px 0' }}>
-                                {t?.ticketLockedDesc || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.'}
+                                {t?.ticketLockedDesc || 'Vui lòng mua vé hoặc kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.'}
                             </p>
-                            <button
-                                type="button"
-                                className="btn btn-primary"
-                                onClick={() => {
-                                    onClose();
-                                    setIsTicketModalOpen(true);
-                                }}
-                            >
-                                {t?.heroScanBtn || 'Kích hoạt vé tham quan'}
-                            </button>
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-primary"
+                                    style={{ padding: '8px 18px', fontWeight: 600 }}
+                                    onClick={() => {
+                                        onClose();
+                                        switchTab('tickets');
+                                    }}
+                                >
+                                    🛒 {t?.btnPurchaseTicket || 'Mua vé tham quan'}
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    style={{ padding: '8px 18px', fontWeight: 600 }}
+                                    onClick={() => {
+                                        onClose();
+                                        setIsTicketModalOpen(true);
+                                    }}
+                                >
+                                    🔑 {t?.btnActivateTicket || 'Kích hoạt vé'}
+                                </button>
+                            </div>
                         </div>
                     ) : narration ? (
                         <div style={{ backgroundColor: '#F0FDF4', border: '1.5px solid #BBF7D0', borderRadius: '12px', padding: '16px', marginBottom: '12px' }}>

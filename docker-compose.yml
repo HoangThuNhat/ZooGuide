@@ -36,7 +36,6 @@ services:
       dockerfile: Dockerfile
       args:
         - VITE_API_BASE_URL=${VITE_API_BASE_URL:-/api}
-        - VITE_USE_MOCK=${VITE_USE_MOCK:-false}
         - VITE_CARTO_API_KEY=${VITE_CARTO_API_KEY}
     container_name: zooguide-frontend
     ports:
