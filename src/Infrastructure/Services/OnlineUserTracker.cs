@@ -188,7 +188,7 @@ public int GetActiveTicketBuyerDevicesCount()
 }
 
     /// <summary>
-    /// Số lượng thiết bị / phiên trình duyệt đang hoạt động (cả người chưa mua vé và đã mua vé, còn trong timeout 45s).
+    /// Số lượng thiết bị đang hoạt động (cả người chưa mua vé và đã mua vé, còn trong timeout 45s).
     /// </summary>
     public int GetActiveDevicesCount()
     {

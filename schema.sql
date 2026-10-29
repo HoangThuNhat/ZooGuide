@@ -22,6 +22,35 @@ ALTER SCHEMA "public" OWNER TO "pg_database_owner";
 COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
+
+CREATE OR REPLACE FUNCTION "public"."sync_content_translation_entity"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+    NEW."AreaId" := NULL;
+    NEW."EnclosureId" := NULL;
+    NEW."SpeciesId" := NULL;
+
+    CASE NEW."EntityType"
+        WHEN 'Area' THEN
+            NEW."AreaId" := NEW."EntityId";
+        WHEN 'Enclosure' THEN
+            NEW."EnclosureId" := NEW."EntityId";
+        WHEN 'Species' THEN
+            NEW."SpeciesId" := NEW."EntityId";
+        ELSE
+            RAISE EXCEPTION
+                'EntityType khong hop le: %',
+                NEW."EntityType";
+    END CASE;
+
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."sync_content_translation_entity"() OWNER TO "postgres";
+
 SET default_tablespace = '';
 
 SET default_table_access_method = "heap";
@@ -182,7 +211,11 @@ CREATE TABLE IF NOT EXISTS "public"."CONTENT_TRANSLATIONS" (
     "IsPublished" boolean DEFAULT true NOT NULL,
     "SourceReference" character varying(500),
     "CreatedAt" timestamp with time zone DEFAULT "now"() NOT NULL,
-    "UpdatedAt" timestamp with time zone
+    "UpdatedAt" timestamp with time zone,
+    "AreaId" integer,
+    "EnclosureId" integer,
+    "SpeciesId" integer,
+    CONSTRAINT "ck_content_translations_entity" CHECK ((((("EntityType")::"text" = 'Area'::"text") AND ("AreaId" IS NOT NULL) AND ("AreaId" = "EntityId") AND ("EnclosureId" IS NULL) AND ("SpeciesId" IS NULL)) OR ((("EntityType")::"text" = 'Enclosure'::"text") AND ("EnclosureId" IS NOT NULL) AND ("EnclosureId" = "EntityId") AND ("AreaId" IS NULL) AND ("SpeciesId" IS NULL)) OR ((("EntityType")::"text" = 'Species'::"text") AND ("SpeciesId" IS NOT NULL) AND ("SpeciesId" = "EntityId") AND ("AreaId" IS NULL) AND ("EnclosureId" IS NULL))))
 );
 
 
@@ -211,7 +244,8 @@ CREATE TABLE IF NOT EXISTS "public"."DEVICE_ACTIVITIES" (
     "CreatedAt" timestamp with time zone DEFAULT "now"() NOT NULL,
     "UpdatedAt" timestamp with time zone,
     "IsActive" boolean DEFAULT true NOT NULL,
-    "DisconnectedAt" timestamp with time zone
+    "DisconnectedAt" timestamp with time zone,
+    "UserId" integer
 );
 
 
@@ -857,6 +891,10 @@ CREATE UNIQUE INDEX "UQ_Users_Username" ON "public"."USERS" USING "btree" ("User
 
 
 
+CREATE OR REPLACE TRIGGER "trg_sync_content_translation_entity" BEFORE INSERT OR UPDATE OF "EntityType", "EntityId", "AreaId", "EnclosureId", "SpeciesId" ON "public"."CONTENT_TRANSLATIONS" FOR EACH ROW EXECUTE FUNCTION "public"."sync_content_translation_entity"();
+
+
+
 ALTER TABLE ONLY "public"."ANIMALS"
     ADD CONSTRAINT "FK_ANIMALS_AREAS_AreaId" FOREIGN KEY ("AreaId") REFERENCES "public"."AREAS"("AreaId") ON DELETE RESTRICT;
 
@@ -884,6 +922,11 @@ ALTER TABLE ONLY "public"."CHAT_MESSAGES"
 
 ALTER TABLE ONLY "public"."CHAT_SESSIONS"
     ADD CONSTRAINT "FK_CHAT_SESSIONS_TICKET_SESSIONS_SessionId" FOREIGN KEY ("SessionId") REFERENCES "public"."TICKET_SESSIONS"("SessionId") ON DELETE CASCADE;
+
+
+
+ALTER TABLE ONLY "public"."DEVICE_ACTIVITIES"
+    ADD CONSTRAINT "FK_DEVICE_ACTIVITIES_USERS_UserId" FOREIGN KEY ("UserId") REFERENCES "public"."USERS"("UserId") ON DELETE SET NULL;
 
 
 
@@ -977,6 +1020,21 @@ ALTER TABLE ONLY "public"."POI_NARRATIONS"
 
 
 
+ALTER TABLE ONLY "public"."CONTENT_TRANSLATIONS"
+    ADD CONSTRAINT "fk_content_translations_area" FOREIGN KEY ("AreaId") REFERENCES "public"."AREAS"("AreaId");
+
+
+
+ALTER TABLE ONLY "public"."CONTENT_TRANSLATIONS"
+    ADD CONSTRAINT "fk_content_translations_enclosure" FOREIGN KEY ("EnclosureId") REFERENCES "public"."ENCLOSURES"("EnclosureId");
+
+
+
+ALTER TABLE ONLY "public"."CONTENT_TRANSLATIONS"
+    ADD CONSTRAINT "fk_content_translations_species" FOREIGN KEY ("SpeciesId") REFERENCES "public"."SPECIES"("SpeciesId");
+
+
+
 ALTER TABLE "public"."ENCLOSURES" ENABLE ROW LEVEL SECURITY;
 
 
@@ -984,6 +1042,12 @@ GRANT USAGE ON SCHEMA "public" TO "postgres";
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."sync_content_translation_entity"() TO "anon";
+GRANT ALL ON FUNCTION "public"."sync_content_translation_entity"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."sync_content_translation_entity"() TO "service_role";
 
 
 

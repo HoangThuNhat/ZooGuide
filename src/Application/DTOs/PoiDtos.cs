@@ -12,6 +12,7 @@ public class PoiDto
     public string Category { get; set; } = "Landmark";
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public decimal RadiusMeters { get; set; }
     public bool IsActive { get; set; }
     public bool IsCoordinateVerified { get; set; }
     public string? VerificationSource { get; set; }
@@ -35,6 +36,7 @@ public class CreatePoiDto
     public string Category { get; set; } = "Landmark";
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public decimal RadiusMeters { get; set; } = 50m;
     public bool IsActive { get; set; } = true;
     public bool IsCoordinateVerified { get; set; } = false;
     public string? VerificationSource { get; set; }
@@ -50,6 +52,7 @@ public class UpdatePoiDto
     public string? Category { get; set; }
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
+    public decimal? RadiusMeters { get; set; }
     public bool? IsActive { get; set; }
     public bool? IsCoordinateVerified { get; set; }
     public string? VerificationSource { get; set; }

@@ -8,7 +8,10 @@ public class PointOfInterestConfiguration : IEntityTypeConfiguration<PointOfInte
 {
     public void Configure(EntityTypeBuilder<PointOfInterest> builder)
     {
-        builder.ToTable("POINTS_OF_INTEREST");
+        builder.ToTable("POINTS_OF_INTEREST", table =>
+    table.HasCheckConstraint(
+        "CK_POINTS_OF_INTEREST_RadiusMeters_NonNegative",
+        "\"RadiusMeters\" >= 0"));
 
         builder.HasKey(p => p.PoiId);
         builder.Property(p => p.PoiId).UseIdentityColumn();
@@ -40,6 +43,11 @@ public class PointOfInterestConfiguration : IEntityTypeConfiguration<PointOfInte
         builder.Property(p => p.Longitude)
             .IsRequired()
             .HasPrecision(10, 7);
+
+            builder.Property(p => p.RadiusMeters)
+    .IsRequired()
+    .HasPrecision(8, 2)
+    .HasDefaultValue(50m);
 
         builder.Property(p => p.IsActive)
             .IsRequired()

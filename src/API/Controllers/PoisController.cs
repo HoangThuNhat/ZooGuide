@@ -58,6 +58,11 @@ public class PoisController : ControllerBase
         {
             return BadRequest(ApiResponse<PoiDto>.Fail("Tên điểm tham quan không được để trống."));
         }
+        if (dto.RadiusMeters < 0)
+{
+    return BadRequest(
+        ApiResponse<PoiDto>.Fail("Bán kính POI không được âm."));
+}
 
         try
         {

@@ -363,7 +363,7 @@ export default function AdminDashboardPage() {
                         Tổng Quan Vận Hành
                     </h2>
                     <p className="admin-page-desc" style={{ margin: 0, color: '#64748B', fontSize: '0.85rem' }}>
-                        Số liệu vận hành thời gian thực từ cơ sở dữ liệu Supabase: Thiết bị hoạt động, phiên tham quan, sức khỏe POI và quản lý thuyết minh.
+                        Thiết bị hoạt động, phiên tham quan, sức khỏe POI và quản lý thuyết minh.
                     </p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -529,10 +529,10 @@ export default function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* 3. Thiết Bị Đang Truy Cập (Online - Persisted Heartbeats) */}
+                    {/* 3. Thiết bị đang hoạt động (Online - Persisted Heartbeats) */}
                     <div className="admin-metric-card" style={{ borderLeft: '3px solid #8B5CF6' }}>
                         <div className="metric-header">
-                            <span className="metric-label">Thiết Bị Đang Truy Cập (Online)</span>
+                            <span className="metric-label">Thiết Bị Đang hoạt động (Online)</span>
                             <span className="badge badge-primary text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                                 <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#8B5CF6', display: 'inline-block' }}></span>
                                 {isLiveSignalR ? 'SignalR Trực Tiếp' : 'Thời gian thực'}

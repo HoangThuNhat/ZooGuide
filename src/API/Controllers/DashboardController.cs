@@ -61,9 +61,9 @@ public class DashboardController : ControllerBase
         var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
         var activeBuyerDevices = onlineTracker.GetActiveTicketBuyerDevicesCount();
         // Calculate active devices truthfully from persisted database heartbeats within 60 seconds
-        var activeDevices = await dbContext.DeviceActivities
+        var activeDevices = (await dbContext.DeviceActivities
             .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= DateTime.UtcNow.AddSeconds(-60));
+            .CountAsync(d => d.LastSeenAt >= DateTime.UtcNow.AddSeconds(-60)));
         var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
 
         var summary = new OnlineUsersSummaryDto

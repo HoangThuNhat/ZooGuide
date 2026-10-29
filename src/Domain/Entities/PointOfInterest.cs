@@ -16,6 +16,7 @@ public class PointOfInterest
     public string Category { get; set; } = "Landmark";
     public decimal Latitude { get; set; }
     public decimal Longitude { get; set; }
+    public decimal RadiusMeters { get; set; } = 50m;
     public bool IsActive { get; set; } = true;
     public bool IsCoordinateVerified { get; set; } = false;
     public string? VerificationSource { get; set; }

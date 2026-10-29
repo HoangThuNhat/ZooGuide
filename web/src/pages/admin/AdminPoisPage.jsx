@@ -63,6 +63,7 @@ export default function AdminPoisPage() {
         category: 'Landmark',
         latitude: 10.787600,
         longitude: 106.705300,
+        radiusMeters: 50,
         isActive: true,
         isCoordinateVerified: false,
         verificationSource: '',
@@ -197,6 +198,7 @@ export default function AdminPoisPage() {
             category: 'Landmark',
             latitude: 10.787600,
             longitude: 106.705300,
+            radiusMeters: 50,
             isActive: true,
             isCoordinateVerified: true,
             verificationSource: 'Khảo sát thực địa Saigon Zoo',
@@ -214,6 +216,7 @@ export default function AdminPoisPage() {
             category: poi.category || 'Landmark',
             latitude: Number(poi.latitude) || 10.787600,
             longitude: Number(poi.longitude) || 106.705300,
+            radiusMeters: Number(poi.radiusMeters ?? 50),
             isActive: poi.isActive !== false,
             isCoordinateVerified: Boolean(poi.isCoordinateVerified),
             verificationSource: poi.verificationSource || '',
@@ -228,6 +231,20 @@ export default function AdminPoisPage() {
             showToast('Vui lòng nhập tên điểm tham quan.', 'error');
             return;
         }
+
+        const radius = Number(formData.radiusMeters);
+
+if (
+    formData.radiusMeters === '' ||
+    !Number.isFinite(radius) ||
+    radius < 0
+) {
+    showToast(
+        'Bán kính POI phải là số không âm.',
+        'error'
+    );
+    return;
+}
 
         const lat = Number(formData.latitude);
         const lng = Number(formData.longitude);
@@ -255,6 +272,7 @@ export default function AdminPoisPage() {
                     category: formData.category,
                     latitude: Number(formData.latitude),
                     longitude: Number(formData.longitude),
+                    radiusMeters: radius,
                     isActive: formData.isActive,
                     isCoordinateVerified: formData.isCoordinateVerified,
                     verificationSource: formData.verificationSource?.trim(),
@@ -277,6 +295,7 @@ export default function AdminPoisPage() {
                     category: formData.category,
                     latitude: Number(formData.latitude),
                     longitude: Number(formData.longitude),
+                    radiusMeters: radius,
                     isActive: formData.isActive,
                     isCoordinateVerified: formData.isCoordinateVerified,
                     verificationSource: formData.verificationSource?.trim(),
@@ -609,7 +628,8 @@ export default function AdminPoisPage() {
                                 <th style={{ width: '100px' }}>Mã POI</th>
                                 <th>Tên Điểm Tham Quan</th>
                                 <th style={{ width: '140px' }}>Phân Loại</th>
-                                <th style={{ width: '170px' }}>Tọa Độ GPS (WGS84)</th>
+                                <th style={{ width: '170px' }}>Tọa Độ GPS</th>
+                                <th style={{ width: '110px' }}>Bán Kính (m)</th>
                                 <th style={{ width: '130px' }}>Kiểm Định</th>
                                 <th style={{ width: '120px' }}>Thuyết Minh</th>
                                 <th style={{ width: '110px' }}>Trạng Thái</th>
@@ -652,6 +672,14 @@ export default function AdminPoisPage() {
                                             </div>
                                         </td>
                                         <td>
+    <span className="font-mono text-xs">
+        {Number(poi.radiusMeters ?? 50).toLocaleString(
+            'vi-VN',
+            { maximumFractionDigits: 2 }
+        )} m
+    </span>
+</td>
+                                        <td>
                                             {poi.isCoordinateVerified ? (
                                                 <span 
                                                     className="badge badge-success text-xs" 
@@ -659,7 +687,7 @@ export default function AdminPoisPage() {
                                                     style={{ cursor: 'pointer' }}
                                                     onClick={() => handleToggleVerification(poi)}
                                                 >
-                                                    ✓ Đã xác thực
+                                                    Đã xác thực
                                                 </span>
                                             ) : (
                                                 <span 
@@ -668,7 +696,7 @@ export default function AdminPoisPage() {
                                                     style={{ cursor: 'pointer' }}
                                                     onClick={() => handleToggleVerification(poi)}
                                                 >
-                                                    ⚠ Chưa xác thực
+                                                    Chưa xác thực
                                                 </span>
                                             )}
                                         </td>
@@ -850,6 +878,36 @@ export default function AdminPoisPage() {
                                             onChange={e => setFormData({ ...formData, longitude: parseFloat(e.target.value) || 0 })}
                                         />
                                     </div>
+
+                                    <div className="form-group">
+    <label
+        className="form-label text-xs"
+        htmlFor="poi-input-radius"
+    >
+        Bán kính POI (m) *
+    </label>
+
+    <input
+        type="number"
+        id="poi-input-radius"
+        className="form-input"
+        min="0"
+        step="0.01"
+        required
+        value={formData.radiusMeters}
+        onChange={e =>
+            setFormData({
+                ...formData,
+                radiusMeters: e.target.value
+            })
+        }
+    />
+
+    <small className="text-muted">
+        Phạm vi bán kính tính từ tọa độ của điểm tham quan.
+        Giá trị phải lớn hơn hoặc bằng 0 mét.
+    </small>
+</div>
                                 </div>
                             </div>
 

@@ -130,6 +130,7 @@ public class PoiService : IPoiService
             Category = string.IsNullOrWhiteSpace(dto.Category) ? "Landmark" : dto.Category.Trim(),
             Latitude = dto.Latitude,
             Longitude = dto.Longitude,
+            RadiusMeters = dto.RadiusMeters,
             IsActive = dto.IsActive,
             IsCoordinateVerified = dto.IsCoordinateVerified,
             VerificationSource = dto.VerificationSource?.Trim(),
@@ -179,6 +180,9 @@ public class PoiService : IPoiService
 
         if (dto.AreaId.HasValue)
             poi.AreaId = dto.AreaId.Value > 0 ? dto.AreaId.Value : null;
+
+        if (dto.RadiusMeters.HasValue)
+            poi.RadiusMeters = dto.RadiusMeters.Value;
 
         poi.UpdatedAt = DateTime.UtcNow;
 
@@ -473,6 +477,7 @@ public class PoiService : IPoiService
             Category = p.Category,
             Latitude = p.Latitude,
             Longitude = p.Longitude,
+            RadiusMeters = p.RadiusMeters,
             IsActive = p.IsActive,
             IsCoordinateVerified = p.IsCoordinateVerified,
             VerificationSource = p.VerificationSource,
