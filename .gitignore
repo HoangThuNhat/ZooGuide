@@ -61,3 +61,6 @@ dist/
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\Project Structure and Architecture.docx
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\Phan_Ra_Product_Backlog.html
 C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\ZooGuide_ERD.png
+
+# Temporary scripts, generated data and cache
+/scratch/
