@@ -12,6 +12,12 @@ on:
       - main
       - develop
   workflow_dispatch:
+    inputs:
+      deploy_demo:
+        description: "Deploy Demo to Windows Self-hosted Runner (when triggered on feature branch)"
+        required: false
+        default: true
+        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -138,7 +144,7 @@ jobs:
           context: .
           file: ./src/API/Dockerfile
           push: false
-          tags: zooguide-api:${{ github.sha }}
+          tags: zooguide-demo-api:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -150,12 +156,202 @@ jobs:
           push: false
           build-args: |
             VITE_API_BASE_URL=/api
-          tags: zooguide-frontend:${{ github.sha }}
+          tags: zooguide-demo-frontend:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # JOB 4: CONTINUOUS DELIVERY (CD) - Gated on main branch & configured secrets
+  # JOB 4: CD DEMO - Deploy to Windows Self-Hosted Runner (feature branch only)
+  # ============================================================================
+  deploy-demo:
+    name: Deploy Demo on Windows Self-Hosted Runner (zooguide-demo)
+    runs-on: [self-hosted, Windows, X64, zooguide-demo]
+    needs:
+      - backend-ci
+      - frontend-ci
+      - docker-ci
+    if: >
+      github.ref == 'refs/heads/feature' &&
+      (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_demo != false)) &&
+      vars.ENABLE_DEMO_DEPLOY != 'false'
+    concurrency:
+      group: zooguide-demo-deployment
+      cancel-in-progress: false
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+
+      - name: Prepare & Validate Demo Environment (.env)
+        env:
+          SECRET_SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+          SECRET_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SECRET_SUPABASE_STORAGE_BUCKET: ${{ secrets.SUPABASE_STORAGE_BUCKET }}
+          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECRET_VITE_CARTO_API_KEY: ${{ secrets.VITE_CARTO_API_KEY }}
+          VAR_API_PORT: ${{ vars.DEMO_API_PORT }}
+          VAR_FRONTEND_PORT: ${{ vars.DEMO_FRONTEND_PORT }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          $workspaceEnv = Join-Path $PWD ".env"
+
+          # 1. Locate existing host .env file without ever overwriting the original file
+          $candidateEnvPaths = @()
+          if ($env:ZOOGUIDE_DEMO_ENV_FILE) { $candidateEnvPaths += $env:ZOOGUIDE_DEMO_ENV_FILE }
+          $candidateEnvPaths += "C:\actions-runner\.env.zooguide-demo"
+          $candidateEnvPaths += "C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\.env"
+
+          $sourceEnv = $candidateEnvPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+          if ($sourceEnv -and ($sourceEnv -ne $workspaceEnv)) {
+              Copy-Item -Path $sourceEnv -Destination $workspaceEnv -Force
+              Write-Output "Loaded base Demo environment configuration from host file: $sourceEnv"
+          } elseif (-not (Test-Path $workspaceEnv)) {
+              New-Item -ItemType File -Path $workspaceEnv -Force | Out-Null
+              Write-Output "Initialized empty workspace .env file to populate from GitHub Secrets/Variables."
+          }
+
+          # 2. Parse key-value pairs safely
+          $envMap = @{}
+          Get-Content $workspaceEnv | ForEach-Object {
+              $line = $_.Trim()
+              if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                  $idx = $line.IndexOf("=")
+                  $k = $line.Substring(0, $idx).Trim()
+                  $v = $line.Substring($idx + 1).Trim()
+                  $envMap[$k] = $v
+              }
+          }
+
+          # 3. Allow GitHub Secrets / Variables to supply or override values if configured
+          if ($env:SECRET_SUPABASE_CONNECTION_STRING) { $envMap["SUPABASE_CONNECTION_STRING"] = $env:SECRET_SUPABASE_CONNECTION_STRING }
+          if ($env:SECRET_SUPABASE_URL) { $envMap["SUPABASE_URL"] = $env:SECRET_SUPABASE_URL }
+          if ($env:SECRET_SUPABASE_STORAGE_BUCKET) { $envMap["SUPABASE_STORAGE_BUCKET"] = $env:SECRET_SUPABASE_STORAGE_BUCKET }
+          if ($env:SECRET_SUPABASE_SERVICE_ROLE_KEY) { $envMap["SUPABASE_SERVICE_ROLE_KEY"] = $env:SECRET_SUPABASE_SERVICE_ROLE_KEY }
+          if ($env:SECRET_VITE_CARTO_API_KEY) { $envMap["VITE_CARTO_API_KEY"] = $env:SECRET_VITE_CARTO_API_KEY }
+          if ($env:VAR_API_PORT) { $envMap["API_PORT"] = $env:VAR_API_PORT }
+          if ($env:VAR_FRONTEND_PORT) { $envMap["FRONTEND_PORT"] = $env:VAR_FRONTEND_PORT }
+
+          # 4. Ensure Demo defaults (Port 3001 avoids Open WebUI on port 3000)
+          $envMap["COMPOSE_PROJECT_NAME"] = "zooguide-demo"
+          if (-not $envMap["API_PORT"]) { $envMap["API_PORT"] = "8080" }
+          if (-not $envMap["FRONTEND_PORT"]) { $envMap["FRONTEND_PORT"] = "3001" }
+          if (-not $envMap["VITE_API_BASE_URL"]) { $envMap["VITE_API_BASE_URL"] = "/api" }
+          if (-not $envMap["SUPABASE_STORAGE_BUCKET"]) { $envMap["SUPABASE_STORAGE_BUCKET"] = "narration-audio" }
+
+          # 5. Validate required variables without printing secret values
+          $requiredKeys = @("SUPABASE_CONNECTION_STRING", "SUPABASE_URL", "SUPABASE_STORAGE_BUCKET", "SUPABASE_SERVICE_ROLE_KEY")
+          foreach ($reqKey in $requiredKeys) {
+              $val = $envMap[$reqKey]
+              if ([string]::IsNullOrWhiteSpace($val) -or $val -match "your_password|your_project_ref|your_username") {
+                  throw "Missing or placeholder value for required environment variable: $reqKey. Configure it in host .env or GitHub Actions Secrets."
+              }
+          }
+
+          # 6. Write workspace .env for docker compose
+          $outLines = foreach ($kv in $envMap.GetEnumerator()) { "$($kv.Key)=$($kv.Value)" }
+          Set-Content -Path $workspaceEnv -Value $outLines -Encoding UTF8
+
+          Write-Output "Validated Demo configuration keys (secrets redacted):"
+          Write-Output "  COMPOSE_PROJECT_NAME=$($envMap['COMPOSE_PROJECT_NAME'])"
+          Write-Output "  API_PORT=$($envMap['API_PORT'])"
+          Write-Output "  FRONTEND_PORT=$($envMap['FRONTEND_PORT'])"
+          Write-Output "  VITE_API_BASE_URL=$($envMap['VITE_API_BASE_URL'])"
+          Write-Output "  SUPABASE_URL=$($envMap['SUPABASE_URL'])"
+          Write-Output "  SUPABASE_STORAGE_BUCKET=$($envMap['SUPABASE_STORAGE_BUCKET'])"
+          Write-Output "  SUPABASE_CONNECTION_STRING=<REDACTED_CONFIGURED>"
+          Write-Output "  SUPABASE_SERVICE_ROLE_KEY=<REDACTED_CONFIGURED>"
+
+      - name: Verify Docker Engine & Protect Existing Containers
+        run: |
+          $ErrorActionPreference = "Stop"
+          Write-Output "=== Checking Docker Engine availability ==="
+          docker version --format "Client: {{.Client.Version}} | Server: {{.Server.Version}}"
+
+          Write-Output "=== Existing containers before Demo deploy ==="
+          docker ps -a --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+          # Cleanly transition legacy 'zooguide' compose project containers if they are holding Demo ports
+          $legacyContainers = docker ps -a --filter "label=com.docker.compose.project=zooguide" --format "{{.Names}}"
+          if ($legacyContainers) {
+              Write-Output "Transitioning legacy 'zooguide' project containers ($($legacyContainers -join ', ')) to isolated 'zooguide-demo' project (volumes preserved)..."
+              docker compose -p zooguide down
+          }
+
+      - name: Build & Deploy ZooGuide Demo (docker compose -p zooguide-demo)
+        run: |
+          $ErrorActionPreference = "Stop"
+          docker compose -p zooguide-demo config --quiet
+          docker compose -p zooguide-demo up -d --build --remove-orphans
+          docker compose -p zooguide-demo ps
+
+      - name: Post-Deploy End-to-End Health & API Verification
+        run: |
+          $ErrorActionPreference = "Stop"
+          $envLines = Get-Content ".env"
+          $apiPort = "8080"
+          $frontendPort = "3001"
+          foreach ($l in $envLines) {
+              if ($l -match "^API_PORT=(.+)$") { $apiPort = $Matches[1].Trim() }
+              if ($l -match "^FRONTEND_PORT=(.+)$") { $frontendPort = $Matches[1].Trim() }
+          }
+
+          Write-Output "Waiting for Backend API (http://localhost:$apiPort/api/health) to report Healthy..."
+          $healthy = $false
+          $healthData = $null
+          for ($i = 1; $i -le 30; $i++) {
+              try {
+                  $healthData = Invoke-RestMethod -Uri "http://localhost:$apiPort/api/health" -Method Get -TimeoutSec 5
+                  if ($healthData.status -eq "Healthy" -and $healthData.databaseConnected -eq $true) {
+                      $healthy = $true
+                      break
+                  }
+              } catch {
+                  # Wait for container startup
+              }
+              Start-Sleep -Seconds 3
+          }
+
+          if (-not $healthy) {
+              Write-Output "=== Backend Container Logs ==="
+              docker compose -p zooguide-demo logs api --tail=50
+              throw "Backend API did not become healthy within 90 seconds."
+          }
+
+          Write-Output "Backend API is Healthy and connected to Supabase PostgreSQL:"
+          $healthData | ConvertTo-Json -Depth 4 | Write-Output
+
+          Write-Output "Verifying Frontend Nginx server (http://localhost:$frontendPort/)..."
+          $feResp = Invoke-WebRequest -Uri "http://localhost:$frontendPort/" -UseBasicParsing -TimeoutSec 10
+          if ($feResp.StatusCode -ne 200) {
+              throw "Frontend returned unexpected HTTP status: $($feResp.StatusCode)"
+          }
+          Write-Output "Frontend HTML loaded (HTTP $($feResp.StatusCode), $($feResp.Content.Length) bytes)."
+
+          Write-Output "Verifying Frontend -> Backend Reverse Proxy & Core APIs via port $frontendPort..."
+          $proxyHealth = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/health" -Method Get -TimeoutSec 10
+          $areasResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/areas" -Method Get -TimeoutSec 10
+          $animalsResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/animals" -Method Get -TimeoutSec 10
+          $poisResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/pois" -Method Get -TimeoutSec 10
+          $langsResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/languages" -Method Get -TimeoutSec 10
+          $dashResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/dashboard/stats" -Method Get -TimeoutSec 15
+
+          if (-not $proxyHealth.databaseConnected) { throw "Proxy /api/health reported databaseConnected=false" }
+          if (-not $dashResp.success) { throw "Dashboard stats endpoint returned success=false" }
+
+          Write-Output "End-to-End Demo Verification PASSED:"
+          Write-Output "  - Frontend URL: http://localhost:$frontendPort/"
+          Write-Output "  - Admin Dashboard URL: http://localhost:$frontendPort/admin"
+          Write-Output "  - Backend Health URL: http://localhost:$apiPort/api/health"
+          Write-Output "  - Database Counts: Animals=$($healthData.counts.animals), Areas=$($healthData.counts.areas), POIs=$($poisResp.data.Count), Languages=$($langsResp.data.Count)"
+
+          Write-Output "=== Final Container Status (All Host Containers) ==="
+          docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+  # ============================================================================
+  # JOB 5: CONTINUOUS DELIVERY (PRODUCTION) - Strictly main branch only
   # ============================================================================
   deploy-production:
     name: Deploy to Production Server (CD)
