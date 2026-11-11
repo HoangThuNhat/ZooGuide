@@ -142,7 +142,6 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         currentLang,
         currentSession,
         hasActiveSession,
-        currentSession,
         setIsTicketModalOpen,
         audioState,
         t

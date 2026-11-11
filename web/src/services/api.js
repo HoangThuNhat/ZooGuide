@@ -9,7 +9,6 @@ export const API_CONFIG = {
     TIMEOUT_MS: 12000
 };
 
-<<<<<<< HEAD
 export const OFFLINE_CACHE_CONFIG = {
     PREFIX: 'zg_offline_tour_v1:',
     VERSION: '1.2.0',
@@ -68,20 +67,11 @@ function readOfflineTourCache(cacheKey) {
             }));
         }
         return { data: parsed.data, cachedAt: parsed.cachedAt };
-=======
-export const AUTH_STORAGE_KEY = 'zooguide_admin_auth_token';
-export const AUTH_USER_KEY = 'zooguide_admin_user_profile';
-
-export function getAuthToken() {
-    try {
-        return localStorage.getItem(AUTH_STORAGE_KEY);
->>>>>>> 2995a63 (feat: implement admin authentication, secure payment webhook, and responsive UI)
     } catch {
         return null;
     }
 }
 
-<<<<<<< HEAD
 export function pruneOfflineTourCache() {
     if (typeof window === 'undefined' || !window.localStorage) return 0;
     let removed = 0;
@@ -174,7 +164,18 @@ export function clearOfflineTourCache() {
 
 // Automatically prune stale or outdated offline tour cache entries on module load
 pruneOfflineTourCache();
-=======
+
+export const AUTH_STORAGE_KEY = 'zooguide_admin_auth_token';
+export const AUTH_USER_KEY = 'zooguide_admin_user_profile';
+
+export function getAuthToken() {
+    try {
+        return localStorage.getItem(AUTH_STORAGE_KEY);
+    } catch {
+        return null;
+    }
+}
+
 export function setAuthSession(token, user) {
     try {
         if (token) localStorage.setItem(AUTH_STORAGE_KEY, token);
@@ -222,7 +223,6 @@ export async function authFetch(url, options = {}) {
     }
     return res;
 }
->>>>>>> 2995a63 (feat: implement admin authentication, secure payment webhook, and responsive UI)
 
 const AREA_COLORS = {
     'A': '#15803D',
