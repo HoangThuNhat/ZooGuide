@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs.Species;
 using ZooGuide.Application.Interfaces;
@@ -16,6 +17,7 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<IEnumerable<SpeciesDto>>> GetAll(
         [FromQuery] string? search = null,
         [FromQuery] string? conservationStatus = null,
@@ -26,6 +28,7 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<ActionResult<SpeciesDto>> GetById(int id, [FromQuery] string? lang = null)
     {
         var species = await _speciesService.GetByIdAsync(id, lang);
@@ -36,6 +39,7 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<SpeciesDto>> Create(SpeciesCreateRequest request)
     {
         try
@@ -54,6 +58,7 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<SpeciesDto>> Update(int id, SpeciesUpdateRequest request)
     {
         try
@@ -75,6 +80,7 @@ public class SpeciesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> Delete(int id)
     {
         try

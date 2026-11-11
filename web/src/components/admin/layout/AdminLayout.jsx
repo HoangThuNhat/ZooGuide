@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { NavLink, Link, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import ZooApi, { getStoredUser } from '../../../services/api';
 
 export default function AdminLayout() {
     const location = useLocation();
+    const navigate = useNavigate();
+    const [currentUser, setCurrentUser] = useState(() => getStoredUser());
 
     // Persistent desktop sidebar state (default: open on desktop)
     const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(() => {
@@ -33,6 +36,19 @@ export default function AdminLayout() {
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
+
+    useEffect(() => {
+        const u = getStoredUser();
+        if (u) setCurrentUser(u);
+    }, [location.pathname]);
+
+    const handleLogout = async () => {
+        try {
+            await ZooApi.logout();
+        } finally {
+            navigate('/admin/login', { replace: true });
+        }
+    };
 
     // Toggle handler
     const handleToggleSidebar = () => {
@@ -130,8 +146,19 @@ export default function AdminLayout() {
                     ))}
                 </nav>
 
-                {/* Back to Visitor Portal Button */}
+                {/* Back to Visitor Portal Button & User Session */}
                 <div className="admin-sidebar-footer">
+                    {currentUser && (
+                        <div className="admin-sidebar-user-info">
+                            <div className="admin-user-avatar">
+                                {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'A'}
+                            </div>
+                            <div className="admin-user-meta">
+                                <span className="admin-user-name">{currentUser.fullName || currentUser.username}</span>
+                                <span className="admin-user-role-badge">{currentUser.role === 'Admin' ? 'Quản trị viên' : 'Nhân viên'}</span>
+                            </div>
+                        </div>
+                    )}
                     <Link
                         to="/"
                         className="admin-sidebar-visitor-link"
@@ -145,6 +172,21 @@ export default function AdminLayout() {
                         </span>
                         <span className="admin-nav-text">Về Website Khách</span>
                     </Link>
+                    <button
+                        type="button"
+                        className="admin-sidebar-logout-btn"
+                        onClick={handleLogout}
+                        title="Đăng xuất"
+                    >
+                        <span className="admin-sidebar-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                        </span>
+                        <span className="admin-nav-text">Đăng Xuất</span>
+                    </button>
                 </div>
             </aside>
 
@@ -175,10 +217,28 @@ export default function AdminLayout() {
                     </div>
 
                     <div className="admin-header-right">
-                        <div className="admin-online-indicator" title="Kết nối máy chủ ổn định">
-                            <span className="admin-online-dot" />
-                            <span>Hệ thống trực tuyến</span>
-                        </div>
+                        {currentUser && (
+                            <div className="admin-header-user" title={`Đang đăng nhập: ${currentUser.fullName || currentUser.username}`}>
+                                <div className="admin-user-avatar-small">
+                                    {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'A'}
+                                </div>
+                                <span className="admin-user-name-small">{currentUser.fullName || currentUser.username}</span>
+                                <span className="admin-badge-small">{currentUser.role}</span>
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            className="admin-header-logout-btn"
+                            onClick={handleLogout}
+                            title="Đăng xuất khỏi phân hệ quản trị"
+                        >
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                <polyline points="16 17 21 12 16 7"></polyline>
+                                <line x1="21" y1="12" x2="9" y2="12"></line>
+                            </svg>
+                            <span>Đăng Xuất</span>
+                        </button>
                         <Link to="/" className="admin-header-primary-btn">
                             Mở Trang Khách
                         </Link>

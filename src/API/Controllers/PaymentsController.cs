@@ -30,9 +30,16 @@ public class PaymentsController : ControllerBase
     {
         // Lấy token xác thực từ Header Authorization hoặc X-Webhook-Secret nếu có
         string? signature = Request.Headers["Authorization"].FirstOrDefault() ?? Request.Headers["X-Webhook-Secret"].FirstOrDefault();
-        if (signature != null && signature.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        if (!string.IsNullOrWhiteSpace(signature))
         {
-            signature = signature.Substring("Bearer ".Length).Trim();
+            if (signature.StartsWith("Apikey ", StringComparison.OrdinalIgnoreCase))
+            {
+                signature = signature.Substring("Apikey ".Length).Trim();
+            }
+            else if (signature.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+            {
+                signature = signature.Substring("Bearer ".Length).Trim();
+            }
         }
 
         var success = await _orderService.ProcessPaymentWebhookAsync(payload, signature);

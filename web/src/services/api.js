@@ -9,6 +9,7 @@ export const API_CONFIG = {
     TIMEOUT_MS: 12000
 };
 
+<<<<<<< HEAD
 export const OFFLINE_CACHE_CONFIG = {
     PREFIX: 'zg_offline_tour_v1:',
     VERSION: '1.2.0',
@@ -67,11 +68,20 @@ function readOfflineTourCache(cacheKey) {
             }));
         }
         return { data: parsed.data, cachedAt: parsed.cachedAt };
+=======
+export const AUTH_STORAGE_KEY = 'zooguide_admin_auth_token';
+export const AUTH_USER_KEY = 'zooguide_admin_user_profile';
+
+export function getAuthToken() {
+    try {
+        return localStorage.getItem(AUTH_STORAGE_KEY);
+>>>>>>> 2995a63 (feat: implement admin authentication, secure payment webhook, and responsive UI)
     } catch {
         return null;
     }
 }
 
+<<<<<<< HEAD
 export function pruneOfflineTourCache() {
     if (typeof window === 'undefined' || !window.localStorage) return 0;
     let removed = 0;
@@ -164,6 +174,55 @@ export function clearOfflineTourCache() {
 
 // Automatically prune stale or outdated offline tour cache entries on module load
 pruneOfflineTourCache();
+=======
+export function setAuthSession(token, user) {
+    try {
+        if (token) localStorage.setItem(AUTH_STORAGE_KEY, token);
+        if (user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+    } catch (e) {
+        console.warn('Cannot write auth session to localStorage:', e);
+    }
+}
+
+export function clearAuthSession() {
+    try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(AUTH_USER_KEY);
+    } catch (e) {
+        console.warn('Cannot clear auth session:', e);
+    }
+}
+
+export function getStoredUser() {
+    try {
+        const raw = localStorage.getItem(AUTH_USER_KEY);
+        return raw ? JSON.parse(raw) : null;
+    } catch {
+        return null;
+    }
+}
+
+export function getAuthHeaders(extraHeaders = {}) {
+    const headers = { ...extraHeaders };
+    const token = getAuthToken();
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
+}
+
+export async function authFetch(url, options = {}) {
+    const headers = getAuthHeaders(options.headers || {});
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401) {
+        clearAuthSession();
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+            window.dispatchEvent(new CustomEvent('zooguide:unauthorized'));
+        }
+    }
+    return res;
+}
+>>>>>>> 2995a63 (feat: implement admin authentication, secure payment webhook, and responsive UI)
 
 const AREA_COLORS = {
     'A': '#15803D',
@@ -229,6 +288,79 @@ function mapAnimalDto(a) {
 }
 
 export const ZooApi = {
+    // AUTHENTICATION & ADMIN ROLES
+    async login(username, password) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.success) {
+                return {
+                    success: false,
+                    status: res.status,
+                    message: json?.message || (res.status === 401 ? 'Tên đăng nhập hoặc mật khẩu không chính xác.' : 'Đăng nhập không thành công.')
+                };
+            }
+            if (json.data?.token) {
+                setAuthSession(json.data.token, json.data.user);
+            }
+            return {
+                success: true,
+                data: json.data,
+                user: json.data?.user,
+                token: json.data?.token,
+                message: json.message
+            };
+        } catch (err) {
+            console.error('ZooApi.login error:', err);
+            return { success: false, message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại mạng.' };
+        }
+    },
+
+    async getCurrentUser() {
+        try {
+            const token = getAuthToken();
+            if (!token) return { success: false, message: 'Chưa đăng nhập' };
+
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/auth/me`);
+            if (!res.ok) {
+                clearAuthSession();
+                return { success: false, status: res.status };
+            }
+            const json = await res.json();
+            if (json.data) {
+                setAuthSession(token, json.data);
+            }
+            return { success: true, data: json.data, user: json.data };
+        } catch (err) {
+            console.error('ZooApi.getCurrentUser error:', err);
+            return { success: false, message: err.message };
+        }
+    },
+
+    async logout() {
+        try {
+            const token = getAuthToken();
+            if (token) {
+                await authFetch(`${API_CONFIG.BASE_URL}/auth/logout`, { method: 'POST' }).catch(() => {});
+            }
+        } finally {
+            clearAuthSession();
+        }
+        return { success: true };
+    },
+
+    isAuthenticated() {
+        return Boolean(getAuthToken());
+    },
+
+    getStoredUser() {
+        return getStoredUser();
+    },
+
     // 0. HEALTH CHECK
     async checkHealth() {
         try {
@@ -482,7 +614,7 @@ export const ZooApi = {
                 mapX: data.mapX ? parseFloat(data.mapX) : null,
                 mapY: data.mapY ? parseFloat(data.mapY) : null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -511,7 +643,7 @@ export const ZooApi = {
                 mapX: data.mapX ? parseFloat(data.mapX) : null,
                 mapY: data.mapY ? parseFloat(data.mapY) : null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -530,7 +662,7 @@ export const ZooApi = {
 
     async deleteEnclosure(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
                 method: 'DELETE'
             });
             if (!res.ok) {
@@ -546,7 +678,7 @@ export const ZooApi = {
 
     async moveAnimalEnclosure(animalId, targetEnclosureId) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/enclosures/move-animal`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures/move-animal`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -797,7 +929,7 @@ export const ZooApi = {
                 actionRequired: record.actionRequired || ''
             };
 
-            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/health-logs`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/dashboard/health-logs`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -820,7 +952,7 @@ export const ZooApi = {
 
     async updateAnimalHealth(animalId, record) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${animalId}/health`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/animals/${animalId}/health`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -920,7 +1052,7 @@ export const ZooApi = {
                 referenceSource: data.referenceSource || '',
                 imageUrl: data.imageUrl || ''
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/species`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/species`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -950,7 +1082,7 @@ export const ZooApi = {
                 referenceSource: data.referenceSource || '',
                 imageUrl: data.imageUrl || ''
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/species/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/species/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -969,7 +1101,7 @@ export const ZooApi = {
 
     async deleteSpecies(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/species/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/species/${id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.message || 'Lỗi xóa species');
@@ -1004,7 +1136,7 @@ export const ZooApi = {
                 healthActionRequired: data.healthActionRequired || null,
                 referenceSource: data.referenceSource || null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/animals`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1043,7 +1175,7 @@ export const ZooApi = {
                 healthActionRequired: data.healthActionRequired || null,
                 referenceSource: data.referenceSource || null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1062,7 +1194,7 @@ export const ZooApi = {
 
     async deleteAnimal(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/animals/${id}`, {
                 method: 'DELETE'
             });
             if (!res.ok) throw new Error('Lỗi xóa động vật trên máy chủ');
@@ -1087,7 +1219,7 @@ export const ZooApi = {
                 mapX: data.mapX != null && data.mapX !== '' ? parseFloat(data.mapX) : null,
                 mapY: data.mapY != null && data.mapY !== '' ? parseFloat(data.mapY) : null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/areas`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/areas`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1118,7 +1250,7 @@ export const ZooApi = {
                 mapX: data.mapX != null && data.mapX !== '' ? parseFloat(data.mapX) : null,
                 mapY: data.mapY != null && data.mapY !== '' ? parseFloat(data.mapY) : null
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1138,7 +1270,7 @@ export const ZooApi = {
     async deleteArea(id) {
         try {
             const numId = typeof id === 'number' ? id : (parseInt(String(id).replace('zone-', '')) || 1);
-            const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/areas/${numId}`, {
                 method: 'DELETE'
             });
             if (!res.ok) {
@@ -1155,7 +1287,7 @@ export const ZooApi = {
     // 11. ADMIN: TICKETS CRUD
     async getTickets() {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const rawList = Array.isArray(data) ? data : (data.data || []);
@@ -1261,7 +1393,7 @@ export const ZooApi = {
             if (status && status !== 'all') params.append('status', status);
 
             const qs = params.toString() ? `?${params.toString()}` : '';
-            const res = await fetch(`${API_CONFIG.BASE_URL}/orders${qs}`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/orders${qs}`);
             const json = await res.json();
             if (!res.ok) throw new Error(json.message || `HTTP ${res.status}`);
             return { success: true, data: json.data || [] };
@@ -1312,7 +1444,7 @@ export const ZooApi = {
 
     async createTicket(data) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
@@ -1355,7 +1487,7 @@ export const ZooApi = {
             if (status === 'Cancelled' || status === 4) targetStatus = 4;
             if (status === 'Locked' || status === 5) targetStatus = 5;
 
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${ticketId}/status`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/${ticketId}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(targetStatus)
@@ -1371,7 +1503,7 @@ export const ZooApi = {
 
     async deleteTicket(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/${id}`, {
                 method: 'DELETE'
             });
             if (!res.ok) {
@@ -1422,7 +1554,7 @@ export const ZooApi = {
                 durationMinutes: 240,
                 isActive: true
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/ticket-types`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1455,7 +1587,7 @@ export const ZooApi = {
                 durationMinutes: 240,
                 isActive: data.isActive !== false
             };
-            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(reqData)
@@ -1473,7 +1605,7 @@ export const ZooApi = {
 
     async deleteTicketType(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, { method: 'DELETE' });
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/ticket-types/${id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const errData = await res.json().catch(() => ({}));
                 throw new Error(errData.message || 'Lỗi xóa loại vé');
@@ -1488,7 +1620,7 @@ export const ZooApi = {
     // 13. ADMIN: TICKET SESSIONS
     async getTicketSessions() {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/sessions`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const list = Array.isArray(data) ? data : (data.data || []);
@@ -1501,7 +1633,7 @@ export const ZooApi = {
 
     async revokeTicketSession(sessionId) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/tickets/sessions/${sessionId}/revoke`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/sessions/${sessionId}/revoke`, {
                 method: 'POST'
             });
             if (res.ok) {
@@ -1566,7 +1698,7 @@ export const ZooApi = {
             if (filter.fromDate) params.append('fromDate', filter.fromDate);
             if (filter.toDate) params.append('toDate', filter.toDate);
             const qs = params.toString() ? `?${params.toString()}` : '';
-            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/stats${qs}`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/dashboard/stats${qs}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return { success: true, data: data.data || data };
@@ -1578,7 +1710,7 @@ export const ZooApi = {
 
     async getOnlineUsers() {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/online-users`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/dashboard/online-users`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return { success: true, data: data.data || data };
@@ -1628,7 +1760,7 @@ export const ZooApi = {
 
     async verifyDashboardAudioStorage(forceRefresh = true) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/verify-audio?forceRefresh=${Boolean(forceRefresh)}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/dashboard/verify-audio?forceRefresh=${Boolean(forceRefresh)}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
@@ -1643,7 +1775,7 @@ export const ZooApi = {
 
     async updateDashboardAlertStatus(alertKey, status, note = '') {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/alerts/status`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/dashboard/alerts/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ alertKey, status, note })
@@ -1660,7 +1792,7 @@ export const ZooApi = {
     // 15. ADMIN: AUDIT LOGS
     async getAdminLogs(limit = 50) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/admin/logs?limit=${limit}`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/admin/logs?limit=${limit}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return { success: true, data: data.data || data };
@@ -1692,7 +1824,7 @@ export const ZooApi = {
 
     async createNarration(payload) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1709,7 +1841,7 @@ export const ZooApi = {
 
     async updateNarration(id, payload) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1726,7 +1858,7 @@ export const ZooApi = {
 
     async updateNarrationStatus(id, status) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/status`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status })
@@ -1743,7 +1875,7 @@ export const ZooApi = {
 
     async deleteNarration(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations/${id}`, {
                 method: 'DELETE'
             });
             if (!res.ok) {
@@ -1758,7 +1890,7 @@ export const ZooApi = {
 
     async addNarrationAudio(id, audioData) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/audio`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations/${id}/audio`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(audioData)
@@ -1775,7 +1907,7 @@ export const ZooApi = {
         try {
             const formData = new FormData();
             formData.append('file', file);
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations/${id}/upload-audio`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations/${id}/upload-audio`, {
                 method: 'POST',
                 body: formData
             });
@@ -1848,7 +1980,7 @@ export const ZooApi = {
 
     async upsertContentTranslation(dto) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/languages/translations`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/languages/translations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -1910,7 +2042,7 @@ export const ZooApi = {
 
     async getActiveDevicesSummary() {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/devices/active-count`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/devices/active-count`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return { success: true, data: data.data || data };
@@ -1992,7 +2124,7 @@ export const ZooApi = {
 
     async createPoi(dto) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -2008,7 +2140,7 @@ export const ZooApi = {
 
     async updatePoi(id, dto) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -2024,7 +2156,7 @@ export const ZooApi = {
 
     async updatePoiStatus(id, isActive) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}/status?isActive=${Boolean(isActive)}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${id}/status?isActive=${Boolean(isActive)}`, {
                 method: 'PATCH'
             });
             const data = await res.json();
@@ -2038,7 +2170,7 @@ export const ZooApi = {
 
     async verifyPoiCoordinates(id, isVerified, verificationSource = '') {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}/verify-coordinates`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${id}/verify-coordinates`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ isVerified, verificationSource })
@@ -2054,7 +2186,7 @@ export const ZooApi = {
 
     async deletePoi(id) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${id}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
@@ -2080,7 +2212,7 @@ export const ZooApi = {
 
     async addPoiNarration(poiId, dto) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -2096,7 +2228,7 @@ export const ZooApi = {
 
     async updatePoiNarration(poiId, narrationId, dto) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(dto)
@@ -2112,7 +2244,7 @@ export const ZooApi = {
 
     async deletePoiNarration(poiId, narrationId) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}`, {
                 method: 'DELETE'
             });
             const data = await res.json();
@@ -2128,7 +2260,7 @@ export const ZooApi = {
         try {
             const formData = new FormData();
             formData.append('audioFile', file);
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}/audio`, {
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations/${narrationId}/audio`, {
                 method: 'POST',
                 body: formData
             });
@@ -2182,3 +2314,5 @@ export const ZooApi = {
         }
     }
 };
+
+export default ZooApi;

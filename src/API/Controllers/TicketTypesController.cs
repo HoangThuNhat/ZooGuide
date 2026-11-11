@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs.TicketType;
 using ZooGuide.Application.Interfaces;
@@ -16,6 +17,7 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpGet]
+    [AllowAnonymous]
     public async Task<ActionResult<IEnumerable<TicketTypeDto>>> GetAll([FromQuery] string? lang = null)
     {
         var ticketTypes = await _ticketTypeService.GetAllAsync(lang);
@@ -23,6 +25,7 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [AllowAnonymous]
     public async Task<ActionResult<TicketTypeDto>> GetById(int id, [FromQuery] string? lang = null)
     {
         var ticketType = await _ticketTypeService.GetByIdAsync(id, lang);
@@ -33,6 +36,7 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<TicketTypeDto>> Create(TicketTypeCreateRequest request)
     {
         try
@@ -51,6 +55,7 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<TicketTypeDto>> Update(int id, TicketTypeUpdateRequest request)
     {
         try
@@ -72,6 +77,7 @@ public class TicketTypesController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> Delete(int id)
     {
         try

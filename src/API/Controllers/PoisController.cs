@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -23,6 +24,7 @@ public class PoisController : ControllerBase
     /// Lấy danh sách điểm tham quan (POI) có hỗ trợ tìm kiếm, lọc phân loại và kiểm định tọa độ
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<PoiDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll([FromQuery] PoiFilterDto filter)
     {
@@ -34,6 +36,7 @@ public class PoisController : ControllerBase
     /// Lấy thông tin chi tiết một điểm tham quan theo ID
     /// </summary>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id)
@@ -50,6 +53,7 @@ public class PoisController : ControllerBase
     /// Tạo mới một điểm tham quan
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreatePoiDto dto)
@@ -59,10 +63,10 @@ public class PoisController : ControllerBase
             return BadRequest(ApiResponse<PoiDto>.Fail("Tên điểm tham quan không được để trống."));
         }
         if (dto.RadiusMeters < 0)
-{
-    return BadRequest(
-        ApiResponse<PoiDto>.Fail("Bán kính POI không được âm."));
-}
+        {
+            return BadRequest(
+                ApiResponse<PoiDto>.Fail("Bán kính POI không được âm."));
+        }
 
         try
         {
@@ -83,6 +87,7 @@ public class PoisController : ControllerBase
     /// Cập nhật thông tin điểm tham quan
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<PoiDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdatePoiDto dto)
@@ -99,6 +104,7 @@ public class PoisController : ControllerBase
     /// Bật/tắt trạng thái hoạt động của điểm tham quan
     /// </summary>
     [HttpPatch("{id:int}/status")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(int id, [FromQuery] bool isActive)
@@ -115,6 +121,7 @@ public class PoisController : ControllerBase
     /// Xác nhận kiểm định tọa độ địa lý WGS84 thực tế
     /// </summary>
     [HttpPatch("{id:int}/verify-coordinates")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> VerifyCoordinates(int id, [FromBody] VerifyCoordinatesRequest request)
@@ -131,6 +138,7 @@ public class PoisController : ControllerBase
     /// Xóa điểm tham quan
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
@@ -149,6 +157,7 @@ public class PoisController : ControllerBase
     /// Danh sách bài thuyết minh đa ngôn ngữ của điểm tham quan
     /// </summary>
     [HttpGet("{id:int}/narrations")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<PoiNarrationDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNarrations(int id)
     {
@@ -160,6 +169,7 @@ public class PoisController : ControllerBase
     /// Thêm mới bài thuyết minh theo ngôn ngữ cho điểm tham quan
     /// </summary>
     [HttpPost("{id:int}/narrations")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> AddNarration(int id, [FromBody] CreatePoiNarrationDto dto)
@@ -184,6 +194,7 @@ public class PoisController : ControllerBase
     /// Cập nhật nội dung hoặc trạng thái bài thuyết minh
     /// </summary>
     [HttpPut("{id:int}/narrations/{narrationId:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateNarration(int id, int narrationId, [FromBody] UpdatePoiNarrationDto dto)
@@ -200,6 +211,7 @@ public class PoisController : ControllerBase
     /// Xóa bài thuyết minh
     /// </summary>
     [HttpDelete("{id:int}/narrations/{narrationId:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<bool>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteNarration(int id, int narrationId)
@@ -216,6 +228,7 @@ public class PoisController : ControllerBase
     /// Upload file âm thanh (MP3 / WAV) cho bài thuyết minh POI vào Supabase Storage
     /// </summary>
     [HttpPost("{id:int}/narrations/{narrationId:int}/audio")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<PoiNarrationDto>), StatusCodes.Status404NotFound)]

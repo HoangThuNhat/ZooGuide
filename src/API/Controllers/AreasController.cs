@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
@@ -21,6 +22,7 @@ public class AreasController : ControllerBase
     /// Lấy danh sách toàn bộ khu vực trong sở thú
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<AreaResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAreas([FromQuery] string? lang = null)
     {
@@ -32,6 +34,7 @@ public class AreasController : ControllerBase
     /// Lấy chi tiết một khu vực theo AreaId
     /// </summary>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAreaById(int id, [FromQuery] string? lang = null)
@@ -49,6 +52,7 @@ public class AreasController : ControllerBase
     /// Thêm mới khu vực sở thú (Validate vĩ độ [-90, 90], kinh độ [-180, 180], bán kính > 0, tên không rỗng)
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateArea([FromBody] CreateAreaDto dto)
@@ -95,6 +99,7 @@ public class AreasController : ControllerBase
     /// Cập nhật thông tin khu vực theo AreaId
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<AreaResponseDto>), StatusCodes.Status404NotFound)]
@@ -141,6 +146,7 @@ public class AreasController : ControllerBase
     /// Xóa khu vực (Kiểm tra ràng buộc động vật; chặn xóa hoặc đổi status sang Closed)
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]

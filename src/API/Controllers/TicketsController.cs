@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.API.Filters;
@@ -26,6 +27,7 @@ public class TicketsController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Roles = "Admin,Staff")]
     public async Task<ActionResult<IEnumerable<TicketDto>>> GetAll(
         [FromQuery] string? search = null,
         [FromQuery] int? ticketTypeId = null,
@@ -38,6 +40,7 @@ public class TicketsController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     public async Task<ActionResult<TicketDto>> GetById(int id)
     {
         var ticket = await _ticketService.GetByIdAsync(id);
@@ -51,6 +54,7 @@ public class TicketsController : ControllerBase
     /// Admin phát hành vé trực tiếp / vé sự kiện tại quầy
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<ApiResponse<TicketDto>>> Create([FromBody] TicketCreateRequest request)
     {
         try
@@ -76,6 +80,7 @@ public class TicketsController : ControllerBase
     /// Cập nhật thông tin vé đã tồn tại (hạn dùng, loại vé)
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<TicketDto>> Update(int id, [FromBody] TicketUpdateRequest request)
     {
         try
@@ -100,6 +105,7 @@ public class TicketsController : ControllerBase
     /// Admin cập nhật trạng thái quản lý / sử dụng của vé (Valid, Used, Expired, Cancelled, Locked) (Nghiệp vụ 5.2 & 5.3)
     /// </summary>
     [HttpPatch("{id:int}/status")]
+    [Authorize(Roles = "Admin,Staff")]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] TicketStatus status)
     {
         try
@@ -120,6 +126,7 @@ public class TicketsController : ControllerBase
     /// Xóa hoặc thu hồi vé khi chưa được sử dụng
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult> Delete(int id)
     {
         try
@@ -140,6 +147,7 @@ public class TicketsController : ControllerBase
     /// Xác thực mã vé (QR/Barcode) từ du khách và khởi tạo phiên tham quan (Ticket Session)
     /// </summary>
     [HttpPost("validate")]
+    [AllowAnonymous]
     public async Task<ActionResult<ValidateTicketResponse>> Validate([FromBody] ValidateTicketRequest request)
     {
         var response = await _ticketService.ValidateAsync(request);
@@ -175,6 +183,7 @@ public class TicketsController : ControllerBase
     /// Lấy danh sách các phiên tham quan (Dành cho trang Giám sát phiên tham quan của Ban Quản Lý)
     /// </summary>
     [HttpGet("sessions")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<TicketSessionDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetSessions()
     {
@@ -186,6 +195,7 @@ public class TicketsController : ControllerBase
     /// Đóng/thu hồi phiên tham quan theo SessionId (Dành cho Quản trị viên và Khách tham quan)
     /// </summary>
     [HttpPost("sessions/{sessionId:guid}/revoke")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> RevokeSession(Guid sessionId)
@@ -203,6 +213,7 @@ public class TicketsController : ControllerBase
     /// Khách tham quan thoát phiên tham quan từ thiết bị (Nút Thoát vé bên trong thẻ điện tử)
     /// </summary>
     [HttpPost("sessions/exit")]
+    [AllowAnonymous]
     public async Task<IActionResult> ExitSession([FromBody] ExitSessionRequest? request)
     {
         Guid targetSessionId = Guid.Empty;

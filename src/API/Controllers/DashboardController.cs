@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
@@ -12,6 +13,7 @@ namespace ZooGuide.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin,Staff")]
 public class DashboardController : ControllerBase
 {
     private readonly IDashboardService _dashboardService;
@@ -43,6 +45,7 @@ public class DashboardController : ControllerBase
     /// và phát thông báo thời gian thực qua SignalR cho Admin Dashboard
     /// </summary>
     [HttpPost("telemetry")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<TelemetryEventDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> RecordTelemetryEvent(
         [FromBody] RecordTelemetryEventRequest request,

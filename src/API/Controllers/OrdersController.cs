@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs.Common;
@@ -104,6 +105,7 @@ public class OrdersController : ControllerBase
     /// Danh sách tất cả đơn hàng (Hỗ trợ tìm kiếm, lọc trạng thái, phân trang máy chủ)
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<OrderDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? search = null,

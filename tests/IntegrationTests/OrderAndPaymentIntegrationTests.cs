@@ -232,6 +232,104 @@ public class OrderAndPaymentIntegrationTests : IDisposable
     }
 
     // =========================================================================
+    // 4b. KIỂM THỬ XÁC THỰC WEBHOOK SECRET / CHỮ KÝ BẢO MẬT (YÊU CẦU STT 7)
+    // =========================================================================
+    [Fact]
+    public async Task PaymentWebhook_WithInvalidSignature_ShouldReject()
+    {
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 1,
+            Quantity = 1,
+            CustomerName = "Kiểm Thử Chữ Ký Sai",
+            CustomerEmail = "sig@test.com",
+            CustomerPhone = "0900000000"
+        });
+
+        var payload = new PaymentWebhookPayload
+        {
+            TransferAmount = 120000m,
+            Content = $"THANH TOAN {order.PaymentDescription}",
+            ReferenceCode = "REF-WRONG-SIG"
+        };
+
+        // Gửi kèm signature sai
+        var result = await _orderService.ProcessPaymentWebhookAsync(payload, "InvalidSecretKey123");
+        Assert.False(result);
+
+        // Đơn hàng vẫn ở trạng thái Pending, không cấp vé
+        var orderAfter = await _orderService.GetByOrderCodeAsync(order.OrderCode);
+        Assert.Equal(PaymentStatus.Pending, orderAfter!.PaymentStatus);
+        Assert.Empty(orderAfter.IssuedTickets);
+    }
+
+    [Fact]
+    public async Task PaymentsController_HandleWebhook_WithVariousAuthHeaders_ShouldParseAndVerify()
+    {
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 2,
+            Quantity = 1,
+            CustomerName = "Kiểm Thử Controller Webhook",
+            CustomerEmail = "ctrl@test.com",
+            CustomerPhone = "0911111111"
+        });
+
+        var controller = new PaymentsController(_orderService);
+        var httpContext = new DefaultHttpContext();
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext
+        };
+
+        var payload = new PaymentWebhookPayload
+        {
+            TransferAmount = 60000m,
+            Content = $"THANH TOAN {order.PaymentDescription}",
+            ReferenceCode = "REF-CTRL-SEPAY"
+        };
+
+        // 1. Gửi header sai -> BadRequest (400)
+        httpContext.Request.Headers["Authorization"] = "Bearer WrongSecret";
+        var badResult = await controller.HandleWebhook(payload);
+        var badResponse = Assert.IsType<BadRequestObjectResult>(badResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, badResponse.StatusCode);
+
+        // 2. Gửi header đúng chuẩn Apikey của SePay -> Ok (200)
+        httpContext.Request.Headers["Authorization"] = "Apikey ZooGuideSecKey2026";
+        var okResult = await controller.HandleWebhook(payload);
+        var okResponse = Assert.IsType<OkObjectResult>(okResult);
+        Assert.Equal(StatusCodes.Status200OK, okResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetOrderByCode_LookupPurchasedOrder_ReturnsAccurateStatusAndTickets()
+    {
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 1,
+            Quantity = 2,
+            CustomerName = "Khách Hàng Tra Cứu",
+            CustomerEmail = "lookup@zooguide.vn",
+            CustomerPhone = "0922222222"
+        });
+
+        // Thanh toán qua sandbox
+        await _orderService.SimulateSandboxPaymentAsync(new SimulatePaymentRequest { OrderCode = order.OrderCode });
+
+        // Tra cứu lại theo mã đơn hàng
+        var retrieved = await _orderService.GetByOrderCodeAsync(order.OrderCode);
+        Assert.NotNull(retrieved);
+        Assert.Equal(PaymentStatus.Paid, retrieved.PaymentStatus);
+        Assert.Equal(2, retrieved.IssuedTickets.Count);
+        Assert.All(retrieved.IssuedTickets, t =>
+        {
+            Assert.StartsWith("ZG-", t.TicketCode);
+            Assert.Equal(TicketStatus.Valid, t.Status);
+        });
+    }
+
+    // =========================================================================
     // 5. KIỂM THỬ SIMULATE SANDBOX PAYMENT (YÊU CẦU 6.1 & 9.3)
     // =========================================================================
     [Fact]

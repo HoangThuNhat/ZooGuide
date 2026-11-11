@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
@@ -21,6 +22,7 @@ public class AnimalsController : ControllerBase
     /// Lấy danh sách cá thể động vật kèm thông tin giống loài (Hỗ trợ tìm kiếm, lọc theo phân khu, tình trạng bảo tồn)
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<AnimalResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAnimals([FromQuery] AnimalFilterDto filter)
     {
@@ -37,6 +39,7 @@ public class AnimalsController : ControllerBase
     /// Lấy chi tiết một cá thể động vật theo AnimalId kèm hồ sơ giống loài và phân khu
     /// </summary>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<AnimalDetailDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AnimalDetailDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetAnimalById(int id, [FromQuery] string? lang = null)
@@ -54,6 +57,7 @@ public class AnimalsController : ControllerBase
     /// Thêm mới cá thể động vật (Kiểm tra giống loài SpeciesId và phân khu AreaId có tồn tại không)
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateAnimal([FromBody] CreateAnimalDto dto)
@@ -82,6 +86,7 @@ public class AnimalsController : ControllerBase
     /// Cập nhật thông tin cá thể động vật (Kiểm tra giống loài mới nếu có thay đổi)
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status404NotFound)]
@@ -111,6 +116,7 @@ public class AnimalsController : ControllerBase
     /// Xóa hồ sơ động vật (Kiểm tra dữ liệu thuyết minh; xóa an toàn hoặc chuyển trạng thái sang Transferred)
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DeleteAnimal(int id)
@@ -128,6 +134,7 @@ public class AnimalsController : ControllerBase
     /// Cập nhật hồ sơ khám sức khỏe thú y thực tế cho cá thể động vật
     /// </summary>
     [HttpPatch("{id:int}/health")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AnimalResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateAnimalHealth(int id, [FromBody] UpdateAnimalHealthDto dto)

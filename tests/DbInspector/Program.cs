@@ -24,75 +24,27 @@ class Program
         using var conn = new NpgsqlConnection(pgConnStr);
         conn.Open();
 
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
-
-        Console.WriteLine("=== VERIFYING ALL 28 POI AUDIOS IN DATABASE ===");
-        int total = 0;
-        int valid = 0;
-        int invalid = 0;
-
+        Console.WriteLine("\n=== CURRENT USERS IN DATABASE ===");
         using (var cmd = new NpgsqlCommand(@"
-            SELECT pn.""PoiNarrationId"", p.""Code"", p.""Name"", l.""Code"" as Lang, pn.""AudioUrl"", pn.""DurationSeconds""
-            FROM ""POI_NARRATIONS"" pn
-            JOIN ""POINTS_OF_INTEREST"" p ON pn.""PoiId"" = p.""PoiId""
-            JOIN ""LANGUAGES"" l ON pn.""LanguageId"" = l.""LanguageId""
-            ORDER BY pn.""PoiNarrationId"";", conn))
+            SELECT ""UserId"", ""Username"", ""Email"", ""FullName"", ""Role"", ""Status"", ""PasswordHash"", ""LastLoginAt""
+            FROM ""USERS""
+            ORDER BY ""UserId"";", conn))
         using (var r = cmd.ExecuteReader())
         {
             while (r.Read())
             {
-                total++;
                 int id = r.GetInt32(0);
-                string code = r.GetString(1);
-                string name = r.GetString(2);
-                string lang = r.GetString(3);
-                string? url = r.IsDBNull(4) ? null : r.GetString(4);
-                int dur = r.IsDBNull(5) ? 0 : r.GetInt32(5);
+                string username = r.GetString(1);
+                string email = r.GetString(2);
+                string fullName = r.GetString(3);
+                string role = r.GetString(4);
+                string status = r.GetString(5);
+                string hash = r.GetString(6);
+                string lastLogin = r.IsDBNull(7) ? "Never" : r.GetDateTime(7).ToString("yyyy-MM-dd HH:mm:ss");
 
-                if (string.IsNullOrWhiteSpace(url))
-                {
-                    Console.WriteLine($"[FAIL] POI #{id} [{code}] ({lang}): URL is NULL");
-                    invalid++;
-                    continue;
-                }
-
-                try
-                {
-                    var resp = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
-                    if (!resp.IsSuccessStatusCode)
-                    {
-                        Console.WriteLine($"[FAIL] POI #{id} [{code}] ({lang}): HTTP {(int)resp.StatusCode}");
-                        invalid++;
-                    }
-                    else
-                    {
-                        var s = await resp.Content.ReadAsStreamAsync();
-                        byte[] buf = new byte[4];
-                        int bytesRead = await s.ReadAsync(buf, 0, 4);
-                        bool isMp3 = bytesRead >= 3 && (
-                            (buf[0] == 0x49 && buf[1] == 0x44 && buf[2] == 0x33) ||
-                            (buf[0] == 0xFF && (buf[1] & 0xE0) == 0xE0)
-                        );
-                        if (isMp3)
-                        {
-                            valid++;
-                            Console.WriteLine($"[OK] POI #{id} [{code}] ({lang}) - Dur={dur}s - Valid MP3");
-                        }
-                        else
-                        {
-                            Console.WriteLine($"[FAIL] POI #{id} [{code}] ({lang}): Bad MP3 header");
-                            invalid++;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"[FAIL] POI #{id} [{code}] ({lang}): {ex.Message}");
-                    invalid++;
-                }
+                Console.WriteLine($"ID: {id} | User: '{username}' | Email: '{email}' | Role: '{role}' | Status: '{status}' | LastLogin: {lastLogin}");
+                Console.WriteLine($"   Hash: {hash}");
             }
         }
-
-        Console.WriteLine($"\n=== POI AUDIO VERIFICATION RESULT: Total={total}, Valid={valid}, Invalid={invalid} ===");
     }
 }

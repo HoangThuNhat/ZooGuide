@@ -4556,3 +4556,546 @@ a:focus-visible {
         border-radius: 50%;
     }
 }
+
+/* ==========================================================================
+   ADMIN AUTHENTICATION & LOGIN UI
+   ========================================================================== */
+.admin-login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+    padding: 20px 16px;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.admin-login-card {
+    width: 100%;
+    max-width: 440px;
+    background: #FFFFFF;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1);
+    padding: 36px 32px;
+    box-sizing: border-box;
+}
+
+.admin-login-header {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.admin-login-logo {
+    width: 56px;
+    height: 56px;
+    background: linear-gradient(135deg, #059669, #10B981);
+    border-radius: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    box-shadow: 0 8px 16px -4px rgba(16, 185, 129, 0.4);
+}
+
+.admin-login-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0 0 6px 0;
+    letter-spacing: -0.02em;
+}
+
+.admin-login-subtitle {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin: 0;
+}
+
+.admin-login-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    color: #B91C1C;
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.4;
+    margin-bottom: 20px;
+    animation: fadeIn 0.2s ease-in-out;
+}
+
+.admin-login-alert svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+}
+
+.admin-login-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.admin-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.admin-form-group label {
+    font-size: 0.825rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.admin-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.admin-input-icon {
+    position: absolute;
+    left: 14px;
+    color: #94A3B8;
+    pointer-events: none;
+}
+
+.admin-form-input {
+    width: 100%;
+    padding: 11px 14px 11px 42px;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #0F172A;
+    background: #F8FAFC;
+    transition: all 0.2s ease;
+    box-sizing: border-box;
+}
+
+.admin-form-input:focus {
+    outline: none;
+    border-color: #10B981;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.18);
+}
+
+.admin-form-input:disabled {
+    background: #E2E8F0;
+    color: #94A3B8;
+    cursor: not-allowed;
+}
+
+.admin-login-options {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.825rem;
+}
+
+.admin-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #475569;
+    cursor: pointer;
+    user-select: none;
+}
+
+.admin-checkbox-label input {
+    accent-color: #059669;
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.admin-login-submit-btn {
+    width: 100%;
+    padding: 12px 18px;
+    background: linear-gradient(135deg, #059669, #10B981);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 0.95rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-login-submit-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #047857, #059669);
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+    transform: translateY(-1px);
+}
+
+.admin-login-submit-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.admin-login-submit-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.admin-login-btn-loading {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.admin-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #FFFFFF;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.admin-login-footer {
+    margin-top: 24px;
+    text-align: center;
+    padding-top: 16px;
+    border-top: 1px solid #F1F5F9;
+}
+
+.admin-login-back-link {
+    color: #64748B;
+    text-decoration: none;
+    font-size: 0.825rem;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.admin-login-back-link:hover {
+    color: #059669;
+}
+
+/* Admin Layout Header User & Logout Controls */
+.admin-header-user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: #F1F5F9;
+    border-radius: 20px;
+    border: 1px solid #E2E8F0;
+}
+
+.admin-user-avatar-small {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #059669;
+    color: #FFFFFF;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.admin-user-name-small {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #1E293B;
+    max-width: 130px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-badge-small {
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #DCFCE7;
+    color: #166534;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+}
+
+.admin-header-logout-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 12px;
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.admin-header-logout-btn:hover {
+    background: #FCA5A5;
+    color: #7F1D1D;
+}
+
+/* Admin Sidebar User & Logout */
+.admin-sidebar-user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.admin-user-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #10B981;
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.admin-user-meta {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.admin-user-name {
+    font-size: 0.825rem;
+    font-weight: 600;
+    color: #F8FAFC;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-user-role-badge {
+    font-size: 0.7rem;
+    color: #94A3B8;
+}
+
+.admin-sidebar-logout-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    background: rgba(239, 68, 68, 0.12);
+    color: #FCA5A5;
+    border: 1px solid rgba(239, 68, 68, 0.25);
+    border-radius: 8px;
+    font-size: 0.825rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-top: 6px;
+}
+
+.admin-sidebar-logout-btn:hover {
+    background: rgba(239, 68, 68, 0.25);
+    color: #FFFFFF;
+}
+
+/* Table Responsive wrapper */
+.admin-table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    background: #FFFFFF;
+    margin-bottom: 16px;
+}
+
+/* ==========================================================================
+   SYSTEM-WIDE RESPONSIVE SYSTEM (320px, 375px, 430px, 768px, 1366px, 1920px)
+   Preserves desktop design intact while ensuring smooth mobile/tablet UX.
+   ========================================================================== */
+
+/* 1. Large Desktops & Wide Displays (1920px) */
+@media (min-width: 1600px) {
+    .container, .saas-dashboard {
+        max-width: 1540px;
+    }
+    .admin-main-content {
+        padding: 28px 36px;
+    }
+}
+
+/* 2. Standard Laptops (1366px - 1440px) */
+@media (min-width: 1025px) and (max-width: 1440px) {
+    .admin-header {
+        padding: 0 20px;
+    }
+    .admin-main-content {
+        padding: 20px 24px;
+    }
+}
+
+/* 3. Tablets (768px - 1024px) */
+@media (max-width: 1024px) {
+    .admin-online-indicator {
+        display: none !important;
+    }
+    .admin-table-wrapper, .saas-table-wrap {
+        border-radius: 6px;
+    }
+}
+
+/* 4. Large Smartphones (430px - 768px) */
+@media (max-width: 768px) {
+    .admin-header-right {
+        gap: 8px;
+    }
+    .admin-user-name-small, .admin-badge-small {
+        display: none;
+    }
+    .floating-audio-bar .audio-speed-select {
+        display: none;
+    }
+    .modal-overlay {
+        padding: 10px;
+    }
+    .modal-dialog {
+        max-width: 95vw;
+        max-height: 92vh;
+    }
+}
+
+/* 5. Standard Smartphones (375px - 430px) */
+@media (max-width: 430px) {
+    .admin-header {
+        padding: 8px 10px;
+        gap: 8px;
+    }
+    .admin-breadcrumb-root, .admin-breadcrumb-sep {
+        display: none !important;
+    }
+    .admin-breadcrumb-current {
+        max-width: 130px;
+        font-size: 0.8rem;
+    }
+    .admin-header-logout-btn span {
+        display: none !important;
+    }
+    .admin-header-logout-btn {
+        padding: 6px 8px;
+    }
+    .admin-header-primary-btn {
+        padding: 6px 9px;
+        font-size: 0.76rem;
+    }
+    /* Audio bar adjustments */
+    #btn-audio-skip-back, #btn-audio-skip-fwd {
+        display: none !important;
+    }
+    .player-meta {
+        min-width: 0;
+        gap: 8px;
+    }
+    .player-thumb {
+        width: 38px;
+        height: 38px;
+    }
+    .player-track-info {
+        max-width: 110px;
+    }
+    .player-track-info h5 {
+        font-size: 0.8rem;
+    }
+    .player-track-info p {
+        font-size: 0.7rem;
+    }
+    .btn-audio-circle {
+        width: 40px;
+        height: 40px;
+    }
+    /* Modal compacting */
+    .modal-dialog {
+        border-radius: 12px;
+        margin: 0;
+    }
+    .modal-header, .modal-body, .modal-footer {
+        padding: 10px 12px;
+    }
+}
+
+/* 6. Ultra-Compact Mobile Screens (320px - 360px) */
+@media (max-width: 360px) {
+    /* Header brand & tabs */
+    .brand-title {
+        font-size: 0.9rem;
+    }
+    .site-nav-btn {
+        padding: 6px 8px;
+        font-size: 0.72rem;
+    }
+    /* Admin header ultra compact */
+    .admin-header {
+        padding: 6px 8px;
+    }
+    .admin-breadcrumb-current {
+        max-width: 90px;
+        font-size: 0.75rem;
+    }
+    .admin-header-user {
+        padding: 2px 4px;
+    }
+    .admin-header-primary-btn {
+        padding: 5px 7px;
+        font-size: 0.72rem;
+    }
+    /* Audio bar on 320px */
+    .player-inner {
+        padding: 0 6px;
+    }
+    .player-thumb {
+        width: 32px;
+        height: 32px;
+    }
+    .player-track-info {
+        max-width: 75px;
+    }
+    .btn-audio-circle {
+        width: 36px;
+        height: 36px;
+    }
+    #btn-audio-stop {
+        padding: 4px;
+    }
+    .player-timers {
+        display: none !important;
+    }
+    #btn-open-transcript span {
+        display: none !important;
+    }
+    #btn-open-transcript {
+        padding: 6px 8px;
+    }
+    /* VietQR on 320px */
+    .tab-content-pane {
+        padding: 8px 0 28px 0 !important;
+    }
+    /* Admin login card */
+    .admin-login-card {
+        padding: 24px 16px;
+        border-radius: 12px;
+    }
+    .admin-login-title {
+        font-size: 1.25rem;
+    }
+}
+

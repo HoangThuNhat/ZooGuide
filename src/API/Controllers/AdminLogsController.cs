@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -7,6 +8,7 @@ namespace ZooGuide.API.Controllers;
 
 [ApiController]
 [Route("api/admin/logs")]
+[Authorize(Roles = "Admin")]
 public class AdminLogsController : ControllerBase
 {
     private readonly IAuditLogService _auditLogService;

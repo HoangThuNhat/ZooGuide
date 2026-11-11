@@ -6,6 +6,8 @@ import VisitorPortal from './pages/visitor/VisitorPortal';
 
 // Admin Portal & Pages
 import AdminLayout from './components/admin/layout/AdminLayout';
+import AdminProtectedRoute from './components/admin/layout/AdminProtectedRoute';
+import AdminLoginPage from './pages/admin/AdminLoginPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminSpeciesPage from './pages/admin/AdminSpeciesPage';
 import AdminAnimalsPage from './pages/admin/AdminAnimalsPage';
@@ -39,17 +41,22 @@ export default function App() {
                     {/* Visitor Routes */}
                     <Route path="/" element={<VisitorPortal />} />
 
-                    {/* Admin Management Routes */}
-                    <Route path="/admin" element={<AdminLayout />}>
-                        <Route index element={<AdminDashboardPage />} />
-                        <Route path="species" element={<AdminSpeciesPage />} />
-                        <Route path="animals" element={<AdminAnimalsPage />} />
-                        <Route path="areas" element={<AdminAreasPage />} />
-                        <Route path="pois" element={<AdminPoisPage />} />
-                        <Route path="tickets" element={<AdminTicketsPage />} />
-                        <Route path="ticket-types" element={<AdminTicketTypesPage />} />
-                        <Route path="ticket-sessions" element={<AdminTicketSessionsPage />} />
-                        <Route path="narration" element={<AdminNarrationPage />} />
+                    {/* Admin Login Route */}
+                    <Route path="/admin/login" element={<AdminLoginPage />} />
+
+                    {/* Protected Admin Management Routes */}
+                    <Route path="/admin" element={<AdminProtectedRoute />}>
+                        <Route element={<AdminLayout />}>
+                            <Route index element={<AdminDashboardPage />} />
+                            <Route path="species" element={<AdminSpeciesPage />} />
+                            <Route path="animals" element={<AdminAnimalsPage />} />
+                            <Route path="areas" element={<AdminAreasPage />} />
+                            <Route path="pois" element={<AdminPoisPage />} />
+                            <Route path="tickets" element={<AdminTicketsPage />} />
+                            <Route path="ticket-types" element={<AdminTicketTypesPage />} />
+                            <Route path="ticket-sessions" element={<AdminTicketSessionsPage />} />
+                            <Route path="narration" element={<AdminNarrationPage />} />
+                        </Route>
                     </Route>
 
                     {/* Catch-all redirect to Visitor */}

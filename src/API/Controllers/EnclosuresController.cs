@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -20,6 +21,7 @@ public class EnclosuresController : ControllerBase
     /// Lấy danh sách chuồng trại trong sở thú (hỗ trợ lọc theo phân khu AreaId, từ khóa tìm kiếm và trạng thái)
     /// </summary>
     [HttpGet]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll([FromQuery] EnclosureFilterRequest filter)
     {
@@ -31,6 +33,7 @@ public class EnclosuresController : ControllerBase
     /// Lấy chi tiết chuồng trại theo EnclosureId (kèm thông tin phân khu và danh sách động vật)
     /// </summary>
     [HttpGet("{id:int}")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<EnclosureDetailResponse>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id, [FromQuery] string? lang = null)
@@ -48,6 +51,7 @@ public class EnclosuresController : ControllerBase
     /// Thêm mới chuồng trại (Kiểm tra AreaId có tồn tại trong hệ thống)
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateEnclosureRequest request)
@@ -81,6 +85,7 @@ public class EnclosuresController : ControllerBase
     /// Cập nhật thông tin chuồng trại theo EnclosureId (Kiểm tra EnclosureId và AreaId tồn tại)
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<EnclosureResponse>), StatusCodes.Status404NotFound)]
@@ -117,6 +122,7 @@ public class EnclosuresController : ControllerBase
     /// Xóa chuồng trại theo EnclosureId (chặn xóa khi chuồng vẫn còn động vật bên trong)
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status409Conflict)]
@@ -142,6 +148,7 @@ public class EnclosuresController : ControllerBase
     /// Chuyển cá thể động vật sang chuồng khác hoặc gỡ khỏi chuồng (TargetEnclosureId rỗng)
     /// </summary>
     [HttpPost("move-animal")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> MoveAnimal([FromBody] MoveAnimalRequest request)
@@ -167,6 +174,7 @@ public class EnclosuresController : ControllerBase
     /// Lấy danh sách toàn bộ chuồng trại thuộc một phân khu (AreaId)
     /// </summary>
     [HttpGet("/api/areas/{areaId:int}/enclosures")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<EnclosureResponse>>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByAreaId(int areaId, [FromQuery] string? lang = null)

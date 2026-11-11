@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -28,6 +29,7 @@ public class NarrationsController : ControllerBase
     /// Lấy danh sách bài thuyết minh (hỗ trợ lọc theo animalId, languageCode, status, search)
     /// </summary>
     [HttpGet]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<NarrationResponseDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll([FromQuery] NarrationFilterDto filter)
     {
@@ -39,6 +41,7 @@ public class NarrationsController : ControllerBase
     /// Lấy chi tiết bài thuyết minh theo ID
     /// </summary>
     [HttpGet("{id:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetById(int id)
@@ -156,6 +159,7 @@ public class NarrationsController : ControllerBase
     /// Thêm bài thuyết minh mới
     /// </summary>
     [HttpPost]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateNarrationDto dto)
@@ -185,6 +189,7 @@ public class NarrationsController : ControllerBase
     /// Cập nhật bài thuyết minh
     /// </summary>
     [HttpPut("{id:int}")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<NarrationResponseDto>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateNarrationDto dto)
@@ -208,6 +213,7 @@ public class NarrationsController : ControllerBase
     /// Thay đổi trạng thái bài thuyết minh (Draft / Published / Archived)
     /// </summary>
     [HttpPatch("{id:int}/status")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateNarrationStatusDto dto)
@@ -226,6 +232,7 @@ public class NarrationsController : ControllerBase
     /// Xóa bài thuyết minh
     /// </summary>
     [HttpDelete("{id:int}")]
+    [Authorize(Roles = "Admin")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
@@ -244,6 +251,7 @@ public class NarrationsController : ControllerBase
     /// Thêm thông tin file audio liên kết với bài thuyết minh
     /// </summary>
     [HttpPost("{id:int}/audio")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<AudioResponseDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> AddAudio(int id, [FromBody] AudioResponseDto audioDto)
     {
@@ -270,6 +278,7 @@ public class NarrationsController : ControllerBase
     /// Lưu trữ vật lý tại wwwroot/uploads/audio và ghi nhận metadata vào CSDL
     /// </summary>
     [HttpPost("{id:int}/upload-audio")]
+    [Authorize(Roles = "Admin,Staff")]
     [Consumes("multipart/form-data")]
     [ProducesResponseType(typeof(ApiResponse<AudioResponseDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<AudioResponseDto>), StatusCodes.Status400BadRequest)]

@@ -1,10 +1,15 @@
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using ZooGuide.API.Filters;
 using ZooGuide.Application.Interfaces;
 using ZooGuide.Application.Services;
 using ZooGuide.Infrastructure.Data;
 using ZooGuide.Infrastructure.Repositories;
+using ZooGuide.Infrastructure.Services;
 
 // Load .env from current or parent directories if present
 var dir = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -41,9 +46,64 @@ builder.Services.AddControllers()
     });
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "ZooGuide API", Version = "v1" });
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
+        Description = "JWT Authorization header using the Bearer scheme. Ví dụ: \"Authorization: Bearer {token}\"",
+        Name = "Authorization",
+        In = ParameterLocation.Header,
+        Type = SecuritySchemeType.ApiKey,
+        Scheme = "Bearer"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
 
-// Application Services
+// Configure JWT Authentication
+var jwtSecretKey = builder.Configuration["Jwt:SecretKey"]
+    ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY")
+    ?? AuthService.DefaultSecretKey;
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? AuthService.DefaultIssuer;
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? AuthService.DefaultAudience;
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSecretKey)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtIssuer,
+        ValidateAudience = true,
+        ValidAudience = jwtAudience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
+// Application & Auth Services
+builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ISpeciesService, ZooGuide.Infrastructure.Services.SpeciesService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketTypeService, ZooGuide.Infrastructure.Services.TicketTypeService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITicketService, ZooGuide.Infrastructure.Services.TicketService>();
@@ -80,7 +140,7 @@ builder.Services.AddScoped<ITicketSessionRepository, TicketSessionRepository>();
 builder.Services.AddScoped<IAreaService, AreaService>();
 builder.Services.AddScoped<IEnclosureService, EnclosureService>();
 builder.Services.AddScoped<IAnimalService, AnimalService>();
-builder.Services.AddScoped<ITicketSessionService, TicketSessionService>();
+builder.Services.AddScoped<ITicketSessionService, ZooGuide.Infrastructure.Services.TicketSessionService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IDeviceTrackingService, ZooGuide.Infrastructure.Services.DeviceTrackingService>();
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.IPoiService, ZooGuide.Infrastructure.Services.PoiService>();
 
@@ -117,6 +177,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowAll");
 app.UseStaticFiles();
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ZooGuide.API.Hubs.OnlineTrackerHub>("/api/hubs/online");
@@ -228,3 +289,5 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.Run();
+
+public partial class Program { }

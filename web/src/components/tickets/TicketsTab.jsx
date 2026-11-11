@@ -25,6 +25,7 @@ export default function TicketsTab() {
     const [currentOrder, setCurrentOrder] = useState(null);
     const [isCreatingOrder, setIsCreatingOrder] = useState(false);
     const [isSimulatingPayment, setIsSimulatingPayment] = useState(false);
+    const [isCheckingPayment, setIsCheckingPayment] = useState(false);
     const [paymentTimeRemaining, setPaymentTimeRemaining] = useState(900); // 15 phút đếm ngược
     const [orderSuccessModal, setOrderSuccessModal] = useState(false);
     const pollingIntervalRef = useRef(null);
@@ -256,6 +257,38 @@ export default function TicketsTab() {
             showToast("Lỗi kết nối máy chủ khi giả lập thanh toán.", "error");
         } finally {
             setIsSimulatingPayment(false);
+        }
+    };
+
+    // 6b. Thủ công kiểm tra trạng thái thanh toán từ máy chủ
+    const handleCheckPaymentStatusManually = async () => {
+        if (!currentOrder || !currentOrder.orderCode || isCheckingPayment) return;
+        setIsCheckingPayment(true);
+        try {
+            const res = await ZooApi.getOrderByCode(currentOrder.orderCode);
+            if (res && res.success && res.data) {
+                if (res.data.paymentStatus === 'Paid' || res.data.paymentStatus === 2) {
+                    setCurrentOrder(res.data);
+                    sessionStorage.setItem(PENDING_ORDER_STORAGE_KEY, JSON.stringify(res.data));
+                    setOrderSuccessModal(true);
+                    setBuyerIdentity({
+                        orderCode: res.data.orderCode,
+                        email: res.data.customerEmail || customerInfo.email
+                    });
+                    if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+                    const ticketList = res.data.issuedTickets || res.data.tickets || [];
+                    showToast(`Đã ghi nhận thanh toán đơn hàng ${res.data.orderCode}! Cấp ${ticketList.length} vé.`, "success");
+                } else {
+                    showToast("Chưa nhận được giao dịch thanh toán từ ngân hàng. Vui lòng thử lại sau giây lát.", "info");
+                }
+            } else {
+                showToast("Chưa tìm thấy thông tin cập nhật mới cho đơn hàng.", "info");
+            }
+        } catch (err) {
+            console.error("Check payment status error:", err);
+            showToast("Lỗi kiểm tra trạng thái thanh toán từ máy chủ.", "error");
+        } finally {
+            setIsCheckingPayment(false);
         }
     };
 
@@ -700,7 +733,7 @@ export default function TicketsTab() {
                                         textAlign: 'center',
                                         background: '#F8FAFC',
                                         borderRadius: '18px',
-                                        padding: '18px',
+                                        padding: '18px 12px',
                                         border: '1px solid #CBD5E1',
                                         marginBottom: '16px'
                                     }}>
@@ -708,8 +741,10 @@ export default function TicketsTab() {
                                             src={currentOrder.qrCodeUrl}
                                             alt="Mã VietQR thanh toán vé ZooGuide"
                                             style={{
-                                                width: '240px',
-                                                height: '240px',
+                                                maxWidth: '100%',
+                                                width: 'min(240px, 68vw)',
+                                                height: 'auto',
+                                                aspectRatio: '1/1',
                                                 objectFit: 'contain',
                                                 borderRadius: '10px',
                                                 background: '#FFFFFF',
@@ -720,12 +755,12 @@ export default function TicketsTab() {
                                             }}
                                         />
 
-                                        <div style={{ marginTop: '14px', fontSize: '0.84rem', color: '#334155' }}>
-                                            <div>Ngân hàng: <strong>{currentOrder.bankName} ({currentOrder.bankCode})</strong></div>
-                                            <div>Số tài khoản: <strong style={{ color: '#0F172A' }}>{currentOrder.bankAccountNumber}</strong></div>
-                                            <div>Chủ tài khoản: <strong>{currentOrder.bankAccountName}</strong></div>
+                                        <div style={{ marginTop: '14px', fontSize: '0.84rem', color: '#334155', wordBreak: 'break-word' }}>
+                                            <div>Ngân hàng: <strong>{currentOrder.bankName || 'MBBank'} ({currentOrder.bankCode || 'MB'})</strong></div>
+                                            <div>Số tài khoản: <strong style={{ color: '#0F172A' }}>{currentOrder.accountNumber || currentOrder.bankAccountNumber}</strong></div>
+                                            <div>Chủ tài khoản: <strong>{currentOrder.accountName || currentOrder.bankAccountName}</strong></div>
                                             <div style={{ marginTop: '6px' }}>
-                                                Nội dung chuyển khoản: <strong style={{ background: '#FEF08A', padding: '2px 8px', borderRadius: '6px', color: '#854D0E' }}>{currentOrder.orderCode}</strong>
+                                                Nội dung chuyển khoản: <strong style={{ background: '#FEF08A', padding: '2px 8px', borderRadius: '6px', color: '#854D0E' }}>{currentOrder.paymentDescription || currentOrder.orderCode}</strong>
                                             </div>
                                             <div style={{ marginTop: '4px', fontSize: '1rem', fontWeight: 800, color: '#15803D' }}>
                                                 Số tiền: {formatCurrency(currentOrder.totalAmount)}
@@ -738,25 +773,50 @@ export default function TicketsTab() {
                                         </div>
                                     </div>
 
-                                    {/* Nút Sandbox Simulator để kiểm thử */}
+                                    {/* Các nút thao tác kiểm tra & Sandbox */}
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <button
+                                            type="button"
+                                            onClick={handleCheckPaymentStatusManually}
+                                            disabled={isCheckingPayment}
+                                            style={{
+                                                flex: 1,
+                                                minWidth: '140px',
+                                                padding: '12px',
+                                                borderRadius: '10px',
+                                                background: '#15803D',
+                                                color: '#FFFFFF',
+                                                border: 'none',
+                                                fontWeight: 700,
+                                                fontSize: '0.88rem',
+                                                cursor: isCheckingPayment ? 'wait' : 'pointer',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '6px'
+                                            }}
+                                        >
+                                            {isCheckingPayment ? 'Đang kiểm tra...' : 'Kiểm tra thanh toán'}
+                                        </button>
+
                                         <button
                                             type="button"
                                             onClick={() => handleSimulatePayment(false)}
                                             disabled={isSimulatingPayment}
                                             style={{
                                                 flex: 1,
+                                                minWidth: '140px',
                                                 padding: '12px',
                                                 borderRadius: '10px',
                                                 background: '#2563EB',
                                                 color: '#FFFFFF',
                                                 border: 'none',
                                                 fontWeight: 700,
-                                                fontSize: '0.9rem',
+                                                fontSize: '0.88rem',
                                                 cursor: isSimulatingPayment ? 'wait' : 'pointer'
                                             }}
                                         >
-                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Xác nhận thanh toán thành công'}
+                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Giả lập Sandbox'}
                                         </button>
 
                                         <button
