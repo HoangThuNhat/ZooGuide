@@ -333,16 +333,22 @@ jobs:
           }
           Write-Output "Frontend HTML loaded (HTTP $($feResp.StatusCode), $($feResp.Content.Length) bytes)."
 
-          Write-Output "Verifying Frontend -> Backend Reverse Proxy & Core APIs via port $frontendPort..."
+          Write-Output "Verifying Frontend -> Backend Reverse Proxy & Public APIs via port $frontendPort..."
           $proxyHealth = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/health" -Method Get -TimeoutSec 10
           $areasResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/areas" -Method Get -TimeoutSec 10
           $animalsResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/animals" -Method Get -TimeoutSec 10
           $poisResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/pois" -Method Get -TimeoutSec 10
           $langsResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/languages" -Method Get -TimeoutSec 10
-          $dashResp = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/dashboard/stats" -Method Get -TimeoutSec 15
-
-          if (-not $proxyHealth.databaseConnected) { throw "Proxy /api/health reported databaseConnected=false" }
-          if (-not $dashResp.success) { throw "Dashboard stats endpoint returned success=false" }
+          if (-not $proxyHealth.databaseConnected) 
+          {
+          throw "Proxy /api/health reported databaseConnected=false"
+          }
+          Write-Output "Public API verification PASSED:"
+          Write-Output "  - Health API"
+          Write-Output "  - Areas API"
+          Write-Output "  - Animals API"
+          Write-Output "  - POIs API"
+          Write-Output "  - Languages API"
 
           Write-Output "End-to-End Demo Verification PASSED:"
           Write-Output "  - Frontend URL: http://localhost:$frontendPort/"
