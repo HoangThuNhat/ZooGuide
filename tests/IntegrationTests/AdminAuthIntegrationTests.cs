@@ -23,7 +23,7 @@ using ZooGuide.Infrastructure.Services;
 
 namespace ZooGuide.IntegrationTests;
 
-public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Program>>, IDisposable
 {
     private readonly WebApplicationFactory<Program> _factory;
     private readonly string _testDbName = $"ZooGuideAuthTestDb_{Guid.NewGuid()}";
@@ -36,8 +36,12 @@ public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Pro
             builder.ConfigureServices(services =>
             {
                 // Thay thế DbContext bằng InMemory database phục vụ kiểm thử cô lập
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<ZooGuideDbContext>));
-                if (descriptor != null)
+                var descriptors = services.Where(d =>
+                    d.ServiceType == typeof(DbContextOptions<ZooGuideDbContext>) ||
+                    d.ServiceType == typeof(DbContextOptions) ||
+                    d.ServiceType == typeof(ZooGuideDbContext)).ToList();
+
+                foreach (var descriptor in descriptors)
                 {
                     services.Remove(descriptor);
                 }
@@ -56,6 +60,20 @@ public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Pro
                 SeedUsers(db);
             });
         });
+    }
+
+    public void Dispose()
+    {
+        try
+        {
+            using var scope = _factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetService<ZooGuideDbContext>();
+            db?.Database.EnsureDeleted();
+        }
+        catch
+        {
+            // Bỏ qua lỗi dọn dẹp nếu host chưa khởi tạo
+        }
     }
 
     private static void SeedUsers(ZooGuideDbContext db)

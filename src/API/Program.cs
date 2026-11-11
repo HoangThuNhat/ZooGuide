@@ -112,22 +112,27 @@ builder.Services.AddScoped<ZooGuide.Application.Interfaces.IOrderService, ZooGui
 builder.Services.AddScoped<ZooGuide.Application.Interfaces.ITranslationService, ZooGuide.Infrastructure.Services.TranslationService>();
 builder.Services.AddSingleton<ZooGuide.Application.Interfaces.ISupabaseStorageService, ZooGuide.Infrastructure.Services.SupabaseStorageService>();
 
-// Configure EF Core with Supabase PostgreSQL
+// Configure EF Core with Supabase PostgreSQL (or bypass in Testing environment if not configured)
 var envConnStr = Environment.GetEnvironmentVariable("SUPABASE_CONNECTION_STRING");
 var cfgConnStr = builder.Configuration.GetConnectionString("DefaultConnection");
 var connectionString = !string.IsNullOrWhiteSpace(envConnStr)
     ? envConnStr
-    : (!string.IsNullOrWhiteSpace(cfgConnStr)
-        ? cfgConnStr
-        : throw new InvalidOperationException("Missing SUPABASE_CONNECTION_STRING or ConnectionStrings:DefaultConnection."));
+    : (!string.IsNullOrWhiteSpace(cfgConnStr) ? cfgConnStr : null);
 
-builder.Services.AddDbContext<ZooGuideDbContext>(options =>
+if (!string.IsNullOrWhiteSpace(connectionString))
 {
-    options.UseNpgsql(connectionString, pgOptions =>
+    builder.Services.AddDbContext<ZooGuideDbContext>(options =>
     {
-        pgOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+        options.UseNpgsql(connectionString, pgOptions =>
+        {
+            pgOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+        });
     });
-});
+}
+else if (!builder.Environment.IsEnvironment("Testing"))
+{
+    throw new InvalidOperationException("Missing SUPABASE_CONNECTION_STRING or ConnectionStrings:DefaultConnection.");
+}
 
 // Register Repositories for Areas, Animals, Tickets, Enclosures
 builder.Services.AddScoped<IAreaRepository, AreaRepository>();
@@ -250,10 +255,14 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 // Seed initial data if development & ensure telemetry schema exists
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
-    try
+    var dbContext = scope.ServiceProvider.GetService<ZooGuideDbContext>();
+    if (dbContext != null)
     {
-        await dbContext.Database.ExecuteSqlRawAsync(@"
+        try
+        {
+            if (dbContext.Database.IsRelational())
+            {
+                await dbContext.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS ""NARRATION_TELEMETRY_EVENTS"" (
                 ""TelemetryEventId"" BIGSERIAL PRIMARY KEY,
                 ""Category"" VARCHAR(40) NOT NULL,
@@ -276,15 +285,17 @@ using (var scope = app.Services.CreateScope())
                 ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
             );
         ");
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning(ex, "Không thể kiểm tra/khởi tạo bảng NARRATION_TELEMETRY_EVENTS lúc khởi động.");
-    }
+            }
+        }
+        catch (Exception ex)
+        {
+            app.Logger.LogWarning(ex, "Không thể kiểm tra/khởi tạo bảng NARRATION_TELEMETRY_EVENTS lúc khởi động.");
+        }
 
-    if (app.Environment.IsDevelopment())
-    {
-        await ZooGuideDataSeeder.SeedAsync(dbContext);
+        if (app.Environment.IsDevelopment())
+        {
+            await ZooGuideDataSeeder.SeedAsync(dbContext);
+        }
     }
 }
 
