@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="970" viewBox="0 0 860 970">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#000000" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="40" y="32" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#000000">14. TRA CỨU THÔNG TIN SỞ THÚ (ZOO INFORMATION LOOKUP)</text>
+  <text x="40" y="52" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#333333">Quy trình tìm kiếm, lọc danh mục động vật, xem hồ sơ chi tiết và liên kết bản đồ/thuyết minh</text>
+  <rect x="40" y="70" width="360" height="870" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="40" y="70" width="360" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Người dùng (Visitor)</text>
+  <rect x="400" y="70" width="420" height="870" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="400" y="70" width="420" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Hệ thống (System)</text>
+  <path d="M 220.0 148 L 220.0 170" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 222 L 220.0 240" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 292 L 610.0 240" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 292 L 610.0 320" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 375 L 610.0 390" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="365.5" width="102" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="377.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Không tìm thấy]</text>
+  <path d="M 610.0 442 L 465 415 L 50 415 L 50 774 L 220.0 760" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 375 L 610.0 460" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="400.5" width="114" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="412.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Tìm thấy kết quả]</text>
+  <path d="M 610.0 512 L 610 510 L 220 510 L 220.0 540" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 592 L 610.0 540" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 592 L 610 590 L 220 590 L 220.0 620" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 675 L 610.0 690" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="417.0" y="665.5" width="198" height="14" fill="#ffffff" stroke="none" />
+  <text x="420.0" y="677.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Xem bản đồ / Nghe audio / Đóng]</text>
+  <path d="M 610.0 742 L 610 774 L 220.0 760" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <circle cx="220.0" cy="134.0" r="14" fill="#000000" stroke="#000000" />
+  <rect x="90.0" y="170" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="190.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Khách mở tab &#x27;Động vật &amp; Tra cứu&#x27;</text>
+  <text x="220.0" y="202.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">trên ứng dụng ZooGuide</text>
+  <rect x="90.0" y="240" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="254.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Nhập từ khóa tìm kiếm (tên tiếng</text>
+  <text x="220.0" y="266.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Việt, tên khoa học) hoặc chọn bộ</text>
+  <text x="220.0" y="278.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">lọc Phân khu, IUCN, Ngôn ngữ</text>
+  <rect x="460.0" y="240" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="254.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Truy vấn kết hợp ANIMALS, SPECIES,</text>
+  <text x="610.0" y="266.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">AREAS, ENCLOSURES và</text>
+  <text x="610.0" y="278.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">CONTENT_TRANSLATIONS</text>
+  <polygon points="610.0,320 700.0,347.5 610.0,375 520.0,347.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="341.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Có dữ liệu động vật khớp</text>
+  <text x="610.0" y="352.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">tiêu chí?</text>
+  <rect x="460.0" y="390" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="410.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Hiển thị giao diện &#x27;Không tìm thấy động</text>
+  <text x="610.0" y="422.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">vật phù hợp&#x27; kèm gợi ý từ khóa</text>
+  <rect x="460.0" y="460" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="474.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Render danh sách động vật dạng lưới thẻ</text>
+  <text x="610.0" y="486.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">(Card Grid): Hình ảnh, Tên, Tên khoa</text>
+  <text x="610.0" y="498.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">học, Phân khu, Huy hiệu IUCN</text>
+  <rect x="90.0" y="540" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="560.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Khách nhấn chọn một thẻ động vật</text>
+  <text x="220.0" y="572.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">cụ thể để xem chi tiết</text>
+  <rect x="460.0" y="540" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="554.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Mở Modal AnimalDetailModal: Sinh cảnh,</text>
+  <text x="610.0" y="566.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Khẩu phần ăn, Tuổi thọ, Trạng thái bảo</text>
+  <text x="610.0" y="578.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">tồn, Vị trí chuồng nuôi</text>
+  <polygon points="220.0,620 300.0,647.5 220.0,675 140.0,647.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="641.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Khách chọn hành động</text>
+  <text x="220.0" y="652.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">liên kết tiếp theo?</text>
+  <rect x="460.0" y="690" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="704.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Thực thi: Chuyển sang Bản đồ số định vị</text>
+  <text x="610.0" y="716.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">chuồng thú, hoặc kích hoạt Thuyết minh</text>
+  <text x="610.0" y="728.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">âm thanh, hoặc đóng modal</text>
+  <circle cx="220.0" cy="774.0" r="14" fill="#ffffff" stroke="#000000" stroke-width="1.5" />
+  <circle cx="220.0" cy="774.0" r="8" fill="#000000" stroke="#000000" />
+</svg>

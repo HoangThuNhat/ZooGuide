@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="ZooGuide OOAD Academic Report" version="24.7.5" type="device">
+  <diagram id="diag_02" name="02 - Animal Management"><mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="1150" math="0" shadow="0"><root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="title_diag_02" value="&lt;div style=&#x27;font-family: Arial, sans-serif;&#x27;&gt;&lt;b&gt;&lt;font style=&#x27;font-size: 15px; color: #000000;&#x27;&gt;02. QUẢN LÝ ĐỘNG VẬT (ANIMAL MANAGEMENT)&lt;/font&gt;&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size: 11px; color: #333333;&#x27;&gt;Quy trình xem danh sách hồ sơ, thêm cá thể, phân bổ chuồng, cập nhật sức khỏe và xóa động vật&lt;/font&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="15" width="780" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="lane_diag_02_0" value="Người dùng (Administrator / Staff)" style="swimlane;whiteSpace=wrap;html=1;startSize=28;horizontal=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontStyle=1;fontSize=12;fontFamily=Arial;collapsible=0;swimlaneFillColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="40" y="70" width="360" height="1030" as="geometry" />
+    </mxCell>
+    <mxCell id="lane_diag_02_1" value="Hệ thống (System)" style="swimlane;whiteSpace=wrap;html=1;startSize=28;horizontal=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontStyle=1;fontSize=12;fontFamily=Arial;collapsible=0;swimlaneFillColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="400" y="70" width="420" height="1030" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_start" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;fontColor=#ffffff;fontStyle=1;fontSize=10;fontFamily=Arial;" vertex="1" parent="1">
+      <mxGeometry x="206" y="120" width="28" height="28" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_open" value="Truy cập phân hệ Quản lý động vật" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="170" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_display" value="Truy vấn JOIN bảng ANIMALS, SPECIES, ENCLOSURES, AREAS và hiển thị danh sách hồ sơ cá thể động vật" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="170" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_dec_action" value="Chọn nghiệp vụ quản lý?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=10;fontFamily=Arial;align=center;spacing=2;" vertex="1" parent="1">
+      <mxGeometry x="140" y="240" width="160" height="55" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_in_new" value="Bấm &#x27;Thêm động vật&#x27; -&gt; Nhập tên cá thể, giới tính; chọn Loài (SpeciesId), Phân khu (AreaId), Chuồng (EnclosureId) -&gt; Bấm &#x27;Lưu&#x27;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="320" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_val_new" value="Kiểm tra tính tồn tại của Species, Area, Enclosure trong cơ sở dữ liệu" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="320" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_dec_val_new" value="Khóa ngoại hợp lệ?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=10;fontFamily=Arial;align=center;spacing=2;" vertex="1" parent="1">
+      <mxGeometry x="520" y="390" width="180" height="55" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_err_val" value="Hiển thị thông báo lỗi: Dữ liệu liên kết loài, khu vực hoặc chuồng không hợp lệ" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="460" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_save_new" value="Sinh mã cá thể (code), INSERT vào bảng ANIMALS -&gt; Thông báo thêm thành công và nạp lại danh sách" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="520" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_sel_upd" value="Chọn cá thể, chỉnh sửa thông tin hoặc chọn chuồng nuôi mới -&gt; Bấm &#x27;Cập nhật&#x27;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="610" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_save_upd" value="Xác thực dữ liệu, UPDATE bản ghi ANIMALS trong Database và hiển thị thông báo cập nhật thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="610" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_in_health" value="Thú y ghi nhận kết quả khám: Tình trạng sức khỏe, Cân nặng, Thân nhiệt, Bác sĩ khám -&gt; Bấm &#x27;Lưu hồ sơ&#x27;" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="700" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_save_health" value="Kiểm tra số đo sinh học, UPDATE trường HealthStatus, LastHealthCheckAt vào bảng ANIMALS và thông báo thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="700" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_sel_del" value="Chọn cá thể, bấm &#x27;Xóa&#x27; và xác nhận trên hộp thoại" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="790" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_act_del_db" value="Kiểm tra ràng buộc lịch sử khám và thuyết minh -&gt; Xóa hoặc chuyển Status = Inactive trong DB -&gt; Thông báo thành công" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="790" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_merge" value="Hợp nhất" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=10;fontFamily=Arial;align=center;spacing=2;" vertex="1" parent="1">
+      <mxGeometry x="140" y="860" width="160" height="55" as="geometry" />
+    </mxCell>
+    <mxCell id="d2_end" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="206" y="920" width="28" height="28" as="geometry" />
+    </mxCell>
+    <mxCell id="e_diag_02_0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_start" target="d2_act_open">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_open" target="d2_act_display">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_display" target="d2_dec_action">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="267" />
+          <mxPoint x="220" y="267" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_3" value="[Thêm cá thể]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_action" target="d2_act_in_new">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_in_new" target="d2_act_val_new">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_val_new" target="d2_dec_val_new">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_6" value="[Không hợp lệ]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_val_new" target="d2_act_err_val">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_7" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_err_val" target="d2_merge">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="465" y="485" />
+          <mxPoint x="350" y="485" />
+          <mxPoint x="350" y="887" />
+          <mxPoint x="220" y="887" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_8" value="[Hợp lệ]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_val_new" target="d2_act_save_new">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_save_new" target="d2_merge">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="580" />
+          <mxPoint x="610" y="887" />
+          <mxPoint x="300" y="887" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_10" value="[Cập nhật/Đổi chuồng]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_action" target="d2_act_sel_upd">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="140" y="267" />
+          <mxPoint x="60" y="267" />
+          <mxPoint x="60" y="635" />
+          <mxPoint x="95" y="635" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_sel_upd" target="d2_act_save_upd">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_12" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_save_upd" target="d2_merge">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="670" />
+          <mxPoint x="610" y="887" />
+          <mxPoint x="300" y="887" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_13" value="[Hồ sơ thú y]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_action" target="d2_act_in_health">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="140" y="267" />
+          <mxPoint x="45" y="267" />
+          <mxPoint x="45" y="725" />
+          <mxPoint x="95" y="725" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_14" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_in_health" target="d2_act_save_health">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_save_health" target="d2_merge">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="760" />
+          <mxPoint x="610" y="887" />
+          <mxPoint x="300" y="887" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_16" value="[Xóa cá thể]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_dec_action" target="d2_act_sel_del">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="140" y="267" />
+          <mxPoint x="30" y="267" />
+          <mxPoint x="30" y="815" />
+          <mxPoint x="95" y="815" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_sel_del" target="d2_act_del_db">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_18" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_act_del_db" target="d2_merge">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="465" y="815" />
+          <mxPoint x="220" y="860" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_02_19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d2_merge" target="d2_end">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+  </root></mxGraphModel></diagram>
+</mxfile>

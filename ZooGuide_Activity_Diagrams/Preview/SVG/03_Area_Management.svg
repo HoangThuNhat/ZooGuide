@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="1250" viewBox="0 0 860 1250">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#000000" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="40" y="32" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#000000">03. QUẢN LÝ KHU VỰC (AREA MANAGEMENT)</text>
+  <text x="40" y="52" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#333333">Quy trình xem danh sách phân khu, thêm mới, cấu hình tọa độ GPS/bản đồ và xóa khu vực</text>
+  <rect x="40" y="70" width="360" height="1150" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="40" y="70" width="360" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Người dùng (Administrator)</text>
+  <rect x="400" y="70" width="420" height="1150" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="400" y="70" width="420" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Hệ thống (System)</text>
+  <path d="M 220.0 148 L 220.0 170" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 222 L 610.0 170" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 222 L 610 267 L 220 267 L 220.0 240" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 295 L 220.0 320" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="222.0" y="290.5" width="90" height="14" fill="#ffffff" stroke="none" />
+  <text x="225.0" y="302.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Thêm khu vực]</text>
+  <path d="M 220.0 372 L 610.0 320" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 372 L 610.0 390" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 445 L 610.0 460" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="435.5" width="78" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="447.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Đã tồn tại]</text>
+  <path d="M 610.0 512 L 465 485 L 350 485 L 350 345 L 220.0 320" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 445 L 610.0 520" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="465.5" width="90" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="477.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Chưa tồn tại]</text>
+  <path d="M 610.0 572 L 610 580 L 610 1007 L 300 1007 L 220.0 980" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 295 L 140 267 L 60 267 L 60 635 L 95 635 L 220.0 610" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="182.0" y="264.0" width="66" height="14" fill="#ffffff" stroke="none" />
+  <text x="185.0" y="276.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Cập nhật]</text>
+  <path d="M 220.0 662 L 610.0 610" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 662 L 610 670 L 610 1007 L 300 1007 L 220.0 980" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 295 L 140 267 L 45 267 L 45 725 L 95 725 L 220.0 700" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="182.0" y="264.0" width="84" height="14" fill="#ffffff" stroke="none" />
+  <text x="185.0" y="276.0" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Xóa khu vực]</text>
+  <path d="M 220.0 752 L 610.0 700" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 752 L 610.0 770" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 825 L 610.0 840" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="815.5" width="108" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="827.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Còn chuồng nuôi]</text>
+  <path d="M 610.0 892 L 465 865 L 220 865 L 220.0 980" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 825 L 610.0 910" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="850.5" width="96" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="862.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Khu vực trống]</text>
+  <path d="M 610.0 962 L 465 935 L 220 935 L 220.0 980" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 1035 L 220.0 1040" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <circle cx="220.0" cy="134.0" r="14" fill="#000000" stroke="#000000" />
+  <rect x="90.0" y="170" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="196.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Truy cập màn hình Quản lý khu vực</text>
+  <rect x="460.0" y="170" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="184.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Truy vấn bảng AREAS và ENCLOSURES -&gt;</text>
+  <text x="610.0" y="196.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Hiển thị danh sách phân khu, tọa độ GPS</text>
+  <text x="610.0" y="208.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">và số lượng chuồng</text>
+  <polygon points="220.0,240 300.0,267.5 220.0,295 140.0,267.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="261.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Chọn thao tác khu</text>
+  <text x="220.0" y="272.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">vực?</text>
+  <rect x="90.0" y="320" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="328.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Nhập: Mã phân khu (Code: A, B,</text>
+  <text x="220.0" y="340.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">C...), Tên khu, Mô tả, Tọa độ</text>
+  <text x="220.0" y="352.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Lat/Lng, Bán kính, Tọa độ</text>
+  <text x="220.0" y="364.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">mapX/mapY -&gt; Bấm &#x27;Tạo khu vực&#x27;</text>
+  <rect x="460.0" y="320" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="340.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Kiểm tra tính hợp lệ dữ liệu và kiểm tra</text>
+  <text x="610.0" y="352.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">trùng lặp Mã phân khu (Code)</text>
+  <polygon points="610.0,390 700.0,417.5 610.0,445 520.0,417.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="417.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Mã phân khu đã tồn tại?</text>
+  <rect x="460.0" y="460" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="480.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Hiển thị thông báo lỗi: Mã phân khu đã</text>
+  <text x="610.0" y="492.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">tồn tại trên hệ thống</text>
+  <rect x="460.0" y="520" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="534.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">INSERT bản ghi mới vào bảng AREAS -&gt;</text>
+  <text x="610.0" y="546.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Thông báo thêm thành công và nạp lại</text>
+  <text x="610.0" y="558.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">danh sách</text>
+  <rect x="90.0" y="610" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="624.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Chọn phân khu, điều chỉnh tên, mô</text>
+  <text x="220.0" y="636.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">tả hoặc tọa độ định vị -&gt; Bấm</text>
+  <text x="220.0" y="648.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">&#x27;Lưu&#x27;</text>
+  <rect x="460.0" y="610" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="624.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Kiểm tra ID tồn tại, UPDATE bản ghi</text>
+  <text x="610.0" y="636.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">trong bảng AREAS và thông báo cập nhật</text>
+  <text x="610.0" y="648.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">thành công</text>
+  <rect x="90.0" y="700" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="720.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Chọn phân khu, bấm &#x27;Xóa&#x27; và xác</text>
+  <text x="220.0" y="732.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">nhận trên hộp thoại</text>
+  <rect x="460.0" y="700" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="720.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Kiểm tra ràng buộc chuồng nuôi trong</text>
+  <text x="610.0" y="732.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">bảng ENCLOSURES</text>
+  <polygon points="610.0,770 700.0,797.5 610.0,825 520.0,797.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="791.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Phân khu còn chứa chuồng</text>
+  <text x="610.0" y="802.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">nuôi?</text>
+  <rect x="460.0" y="840" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="860.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Từ chối xóa và hiển thị cảnh báo: Không</text>
+  <text x="610.0" y="872.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">thể xóa khu vực đang chứa chuồng trại</text>
+  <rect x="460.0" y="910" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="930.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">DELETE bản ghi khỏi bảng AREAS -&gt; Thông</text>
+  <text x="610.0" y="942.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">báo xóa thành công và nạp lại danh sách</text>
+  <polygon points="220.0,980 300.0,1007.5 220.0,1035 140.0,1007.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="1007.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Hợp nhất</text>
+  <circle cx="220.0" cy="1054.0" r="14" fill="#ffffff" stroke="#000000" stroke-width="1.5" />
+  <circle cx="220.0" cy="1054.0" r="8" fill="#000000" stroke="#000000" />
+</svg>

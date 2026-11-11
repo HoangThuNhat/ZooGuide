@@ -1,0 +1,107 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="ZooGuide OOAD Academic Report" version="24.7.5" type="device">
+  <diagram id="diag_12" name="12 - Language Management"><mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="900" pageHeight="950" math="0" shadow="0"><root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+    <mxCell id="title_diag_12" value="&lt;div style=&#x27;font-family: Arial, sans-serif;&#x27;&gt;&lt;b&gt;&lt;font style=&#x27;font-size: 15px; color: #000000;&#x27;&gt;12. QUẢN LÝ NGÔN NGỮ (LANGUAGE MANAGEMENT)&lt;/font&gt;&lt;/b&gt;&lt;br/&gt;&lt;font style=&#x27;font-size: 11px; color: #333333;&#x27;&gt;Quy trình chuyển đổi ngôn ngữ, tải từ điển chuỗi giao diện và nạp bản dịch nội dung&lt;/font&gt;&lt;/div&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;" vertex="1" parent="1">
+      <mxGeometry x="40" y="15" width="780" height="45" as="geometry" />
+    </mxCell>
+    <mxCell id="lane_diag_12_0" value="Người dùng (Visitor / User)" style="swimlane;whiteSpace=wrap;html=1;startSize=28;horizontal=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontStyle=1;fontSize=12;fontFamily=Arial;collapsible=0;swimlaneFillColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="40" y="70" width="360" height="830" as="geometry" />
+    </mxCell>
+    <mxCell id="lane_diag_12_1" value="Hệ thống (System)" style="swimlane;whiteSpace=wrap;html=1;startSize=28;horizontal=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontStyle=1;fontSize=12;fontFamily=Arial;collapsible=0;swimlaneFillColor=#ffffff;" vertex="1" parent="1">
+      <mxGeometry x="400" y="70" width="420" height="830" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_start" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#000000;strokeColor=#000000;fontColor=#ffffff;fontStyle=1;fontSize=10;fontFamily=Arial;" vertex="1" parent="1">
+      <mxGeometry x="206" y="120" width="28" height="28" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_click" value="Bấm vào menu chọn ngôn ngữ trên thanh Header" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="170" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_menu" value="Hiển thị danh sách các ngôn ngữ hỗ trợ (vi, en, zh, ja, fr...)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="170" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_pick" value="Người dùng chọn ngôn ngữ mong muốn (ví dụ: &#x27;en&#x27; - Tiếng Anh)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="90" y="240" width="260" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_load_ui" value="Lưu languageCode = &#x27;en&#x27; vào localStorage và truy vấn từ điển chuỗi giao diện tương ứng từ máy chủ" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="240" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_apply_ui" value="Nạp từ điển mới và cập nhật tức thì toàn bộ nhãn nút, tiêu đề giao diện (Re-render UI)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="310" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_reload_content" value="Tự động gửi lại các yêu cầu tải dữ liệu nội dung với tham số ?lang=en (areas, animals, pois, narrations)" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="380" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_dec_trans" value="Có bản dịch tiếng Anh trong DB?" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=10;fontFamily=Arial;align=center;spacing=2;" vertex="1" parent="1">
+      <mxGeometry x="520" y="450" width="180" height="55" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_fallback" value="Fallback: Trả về nội dung gốc Tiếng Việt (&#x27;vi&#x27;) kèm cảnh báo" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="520" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_translated" value="Trả về nội dung văn bản đã được bản địa hóa chuẩn" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="590" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_act_render_all" value="Hiển thị toàn bộ thông tin sở thú theo ngôn ngữ đã chọn một cách đồng bộ" style="rounded=1;whiteSpace=wrap;html=1;arcSize=20;fillColor=#ffffff;strokeColor=#000000;strokeWidth=1.2;fontColor=#000000;fontSize=11;fontFamily=Arial;align=center;spacing=4;" vertex="1" parent="1">
+      <mxGeometry x="460" y="660" width="300" height="52" as="geometry" />
+    </mxCell>
+    <mxCell id="d12_end" value="" style="ellipse;html=1;shape=endState;fillColor=#000000;strokeColor=#000000;" vertex="1" parent="1">
+      <mxGeometry x="206" y="720" width="28" height="28" as="geometry" />
+    </mxCell>
+    <mxCell id="e_diag_12_0" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_start" target="d12_act_click">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_click" target="d12_act_menu">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_2" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_menu" target="d12_act_pick">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="210" />
+          <mxPoint x="220" y="210" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_pick" target="d12_act_load_ui">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_load_ui" target="d12_act_apply_ui">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_apply_ui" target="d12_act_reload_content">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_reload_content" target="d12_dec_trans">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_7" value="[Chưa có bản dịch]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_dec_trans" target="d12_act_fallback">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_8" value="[Có bản dịch]" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_dec_trans" target="d12_act_translated">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_fallback" target="d12_act_render_all">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_10" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_translated" target="d12_act_render_all">
+      <mxGeometry relative="1" as="geometry">
+      </mxGeometry>
+    </mxCell>
+    <mxCell id="e_diag_12_11" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#000000;strokeWidth=1.2;endArrow=block;endFill=1;fontSize=10;fontColor=#000000;fontFamily=Arial;" edge="1" parent="1" source="d12_act_render_all" target="d12_end">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="610" y="734" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+  </root></mxGraphModel></diagram>
+</mxfile>

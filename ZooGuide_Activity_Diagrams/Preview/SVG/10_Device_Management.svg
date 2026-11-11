@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="910" viewBox="0 0 860 910">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#000000" />
+    </marker>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff" />
+  <text x="40" y="32" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="bold" fill="#000000">10. QUẢN LÝ THIẾT BỊ (DEVICE MANAGEMENT)</text>
+  <text x="40" y="52" font-family="Arial, Helvetica, sans-serif" font-size="11" fill="#333333">Quy trình nhận heartbeat định kỳ, giám sát thiết bị trực tuyến và ngắt kết nối an toàn</text>
+  <rect x="40" y="70" width="360" height="810" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="40" y="70" width="360" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Người dùng (Visitor / Administrator)</text>
+  <rect x="400" y="70" width="420" height="810" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <rect x="400" y="70" width="420" height="28" fill="#f8fafc" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="89" font-family="Arial, Helvetica, sans-serif" font-size="12" font-weight="bold" fill="#000000" text-anchor="middle">Hệ thống (System)</text>
+  <path d="M 220.0 148 L 220.0 170" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 222 L 610.0 170" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 222 L 610.0 240" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 292 L 610.0 310" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 365 L 610.0 380" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="355.5" width="90" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="367.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Chưa tồn tại]</text>
+  <path d="M 610.0 365 L 610.0 450" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <rect x="612.0" y="390.5" width="78" height="14" fill="#ffffff" stroke="none" />
+  <text x="615.0" y="402.5" font-family="Arial, Helvetica, sans-serif" font-size="10" font-weight="bold" fill="#000000">[Đã tồn tại]</text>
+  <path d="M 610.0 432 L 465 405 L 350 405 L 350 555 L 220 555 L 220.0 530" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 502 L 465 475 L 350 475 L 350 555 L 220 555 L 220.0 530" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 582 L 610.0 530" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 582 L 610 580 L 220 580 L 220.0 620" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 220.0 672 L 610.0 620" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <path d="M 610.0 672 L 610 714 L 220.0 700" fill="none" stroke="#000000" stroke-width="1.2" marker-end="url(#arrow)" />
+  <circle cx="220.0" cy="134.0" r="14" fill="#000000" stroke="#000000" />
+  <rect x="90.0" y="170" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="190.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Du khách mở ứng dụng ZooGuide trên</text>
+  <text x="220.0" y="202.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">trình duyệt thiết bị di động</text>
+  <rect x="460.0" y="170" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="184.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Khởi tạo mã định danh thiết bị</text>
+  <text x="610.0" y="196.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">installationId và định kỳ mỗi 30 giây</text>
+  <text x="610.0" y="208.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">gửi Heartbeat lên máy chủ</text>
+  <rect x="460.0" y="240" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="254.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Tìm kiếm bản ghi thiết bị theo</text>
+  <text x="610.0" y="266.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">InstallationId trong bảng</text>
+  <text x="610.0" y="278.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">DEVICE_ACTIVITIES</text>
+  <polygon points="610.0,310 700.0,337.5 610.0,365 520.0,337.5" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="331.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">Thiết bị đã tồn tại</text>
+  <text x="610.0" y="342.5" font-family="Arial, Helvetica, sans-serif" font-size="9.5" fill="#000000" text-anchor="middle">trong DB?</text>
+  <rect x="460.0" y="380" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="394.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">INSERT bản ghi mới: InstallationId, IP,</text>
+  <text x="610.0" y="406.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">UserAgent, CreatedAt=Now,</text>
+  <text x="610.0" y="418.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">LastSeenAt=Now, IsActive=true</text>
+  <rect x="460.0" y="450" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="464.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">UPDATE bản ghi: LastSeenAt = Now,</text>
+  <text x="610.0" y="476.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">IsActive = true, cập nhật thông tin đơn</text>
+  <text x="610.0" y="488.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">hàng/email</text>
+  <rect x="90.0" y="530" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="544.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Quản trị viên truy cập màn hình</text>
+  <text x="220.0" y="556.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Giám sát thiết bị để theo dõi vận</text>
+  <text x="220.0" y="568.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">hành</text>
+  <rect x="460.0" y="530" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="544.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Quét bảng DEVICE_ACTIVITIES lọc thiết bị</text>
+  <text x="610.0" y="556.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">IsActive=true trong 5 phút qua -&gt; Hiển</text>
+  <text x="610.0" y="568.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">thị số lượng online theo thời gian thực</text>
+  <rect x="90.0" y="620" width="260" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="220.0" y="634.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Du khách đóng tab / chuyển trang</text>
+  <text x="220.0" y="646.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">(hoặc hết hạn timeout 5 phút không</text>
+  <text x="220.0" y="658.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">nhận Heartbeat)</text>
+  <rect x="460.0" y="620" width="300" height="52" rx="10" ry="10" fill="#ffffff" stroke="#000000" stroke-width="1.2" />
+  <text x="610.0" y="628.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">Tiếp nhận tín hiệu sendBeacon disconnect</text>
+  <text x="610.0" y="640.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">-&gt; Cập nhật IsActive = false, lưu thời</text>
+  <text x="610.0" y="652.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">gian ngắt kết nối vào DB và cập nhật số</text>
+  <text x="610.0" y="664.0" font-family="Arial, Helvetica, sans-serif" font-size="10.5" fill="#000000" text-anchor="middle">liệu</text>
+  <circle cx="220.0" cy="714.0" r="14" fill="#ffffff" stroke="#000000" stroke-width="1.5" />
+  <circle cx="220.0" cy="714.0" r="8" fill="#000000" stroke="#000000" />
+</svg>
