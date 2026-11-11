@@ -473,4 +473,168 @@ public class EndToEndIntegrationTests : IDisposable
         Assert.False(apiResponse.Success);
         Assert.Contains("Ngày bắt đầu không được lớn hơn ngày kết thúc", apiResponse.Message);
     }
+
+    // ==========================================
+    // I. TEST MULTILINGUAL NARRATION DASHBOARD TELEMETRY & MONITORING (TASKS 1 - 9)
+    // ==========================================
+    [Fact]
+    public async Task Dashboard_MultilingualNarrationAndPoiMonitoring_ShouldComputeAccurateReadinessAndTelemetry()
+    {
+        // 1. Seed 2 POIs (1 ready, 1 unready due to missing verified coordinate)
+        var readyPoi = new PointOfInterest
+        {
+            PoiId = 10,
+            Code = "POI-READY-01",
+            Name = "Cổng Chính Thảo Cầm Viên",
+            Category = "Gate",
+            Latitude = 10.7875m,
+            Longitude = 106.7051m,
+            RadiusMeters = 50m,
+            IsActive = true,
+            IsCoordinateVerified = true
+        };
+        var unreadyPoi = new PointOfInterest
+        {
+            PoiId = 11,
+            Code = "POI-UNREADY-02",
+            Name = "Hồ Sen Chưa Xác Thực",
+            Category = "Landmark",
+            Latitude = 10.7880m,
+            Longitude = 106.7060m,
+            RadiusMeters = 0m,
+            IsActive = true,
+            IsCoordinateVerified = false
+        };
+        _context.PointsOfInterest.AddRange(readyPoi, unreadyPoi);
+
+        _context.PoiNarrations.Add(new PoiNarration
+        {
+            PoiNarrationId = 100,
+            PoiId = 10,
+            LanguageId = 1,
+            Title = "Thuyết minh Cổng Chính",
+            Content = "Nội dung thuyết minh cổng chính Thảo Cầm Viên.",
+            AudioUrl = "https://mqawjvhflseqjjapegfk.supabase.co/storage/v1/object/public/narration-audio/poi/vi/gate_a_vi.mp3",
+            DurationSeconds = 15,
+            Status = NarrationStatus.Published
+        });
+        await _context.SaveChangesAsync();
+
+        // 2. Record real telemetry events (Language selection, GPS Auto-Trigger funnel, Audio playback success & failure)
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "LANGUAGE",
+            EventType = "LANGUAGE_SELECTED",
+            InstallationId = "visitor-dev-100",
+            LanguageCode = "vi"
+        });
+
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "GPS",
+            EventType = "PROXIMITY_DETECTED",
+            InstallationId = "visitor-dev-100",
+            TargetType = "POI",
+            TargetId = 10,
+            TargetCode = "POI-READY-01",
+            TargetName = "Cổng Chính Thảo Cầm Viên",
+            DistanceMeters = 22.5m
+        });
+
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "GPS",
+            EventType = "TRIGGERED",
+            InstallationId = "visitor-dev-100",
+            TargetType = "POI",
+            TargetId = 10,
+            TargetCode = "POI-READY-01",
+            TargetName = "Cổng Chính Thảo Cầm Viên",
+            DistanceMeters = 22.5m
+        });
+
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "AUDIO",
+            EventType = "PLAY_REQUESTED",
+            InstallationId = "visitor-dev-100",
+            LanguageCode = "vi",
+            TargetType = "POI",
+            TargetId = 10,
+            TargetCode = "POI-READY-01",
+            TargetName = "Cổng Chính Thảo Cầm Viên",
+            TriggerSource = "GPS_AUTO"
+        });
+
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "AUDIO",
+            EventType = "PLAY_COMPLETED",
+            InstallationId = "visitor-dev-100",
+            LanguageCode = "vi",
+            TargetType = "POI",
+            TargetId = 10,
+            TargetCode = "POI-READY-01",
+            TargetName = "Cổng Chính Thảo Cầm Viên",
+            TriggerSource = "GPS_AUTO",
+            ListenDurationSeconds = 15
+        });
+
+        await _dashboardService.RecordTelemetryEventAsync(new RecordTelemetryEventRequest
+        {
+            Category = "AUDIO",
+            EventType = "ERROR_LOAD_FILE",
+            InstallationId = "visitor-dev-100",
+            LanguageCode = "en",
+            TargetType = "Animal",
+            TargetId = 1,
+            TargetName = "Sư tử Simba",
+            TriggerSource = "MANUAL_MAP",
+            IsSuccess = false,
+            ErrorCode = "HTTP_404",
+            ErrorMessage = "Không tải được file âm thanh"
+        });
+
+        // 3. Query Dashboard stats and verify Tasks 2-9
+        var stats = await _dashboardService.GetStatsAsync();
+
+        Assert.NotNull(stats.OverviewKpis);
+        Assert.Equal(1, stats.OverviewKpis.ActiveNarrationUsersCount);
+        Assert.Equal(1, stats.OverviewKpis.ReadyPoisCount);
+        Assert.Equal(1, stats.OverviewKpis.FailedAudioPlaysCount);
+        Assert.Equal(1, stats.OverviewKpis.FileLoadErrorCount);
+        Assert.True(stats.OverviewKpis.HasPlayRateData);
+        Assert.Equal(50.0, stats.OverviewKpis.AudioPlaySuccessRatePercent); // 1 completed vs 1 failed
+
+        // POI Monitoring
+        Assert.Equal(2, stats.PoiMonitoring.TotalPois);
+        Assert.Equal(1, stats.PoiMonitoring.ReadyForAutoTriggerCount);
+        Assert.Equal(1, stats.PoiMonitoring.NotReadyForAutoTriggerCount);
+
+        // GPS Funnel
+        Assert.True(stats.GpsAutoTrigger.HasGpsTriggerData);
+        Assert.Equal(1, stats.GpsAutoTrigger.TriggeredCount);
+
+        // Language Usage
+        Assert.True(stats.LanguageUsage.HasUsageData);
+        Assert.Equal("vi", stats.LanguageUsage.MostUsedLanguageCode);
+
+        // Service Monitoring & Alerts
+        Assert.NotEmpty(stats.ServiceMonitoring.Services);
+        Assert.NotEmpty(stats.SystemAlerts);
+
+        // Update Alert Status
+        var firstAlertKey = stats.SystemAlerts[0].AlertKey;
+        bool updatedAlert = await _dashboardService.UpdateAlertStatusAsync(new UpdateAlertStatusRequest
+        {
+            AlertKey = firstAlertKey,
+            Status = "InProgress"
+        });
+        Assert.True(updatedAlert);
+
+        var statsAfterAlertUpdate = await _dashboardService.GetStatsAsync();
+        var matchingAlert = statsAfterAlertUpdate.SystemAlerts.First(a => a.AlertKey == firstAlertKey);
+        Assert.Equal("InProgress", matchingAlert.Status);
+        Assert.Equal("Đang xử lý", matchingAlert.StatusLabel);
+    }
 }

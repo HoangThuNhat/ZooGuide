@@ -683,29 +683,77 @@ tileLayer.addTo(map);
     const evaluateAutoNarrationTrigger = useCallback((userLat, userLng, accuracy) => {
         if (!mergedMarkers || mergedMarkers.length === 0) return;
 
-        // Lọc các điểm có audio hoặc bài thuyết minh
-        const eligibleTargets = mergedMarkers.filter(m => {
-            if (!m.lat || !m.lng) return false;
+        // Lọc các điểm nằm trong bán kính kích hoạt (sử dụng radiusMeters của POI hoặc mặc định 25m)
+        const nearbyTargets = mergedMarkers.filter(m => m.lat && m.lng).map(m => {
+            const dist = calculateHaversineDistance(userLat, userLng, m.lat, m.lng);
+            const triggerRadius = Number(m.radiusMeters) > 0 ? Math.min(Number(m.radiusMeters), 50) : 25;
+            return { ...m, dist, triggerRadius };
+        }).filter(m => m.dist <= m.triggerRadius);
+
+        if (nearbyTargets.length === 0) return;
+
+        // Ưu tiên điểm gần du khách nhất
+        nearbyTargets.sort((a, b) => a.dist - b.dist);
+        const nearest = nearbyTargets[0];
+        const now = Date.now();
+
+        // Ghi nhận sự kiện phát hiện vào vùng POI (throttled mỗi 90s cho cùng 1 điểm để tránh spam)
+        const proxKey = `prox_${nearest.id}`;
+        const lastProxTime = audioCooldownMapRef.current.get(proxKey) || 0;
+        if (now - lastProxTime > 90000) {
+            audioCooldownMapRef.current.set(proxKey, now);
+            ZooApi.recordDashboardTelemetry({
+                category: 'GPS',
+                eventType: 'PROXIMITY_DETECTED',
+                sessionId: currentSession?.sessionId || null,
+                languageCode: currentLang,
+                targetType: nearest.poiId ? 'POI' : 'Enclosure',
+                targetId: nearest.poiId || nearest.enclosureId || null,
+                targetCode: nearest.code || String(nearest.id),
+                targetName: nearest.name,
+                triggerSource: 'GPS_AUTO',
+                distanceMeters: Math.round(nearest.dist * 10) / 10,
+                accuracyMeters: Math.round((accuracy || 0) * 10) / 10,
+                isSuccess: true
+            });
+        }
+
+        // Lọc các điểm đủ điều kiện có audio hoặc bài thuyết minh
+        const eligibleTargets = nearbyTargets.filter(m => {
             const isPoiWithAudio = m.poiId && m.hasAudio;
             const isEnclosureWithAnimals = m.residentAnimals && m.residentAnimals.length > 0;
             return isPoiWithAudio || isEnclosureWithAnimals;
-        }).map(m => {
-            const dist = calculateHaversineDistance(userLat, userLng, m.lat, m.lng);
-            return { ...m, dist };
-        }).filter(m => m.dist <= 25); // Ngưỡng bán kính kích hoạt: 25 mét
+        });
 
         if (eligibleTargets.length === 0) return;
 
-        // Ưu tiên điểm gần du khách nhất
-        eligibleTargets.sort((a, b) => a.dist - b.dist);
-
-        const now = Date.now();
         const candidate = eligibleTargets.find(t => {
             const lastTime = audioCooldownMapRef.current.get(t.id) || 0;
             return (now - lastTime) > 120000; // Cooldown 120s (2 phút) để tránh lặp âm thanh
         });
 
-        if (!candidate) return;
+        if (!candidate) {
+            // Đang trong thời gian chờ Cooldown -> ghi nhận SKIPPED_COOLDOWN tối đa 1 lần / 90s
+            const skipKey = `skip_${eligibleTargets[0].id}`;
+            const lastSkipTime = audioCooldownMapRef.current.get(skipKey) || 0;
+            if (now - lastSkipTime > 90000) {
+                audioCooldownMapRef.current.set(skipKey, now);
+                ZooApi.recordDashboardTelemetry({
+                    category: 'GPS',
+                    eventType: 'SKIPPED_COOLDOWN',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: currentLang,
+                    targetType: eligibleTargets[0].poiId ? 'POI' : 'Enclosure',
+                    targetId: eligibleTargets[0].poiId || eligibleTargets[0].enclosureId || null,
+                    targetCode: eligibleTargets[0].code || String(eligibleTargets[0].id),
+                    targetName: eligibleTargets[0].name,
+                    triggerSource: 'GPS_AUTO',
+                    distanceMeters: Math.round(eligibleTargets[0].dist * 10) / 10,
+                    isSuccess: true
+                });
+            }
+            return;
+        }
 
         // Kiểm tra quyền nghe thuyết minh (yêu cầu phiên vé)
         if (!hasActiveSession) {
@@ -714,12 +762,42 @@ tileLayer.addTo(map);
             return;
         }
 
-        // Kích hoạt audio thuyết minh
+        // Đủ điều kiện kích hoạt và thực hiện kích hoạt thuyết minh tự động
         audioCooldownMapRef.current.set(candidate.id, now);
         setLastTriggeredTarget({ id: candidate.id, name: candidate.name, dist: Math.round(candidate.dist) });
 
+        ZooApi.recordDashboardTelemetry({
+            category: 'GPS',
+            eventType: 'TRIGGER_ELIGIBLE',
+            sessionId: currentSession?.sessionId || null,
+            languageCode: currentLang,
+            targetType: candidate.poiId ? 'POI' : 'Enclosure',
+            targetId: candidate.poiId || candidate.enclosureId || null,
+            targetCode: candidate.code || String(candidate.id),
+            targetName: candidate.name,
+            triggerSource: 'GPS_AUTO',
+            distanceMeters: Math.round(candidate.dist * 10) / 10,
+            accuracyMeters: Math.round((accuracy || 0) * 10) / 10,
+            isSuccess: true
+        });
+
+        ZooApi.recordDashboardTelemetry({
+            category: 'GPS',
+            eventType: 'TRIGGERED',
+            sessionId: currentSession?.sessionId || null,
+            languageCode: currentLang,
+            targetType: candidate.poiId ? 'POI' : 'Enclosure',
+            targetId: candidate.poiId || candidate.enclosureId || null,
+            targetCode: candidate.code || String(candidate.id),
+            targetName: candidate.name,
+            triggerSource: 'GPS_AUTO',
+            distanceMeters: Math.round(candidate.dist * 10) / 10,
+            accuracyMeters: Math.round((accuracy || 0) * 10) / 10,
+            isSuccess: true
+        });
+
         if (candidate.poiId && onPlayPoiAudio) {
-            onPlayPoiAudio(candidate.poiId);
+            onPlayPoiAudio(candidate.poiId, true, 'GPS_AUTO');
             showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
         } else if (candidate.residentAnimals && candidate.residentAnimals.length > 0) {
             if (onOpenSpeciesNarration) {
@@ -729,10 +807,20 @@ tileLayer.addTo(map);
             }
             showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
         }
-    }, [mergedMarkers, hasActiveSession, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast, setIsTicketModalOpen]);
+    }, [mergedMarkers, hasActiveSession, currentSession?.sessionId, currentLang, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast]);
 
     const startAutoNarrationTracking = useCallback(() => {
         if (!navigator.geolocation) {
+            ZooApi.recordDashboardTelemetry({
+                category: 'GPS',
+                eventType: 'GPS_UNAVAILABLE',
+                sessionId: currentSession?.sessionId || null,
+                languageCode: currentLang,
+                triggerSource: 'GPS_AUTO',
+                isSuccess: false,
+                errorCode: 'GEOLOCATION_UNSUPPORTED',
+                errorMessage: 'Trình duyệt không hỗ trợ định vị GPS'
+            });
             showToast("Trình duyệt của bạn không hỗ trợ định vị GPS.", "error");
             return;
         }
@@ -764,6 +852,16 @@ tileLayer.addTo(map);
             },
             (err) => {
                 console.warn("watchPosition error:", err);
+                ZooApi.recordDashboardTelemetry({
+                    category: 'GPS',
+                    eventType: 'GPS_UNAVAILABLE',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: currentLang,
+                    triggerSource: 'GPS_AUTO',
+                    isSuccess: false,
+                    errorCode: `GEO_ERR_${err.code}`,
+                    errorMessage: err.code === 1 ? 'Khách từ chối cấp quyền vị trí GPS' : 'Mất tín hiệu hoặc hết thời gian chờ GPS'
+                });
                 if (err.code === 1) {
                     showToast("Quyền truy cập vị trí bị từ chối. Vui lòng cho phép quyền vị trí trong trình duyệt.", "error");
                     stopAutoNarrationTracking();
@@ -777,7 +875,7 @@ tileLayer.addTo(map);
         );
 
         showToast("Đã bật chế độ thuyết minh tự động theo GPS.", "success");
-    }, [evaluateAutoNarrationTrigger, showToast, updateUserGpsMarker]);
+    }, [currentLang, currentSession?.sessionId, evaluateAutoNarrationTrigger, showToast, updateUserGpsMarker]);
 
     const stopAutoNarrationTracking = useCallback(() => {
         if (watchIdRef.current) {

@@ -34,6 +34,7 @@ public class ZooGuideDbContext : DbContext
     public virtual DbSet<DeviceActivity> DeviceActivities => Set<DeviceActivity>();
     public virtual DbSet<PointOfInterest> PointsOfInterest => Set<PointOfInterest>();
     public virtual DbSet<PoiNarration> PoiNarrations => Set<PoiNarration>();
+    public virtual DbSet<NarrationTelemetryEvent> NarrationTelemetryEvents => Set<NarrationTelemetryEvent>();
 
     // Extended Sets
     public virtual DbSet<LocationLog> LocationLogs => Set<LocationLog>();

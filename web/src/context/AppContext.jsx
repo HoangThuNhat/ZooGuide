@@ -1258,6 +1258,17 @@ export function AppProvider({ children }) {
         try {
             localStorage.setItem(LANG_STORAGE_KEY, normalized);
         } catch (e) {}
+        ZooApi.recordDashboardTelemetry({
+            category: 'LANGUAGE',
+            eventType: 'LANGUAGE_SELECTED',
+            languageCode: normalized,
+            sessionId: currentSession?.sessionId || null,
+            targetType: 'Language',
+            targetCode: normalized.toUpperCase(),
+            targetName: `Ngôn ngữ ${normalized.toUpperCase()}`,
+            triggerSource: 'MANUAL_UI',
+            isSuccess: true
+        });
         const baseT = translations[normalized] || translations.vi;
         const remoteT = remoteUiTranslations[normalized] || {};
         showToast(remoteT.languageChanged || baseT.languageChanged || `Language: ${normalized}`, 'info');

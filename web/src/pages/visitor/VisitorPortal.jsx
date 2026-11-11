@@ -49,8 +49,27 @@ export default function VisitorPortal() {
         setAudioState(prev => ({ ...prev, isPlaying: false }));
     }, [setAudioState]);
 
-    const startAudioPlayback = useCallback((narration, rate = 1.0) => {
+    const startAudioPlayback = useCallback((narration, rate = 1.0, triggerSource = 'MANUAL_LIST') => {
+        const isPoi = Boolean(narration?.poiId);
+        const targetType = isPoi ? 'POI' : 'Animal';
+        const targetId = narration?.poiId || narration?.speciesId || narration?.animalId || null;
+        const targetName = narration?.poiName || narration?.speciesName || narration?.animalName || narration?.title || 'Thuyết minh';
+        const langCode = narration?.languageCode || currentLang || 'vi';
+
         if (!narration || !narration.audioSrc) {
+            ZooApi.recordDashboardTelemetry({
+                category: 'AUDIO',
+                eventType: 'ERROR_LOAD_FILE',
+                sessionId: currentSession?.sessionId || null,
+                languageCode: langCode,
+                targetType,
+                targetId,
+                targetName,
+                triggerSource,
+                isSuccess: false,
+                errorCode: 'MISSING_AUDIO_SRC',
+                errorMessage: 'Bài thuyết minh chưa có đường dẫn file âm thanh'
+            });
             showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
             setAudioState(prev => ({ ...prev, isPlaying: false }));
             return;
@@ -81,6 +100,34 @@ export default function VisitorPortal() {
             };
 
             audio.onended = () => {
+                const listenedSec = Math.round(audio.duration || narration.durationSec || 30);
+                ZooApi.recordDashboardTelemetry({
+                    category: 'AUDIO',
+                    eventType: 'PLAY_COMPLETED',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: langCode,
+                    targetType,
+                    targetId,
+                    targetName,
+                    triggerSource,
+                    listenDurationSeconds: listenedSec,
+                    totalDurationSeconds: listenedSec,
+                    isSuccess: true
+                });
+                if (triggerSource === 'GPS_AUTO') {
+                    ZooApi.recordDashboardTelemetry({
+                        category: 'GPS',
+                        eventType: 'TRIGGER_PLAY_SUCCESS',
+                        sessionId: currentSession?.sessionId || null,
+                        languageCode: langCode,
+                        targetType,
+                        targetId,
+                        targetName,
+                        triggerSource: 'GPS_AUTO',
+                        listenDurationSeconds: listenedSec,
+                        isSuccess: true
+                    });
+                }
                 setAudioState(prev => ({
                     ...prev,
                     isPlaying: false,
@@ -90,7 +137,19 @@ export default function VisitorPortal() {
 
             audio.onerror = () => {
                 console.warn('Audio playback error for stream:', audio.src);
-                // Loại bỏ hoàn toàn fallback publicUrl đối với audio yêu cầu phiên vé hợp lệ
+                ZooApi.recordDashboardTelemetry({
+                    category: 'AUDIO',
+                    eventType: 'ERROR_LOAD_FILE',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: langCode,
+                    targetType,
+                    targetId,
+                    targetName,
+                    triggerSource,
+                    isSuccess: false,
+                    errorCode: 'AUDIO_STREAM_ERROR',
+                    errorMessage: 'Không thể tải hoặc giải mã luồng âm thanh'
+                });
                 showToast(t?.audioMissingDesc || 'Không thể tải hoặc phát file âm thanh thuyết minh. Vui lòng kiểm tra quyền truy cập hoặc kết nối mạng.', 'error');
                 pauseAudioPlayback();
             };
@@ -98,17 +157,43 @@ export default function VisitorPortal() {
             audio.src = narration.audioSrc;
             audio.playbackRate = rate;
             audio.currentTime = 0;
-            audio.play().catch(err => {
+            audio.play().then(() => {
+                ZooApi.recordDashboardTelemetry({
+                    category: 'AUDIO',
+                    eventType: 'PLAY_STARTED',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: langCode,
+                    targetType,
+                    targetId,
+                    targetName,
+                    triggerSource,
+                    totalDurationSeconds: narration.durationSec || 30,
+                    isSuccess: true
+                });
+            }).catch(err => {
                 console.warn('Audio playback blocked or failed:', err.message);
+                ZooApi.recordDashboardTelemetry({
+                    category: 'AUDIO',
+                    eventType: 'ERROR_PLAYBACK',
+                    sessionId: currentSession?.sessionId || null,
+                    languageCode: langCode,
+                    targetType,
+                    targetId,
+                    targetName,
+                    triggerSource,
+                    isSuccess: false,
+                    errorCode: 'PLAYBACK_BLOCKED',
+                    errorMessage: err.message
+                });
                 setAudioState(prev => ({ ...prev, isPlaying: false }));
             });
         } catch (err) {
             console.warn('Audio setup error:', err);
             pauseAudioPlayback();
         }
-    }, [pauseAudioPlayback, setAudioState, showToast, t]);
+    }, [currentLang, currentSession?.sessionId, pauseAudioPlayback, setAudioState, showToast, t]);
 
-    const playSpeciesAudio = useCallback(async (speciesId, startAutoplay = true, lang = currentLang) => {
+    const playSpeciesAudio = useCallback(async (speciesId, startAutoplay = true, lang = currentLang, triggerSource = 'MANUAL_LIST') => {
         if (!hasActiveSession || !currentSession?.sessionId) {
             showToast(t?.ticketRequiredNarration || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
             pauseAudioPlayback();
@@ -124,8 +209,33 @@ export default function VisitorPortal() {
             return;
         }
 
+        ZooApi.recordDashboardTelemetry({
+            category: 'AUDIO',
+            eventType: 'PLAY_REQUESTED',
+            sessionId: currentSession.sessionId,
+            languageCode: lang,
+            targetType: 'Animal',
+            targetId: parseInt(speciesId),
+            targetName: `Loài #${speciesId}`,
+            triggerSource,
+            isSuccess: true
+        });
+
         const res = await ZooApi.getSpeciesNarration(speciesId, lang, currentSession.sessionId);
         if (!res.success) {
+            ZooApi.recordDashboardTelemetry({
+                category: 'AUDIO',
+                eventType: 'ERROR_API',
+                sessionId: currentSession.sessionId,
+                languageCode: lang,
+                targetType: 'Animal',
+                targetId: parseInt(speciesId),
+                targetName: `Loài #${speciesId}`,
+                triggerSource,
+                isSuccess: false,
+                errorCode: res.unauthorized ? 'UNAUTHORIZED_SESSION' : 'NARRATION_API_ERROR',
+                errorMessage: res.message || 'Lỗi truy vấn API thuyết minh'
+            });
             if (res.unauthorized) {
                 showToast(res.message || 'Phiên tham quan đã hết hạn hoặc bị thu hồi. Vui lòng kích hoạt lại vé.', 'error');
                 clearSession();
@@ -166,7 +276,7 @@ export default function VisitorPortal() {
 
         if (startAutoplay) {
             if (res.data.hasAudio && res.data.audioSrc) {
-                startAudioPlayback(res.data, 1.0);
+                startAudioPlayback(res.data, 1.0, triggerSource);
             } else {
                 showToast(t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.', 'error');
             }
@@ -219,6 +329,23 @@ export default function VisitorPortal() {
     const handleStopAudio = useCallback(() => {
         if (audioElementRef.current) {
             try {
+                const curSec = Math.round(audioElementRef.current.currentTime || 0);
+                const durSec = Math.round(audioElementRef.current.duration || audioState?.duration || 0);
+                if (curSec > 0 && (durSec === 0 || curSec < durSec - 1)) {
+                    ZooApi.recordDashboardTelemetry({
+                        category: 'AUDIO',
+                        eventType: 'PLAY_STOPPED_EARLY',
+                        sessionId: currentSession?.sessionId || null,
+                        languageCode: audioState?.narration?.languageCode || currentLang,
+                        targetType: 'Animal',
+                        targetId: audioState?.narration?.speciesId || audioState?.animal?.id || null,
+                        targetName: audioState?.animal?.name || audioState?.narration?.title || 'Thuyết minh',
+                        triggerSource: 'MANUAL_STOP',
+                        listenDurationSeconds: curSec,
+                        totalDurationSeconds: durSec || null,
+                        isSuccess: true
+                    });
+                }
                 audioElementRef.current.pause();
                 audioElementRef.current.currentTime = 0;
             } catch (e) {
@@ -230,11 +357,28 @@ export default function VisitorPortal() {
             isPlaying: false,
             currentTime: 0
         }));
-    }, [setAudioState]);
+    }, [audioState, currentLang, currentSession?.sessionId, setAudioState]);
 
     const handleCloseAudio = useCallback(() => {
         if (audioElementRef.current) {
             try {
+                const curSec = Math.round(audioElementRef.current.currentTime || 0);
+                const durSec = Math.round(audioElementRef.current.duration || audioState?.duration || 0);
+                if (!audioElementRef.current.paused && curSec > 0 && (durSec === 0 || curSec < durSec - 1)) {
+                    ZooApi.recordDashboardTelemetry({
+                        category: 'AUDIO',
+                        eventType: 'PLAY_STOPPED_EARLY',
+                        sessionId: currentSession?.sessionId || null,
+                        languageCode: audioState?.narration?.languageCode || currentLang,
+                        targetType: 'Animal',
+                        targetId: audioState?.narration?.speciesId || audioState?.animal?.id || null,
+                        targetName: audioState?.animal?.name || audioState?.narration?.title || 'Thuyết minh',
+                        triggerSource: 'MANUAL_CLOSE',
+                        listenDurationSeconds: curSec,
+                        totalDurationSeconds: durSec || null,
+                        isSuccess: true
+                    });
+                }
                 audioElementRef.current.pause();
                 audioElementRef.current.currentTime = 0;
                 audioElementRef.current.src = '';
@@ -248,7 +392,7 @@ export default function VisitorPortal() {
             currentTime: 0,
             isVisible: false
         }));
-    }, [setAudioState]);
+    }, [audioState, currentLang, currentSession?.sessionId, setAudioState]);
 
     // Tự động dừng âm thanh khi mất phiên vé hoặc phiên vé hết hạn
     useEffect(() => {
@@ -337,7 +481,7 @@ export default function VisitorPortal() {
         };
     }, []);
 
-    const playPoiAudio = useCallback(async (poiId, startAutoplay = true) => {
+    const playPoiAudio = useCallback(async (poiId, startAutoplay = true, triggerSource = 'MANUAL_MAP') => {
         if (!hasActiveSession || !currentSession?.sessionId) {
             showToast(t?.ticketRequiredNarration || 'Vui lòng kích hoạt vé tham quan hợp lệ để sử dụng chức năng thuyết minh.', 'error');
             pauseAudioPlayback();
@@ -353,9 +497,34 @@ export default function VisitorPortal() {
             return;
         }
 
+        ZooApi.recordDashboardTelemetry({
+            category: 'AUDIO',
+            eventType: 'PLAY_REQUESTED',
+            sessionId: currentSession.sessionId,
+            languageCode: currentLang,
+            targetType: 'POI',
+            targetId: parseInt(poiId),
+            targetName: `POI #${poiId}`,
+            triggerSource,
+            isSuccess: true
+        });
+
         try {
             const res = await ZooApi.getPoiPublicNarration(poiId, currentLang, currentSession.sessionId);
             if (!res.success) {
+                ZooApi.recordDashboardTelemetry({
+                    category: 'AUDIO',
+                    eventType: 'ERROR_API',
+                    sessionId: currentSession.sessionId,
+                    languageCode: currentLang,
+                    targetType: 'POI',
+                    targetId: parseInt(poiId),
+                    targetName: `POI #${poiId}`,
+                    triggerSource,
+                    isSuccess: false,
+                    errorCode: res.unauthorized ? 'UNAUTHORIZED_SESSION' : 'POI_API_ERROR',
+                    errorMessage: res.message || 'Chưa có bài thuyết minh cho điểm tham quan này'
+                });
                 if (res.unauthorized) {
                     showToast(res.message || 'Phiên tham quan đã hết hạn hoặc không hợp lệ. Vui lòng kích hoạt lại vé.', 'error');
                     clearSession();
@@ -379,6 +548,9 @@ export default function VisitorPortal() {
             const mins = Math.floor(duration / 60);
             const secs = (duration % 60).toString().padStart(2, '0');
             const narrationData = {
+                poiId: data.poiId,
+                poiName: data.poiName,
+                languageCode: data.languageCode || currentLang,
                 title: data.title || data.poiName,
                 narrator: 'ZooGuide Audio',
                 audioSrc: audioSource,
@@ -403,7 +575,7 @@ export default function VisitorPortal() {
                 showToast(data.fallbackMessage || ('Đang phát thuyết minh bằng ngôn ngữ dự phòng (' + (data.languageCode || '').toUpperCase() + ').'), 'info');
             }
             if (startAutoplay && audioSource) {
-                startAudioPlayback(narrationData, 1.0);
+                startAudioPlayback(narrationData, 1.0, triggerSource);
             } else if (!audioSource) {
                 showToast('Điểm tham quan này hiện chưa có file âm thanh thuyết minh.', 'info');
             }

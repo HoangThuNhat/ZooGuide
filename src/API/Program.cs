@@ -186,12 +186,45 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 .WithName("HealthCheck")
 .WithOpenApi();
 
-// Seed initial data if development
-if (app.Environment.IsDevelopment())
+// Seed initial data if development & ensure telemetry schema exists
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
-    await ZooGuideDataSeeder.SeedAsync(dbContext);
+    try
+    {
+        await dbContext.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""NARRATION_TELEMETRY_EVENTS"" (
+                ""TelemetryEventId"" BIGSERIAL PRIMARY KEY,
+                ""Category"" VARCHAR(40) NOT NULL,
+                ""EventType"" VARCHAR(60) NOT NULL,
+                ""InstallationId"" VARCHAR(128) NULL,
+                ""SessionId"" UUID NULL,
+                ""LanguageCode"" VARCHAR(16) NULL,
+                ""TargetType"" VARCHAR(40) NULL,
+                ""TargetId"" INT NULL,
+                ""TargetCode"" VARCHAR(100) NULL,
+                ""TargetName"" VARCHAR(255) NULL,
+                ""TriggerSource"" VARCHAR(40) NULL,
+                ""ListenDurationSeconds"" INT NULL,
+                ""TotalDurationSeconds"" INT NULL,
+                ""DistanceMeters"" NUMERIC(10, 2) NULL,
+                ""AccuracyMeters"" NUMERIC(10, 2) NULL,
+                ""IsSuccess"" BOOLEAN NOT NULL DEFAULT TRUE,
+                ""ErrorCode"" VARCHAR(80) NULL,
+                ""ErrorMessage"" TEXT NULL,
+                ""CreatedAt"" TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+        ");
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning(ex, "Không thể kiểm tra/khởi tạo bảng NARRATION_TELEMETRY_EVENTS lúc khởi động.");
+    }
+
+    if (app.Environment.IsDevelopment())
+    {
+        await ZooGuideDataSeeder.SeedAsync(dbContext);
+    }
 }
 
 app.Run();

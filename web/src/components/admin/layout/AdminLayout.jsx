@@ -86,16 +86,16 @@ export default function AdminLayout() {
                 aria-label="Thanh điều hướng quản trị"
             >
                 <div className="admin-sidebar-header">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', overflow: 'hidden' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: '#15803D', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2.2">
-                                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path>
-                                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"></path>
+                    <div className="admin-sidebar-brand">
+                        <div className="admin-sidebar-logo">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M12 2a8 8 0 0 0-8 8c0 5.25 8 12 8 12s8-6.75 8-12a8 8 0 0 0-8-8z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
                             </svg>
                         </div>
-                        <div style={{ overflow: 'hidden' }}>
-                            <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#F8FAFC', whiteSpace: 'nowrap' }}>ZooGuide Admin</h2>
-                            <span style={{ fontSize: '0.72rem', color: '#94A3B8', whiteSpace: 'nowrap' }}>Thảo Cầm Viên Sài Gòn</span>
+                        <div className="admin-sidebar-brand-text">
+                            <h2>ZooGuide Admin</h2>
+                            <span>Thảo Cầm Viên Sài Gòn</span>
                         </div>
                     </div>
                     {/* Mobile close button */}
@@ -120,9 +120,11 @@ export default function AdminLayout() {
                             className={({ isActive }) => `admin-sidebar-link ${isActive ? 'active' : ''}`}
                             title={link.label}
                         >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                                <path d={link.icon}></path>
-                            </svg>
+                            <span className="admin-sidebar-icon">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d={link.icon}></path>
+                                </svg>
+                            </span>
                             <span className="admin-nav-text">{link.label}</span>
                         </NavLink>
                     ))}
@@ -135,10 +137,12 @@ export default function AdminLayout() {
                         className="admin-sidebar-visitor-link"
                         title="Về Trang Khách Tham Quan"
                     >
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
-                            <line x1="19" y1="12" x2="5" y2="12"></line>
-                            <polyline points="12 19 5 12 12 5"></polyline>
-                        </svg>
+                        <span className="admin-sidebar-icon">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.85" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="19" y1="12" x2="5" y2="12"></line>
+                                <polyline points="12 19 5 12 12 5"></polyline>
+                            </svg>
+                        </span>
                         <span className="admin-nav-text">Về Website Khách</span>
                     </Link>
                 </div>
@@ -157,23 +161,25 @@ export default function AdminLayout() {
                             aria-expanded={isSidebarOpen}
                             title={isSidebarOpen ? "Thu gọn thanh điều hướng" : "Mở rộng thanh điều hướng"}
                         >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                 <line x1="3" y1="12" x2="21" y2="12"></line>
                                 <line x1="3" y1="6" x2="21" y2="6"></line>
                                 <line x1="3" y1="18" x2="21" y2="18"></line>
                             </svg>
                         </button>
-                        <div className="admin-header-title">
-                            <span style={{ color: '#64748B', fontSize: '0.82rem' }}>Phân Hệ Quản Trị / </span>
-                            <strong style={{ color: '#0F172A', fontSize: '0.9rem' }}>{pageTitle}</strong>
-                        </div>
+                        <nav className="admin-breadcrumb" aria-label="Breadcrumb">
+                            <span className="admin-breadcrumb-root">Phân hệ quản trị</span>
+                            <span className="admin-breadcrumb-sep" aria-hidden="true">/</span>
+                            <span className="admin-breadcrumb-current">{pageTitle}</span>
+                        </nav>
                     </div>
 
                     <div className="admin-header-right">
-                        <span className="badge badge-success text-xs" style={{ borderRadius: '4px' }}>
-                            Hệ Thống Trực Tuyến
-                        </span>
-                        <Link to="/" className="btn btn-sm btn-outline" style={{ fontSize: '0.8rem', padding: '5px 12px' }}>
+                        <div className="admin-online-indicator" title="Kết nối máy chủ ổn định">
+                            <span className="admin-online-dot" />
+                            <span>Hệ thống trực tuyến</span>
+                        </div>
+                        <Link to="/" className="admin-header-primary-btn">
                             Mở Trang Khách
                         </Link>
                     </div>

@@ -93,7 +93,7 @@ export default function TicketModal() {
                                 switchTab('tickets');
                             }}
                         >
-                            🛒 {t?.btnPurchaseTicket || 'Mua vé tham quan trực tuyến'}
+                            {t?.btnPurchaseTicket || 'Mua vé tham quan trực tuyến'}
                         </button>
                     </div>
                 </div>

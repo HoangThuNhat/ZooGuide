@@ -1318,6 +1318,75 @@ export const ZooApi = {
         }
     },
 
+    async recordDashboardTelemetry(payload = {}) {
+        try {
+            let installationId = payload.installationId;
+            if (!installationId && typeof window !== 'undefined' && window.localStorage) {
+                installationId = window.localStorage.getItem('zooguide_device_installation_id_v1') || null;
+            }
+            const body = {
+                category: payload.category || 'AUDIO',
+                eventType: payload.eventType || 'PLAY_REQUESTED',
+                installationId: installationId || null,
+                sessionId: payload.sessionId || null,
+                languageCode: payload.languageCode || null,
+                targetType: payload.targetType || null,
+                targetId: payload.targetId != null ? Number(payload.targetId) : null,
+                targetCode: payload.targetCode || null,
+                targetName: payload.targetName || null,
+                triggerSource: payload.triggerSource || 'MANUAL_MAP',
+                listenDurationSeconds: payload.listenDurationSeconds != null ? Math.round(Number(payload.listenDurationSeconds)) : null,
+                totalDurationSeconds: payload.totalDurationSeconds != null ? Math.round(Number(payload.totalDurationSeconds)) : null,
+                distanceMeters: payload.distanceMeters != null ? Number(payload.distanceMeters) : null,
+                accuracyMeters: payload.accuracyMeters != null ? Number(payload.accuracyMeters) : null,
+                isSuccess: payload.isSuccess !== false,
+                errorCode: payload.errorCode || null,
+                errorMessage: payload.errorMessage || null
+            };
+            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/telemetry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) return { success: false };
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    },
+
+    async verifyDashboardAudioStorage(forceRefresh = true) {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/verify-audio?forceRefresh=${Boolean(forceRefresh)}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('verifyDashboardAudioStorage error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
+    async updateDashboardAlertStatus(alertKey, status, note = '') {
+        try {
+            const res = await fetch(`${API_CONFIG.BASE_URL}/dashboard/alerts/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ alertKey, status, note })
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            return { success: true, data: data.data || data };
+        } catch (err) {
+            console.error('updateDashboardAlertStatus error:', err);
+            return { success: false, error: err.message };
+        }
+    },
+
     // 15. ADMIN: AUDIT LOGS
     async getAdminLogs(limit = 50) {
         try {

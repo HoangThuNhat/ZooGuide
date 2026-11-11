@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { ZooApi } from '../../services/api';
 import { useApp } from '../../context/AppContext';
 
@@ -277,7 +277,7 @@ export default function SpeciesNarrationModal({
                                         switchTab('tickets');
                                     }}
                                 >
-                                    🛒 {t?.btnPurchaseTicket || 'Mua vé tham quan'}
+                                    {t?.btnPurchaseTicket || 'Mua vé tham quan'}
                                 </button>
                                 <button
                                     type="button"
@@ -288,7 +288,7 @@ export default function SpeciesNarrationModal({
                                         setIsTicketModalOpen(true);
                                     }}
                                 >
-                                    🔑 {t?.btnActivateTicket || 'Kích hoạt vé'}
+                                    {t?.btnActivateTicket || 'Kích hoạt vé'}
                                 </button>
                             </div>
                         </div>
