@@ -1,28 +1,70 @@
 import React from 'react';
 import { useNetworkStatus } from '../../pwa/useNetworkStatus';
+import { ZooApi } from '../../services/api';
 
 export default function OfflineBanner() {
-    const { isOnline, showReconnected, isDismissed, dismissAlert } = useNetworkStatus();
+    const {
+        isOnline,
+        isApiReachable,
+        isUsingOfflineData,
+        lastOfflineCachedAt,
+        showReconnected,
+        isDismissed,
+        dismissAlert,
+        hasSwUpdate,
+        triggerSwUpdate
+    } = useNetworkStatus();
 
-    // If online and not currently showing reconnection feedback, render nothing
-    if (isOnline && !showReconnected) {
+    const isDisconnected = !isOnline || !isApiReachable || isUsingOfflineData;
+
+    if (!isDisconnected && !showReconnected && !hasSwUpdate) {
         return null;
     }
 
-    // If user explicitly dismissed the offline alert for the current session, render nothing
-    if (!isOnline && isDismissed) {
+    if (isDisconnected && isDismissed && !hasSwUpdate) {
         return null;
     }
+
+    const cachedTimeLabel = lastOfflineCachedAt
+        ? new Date(lastOfflineCachedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })
+        : null;
 
     return (
-        <aside 
-            className={`network-status-banner ${isOnline ? 'banner-reconnected' : 'banner-offline'}`}
+        <aside
+            className={`network-status-banner ${
+                hasSwUpdate
+                    ? 'banner-reconnected'
+                    : !isDisconnected && showReconnected
+                      ? 'banner-reconnected'
+                      : 'banner-offline'
+            }`}
             role="status"
             aria-live="polite"
+            data-testid="network-status-banner"
         >
             <div className="container banner-inner">
                 <div className="banner-content">
-                    {isOnline ? (
+                    {hasSwUpdate ? (
+                        <>
+                            <span className="banner-icon icon-success" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                                </svg>
+                            </span>
+                            <div className="banner-text">
+                                <strong>Cập nhật ứng dụng:</strong> Đã có phiên bản mới của ZooGuide sẵn sàng kích hoạt.
+                            </div>
+                            <button
+                                type="button"
+                                className="banner-dismiss-btn"
+                                onClick={triggerSwUpdate}
+                                aria-label="Cập nhật phiên bản mới"
+                            >
+                                Cập nhật ngay
+                            </button>
+                        </>
+                    ) : !isDisconnected && showReconnected ? (
                         <>
                             <span className="banner-icon icon-success" aria-hidden="true">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -33,10 +75,10 @@ export default function OfflineBanner() {
                                 </svg>
                             </span>
                             <div className="banner-text">
-                                <strong>Đã khôi phục kết nối:</strong> Thiết bị đã kết nối lại Internet.
+                                <strong>Đã khôi phục kết nối:</strong> Dữ liệu tham quan trực tuyến đã sẵn sàng.
                             </div>
                         </>
-                    ) : (
+                    ) : !isOnline ? (
                         <>
                             <span className="banner-icon icon-warning" aria-hidden="true">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -50,14 +92,46 @@ export default function OfflineBanner() {
                                 </svg>
                             </span>
                             <div className="banner-text">
-                                <strong>Chế độ ngoại tuyến:</strong> Thiết bị mất kết nối mạng. Bạn vẫn có thể duyệt giao diện App Shell đã lưu; các tác vụ quét vé và phiên tham quan yêu cầu kết nối mạng.
+                                <strong>Chế độ ngoại tuyến:</strong> Đang hiển thị bản đồ, khu vực, loài thú và POI từ bộ nhớ đệm ngoại tuyến
+                                {cachedTimeLabel ? ` (đồng bộ lúc ${cachedTimeLabel})` : ''}. Các tác vụ mua vé, xác thực vé và phát audio trực tuyến tạm khóa.
                             </div>
-                            <button 
+                            <button
+                                type="button"
                                 className="banner-dismiss-btn"
                                 onClick={dismissAlert}
                                 aria-label="Đóng thông báo ngoại tuyến"
                             >
                                 Đã hiểu
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <span className="banner-icon icon-warning" aria-hidden="true">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                            </span>
+                            <div className="banner-text">
+                                <strong>Máy chủ tạm thời không phản hồi:</strong> Đang sử dụng dữ liệu tham quan đã lưu trên thiết bị
+                                {cachedTimeLabel ? ` (lúc ${cachedTimeLabel})` : ''}.
+                            </div>
+                            <button
+                                type="button"
+                                className="banner-dismiss-btn"
+                                onClick={() => ZooApi.checkHealth()}
+                                aria-label="Kiểm tra lại kết nối máy chủ"
+                            >
+                                Thử lại
+                            </button>
+                            <button
+                                type="button"
+                                className="banner-dismiss-btn"
+                                onClick={dismissAlert}
+                                aria-label="Đóng thông báo"
+                            >
+                                Ẩn
                             </button>
                         </>
                     )}

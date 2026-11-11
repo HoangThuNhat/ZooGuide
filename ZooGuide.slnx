@@ -12,4 +12,7 @@
   <Folder Name="/src/Infrastructure/">
     <Project Path="src/Infrastructure/ZooGuide.Infrastructure.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/IntegrationTests/ZooGuide.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

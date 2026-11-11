@@ -106,6 +106,7 @@ export default function Header() {
 
                     {/* Header Right Actions */}
                     <div className="header-actions">
+                        <PwaInstallButton variant="header" />
                         {hasActiveSession ? (
                             <button
                                 id="ticket-status-badge"
@@ -277,6 +278,7 @@ export default function Header() {
                     </a>
 
                     <div style={{ marginTop: 'auto', paddingTop: '16px', borderTop: '1px solid #E2E8F0', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <PwaInstallButton variant="banner" />
                         {hasActiveSession ? (
                             <button
                                 className="btn btn-sm btn-primary"

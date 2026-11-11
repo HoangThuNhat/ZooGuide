@@ -9,6 +9,162 @@ export const API_CONFIG = {
     TIMEOUT_MS: 12000
 };
 
+export const OFFLINE_CACHE_CONFIG = {
+    PREFIX: 'zg_offline_tour_v1:',
+    VERSION: '1.2.0',
+    TTL_MS: 24 * 60 * 60 * 1000, // 24 hours TTL for public read-only tour data
+    MAX_ENTRY_CHARS: 400000
+};
+
+function notifyApiStatus(reachable, extra = {}) {
+    if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+    try {
+        window.dispatchEvent(new CustomEvent('zooguide:api-status', {
+            detail: { reachable: Boolean(reachable), timestamp: Date.now(), ...extra }
+        }));
+    } catch {
+        // Ignore event dispatch errors in non-DOM test environments
+    }
+}
+
+function saveOfflineTourCache(cacheKey, data) {
+    if (typeof window === 'undefined' || !window.localStorage || !cacheKey) return false;
+    try {
+        const payload = JSON.stringify({
+            version: OFFLINE_CACHE_CONFIG.VERSION,
+            cachedAt: Date.now(),
+            data
+        });
+        if (payload.length > OFFLINE_CACHE_CONFIG.MAX_ENTRY_CHARS) {
+            return false;
+        }
+        window.localStorage.setItem(`${OFFLINE_CACHE_CONFIG.PREFIX}${cacheKey}`, payload);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function readOfflineTourCache(cacheKey) {
+    if (typeof window === 'undefined' || !window.localStorage || !cacheKey) return null;
+    const storageKey = `${OFFLINE_CACHE_CONFIG.PREFIX}${cacheKey}`;
+    try {
+        const raw = window.localStorage.getItem(storageKey);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (
+            !parsed ||
+            parsed.version !== OFFLINE_CACHE_CONFIG.VERSION ||
+            typeof parsed.cachedAt !== 'number' ||
+            Date.now() - parsed.cachedAt > OFFLINE_CACHE_CONFIG.TTL_MS
+        ) {
+            window.localStorage.removeItem(storageKey);
+            return null;
+        }
+        if (typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('zooguide:offline-data-used', {
+                detail: { key: cacheKey, cachedAt: parsed.cachedAt }
+            }));
+        }
+        return { data: parsed.data, cachedAt: parsed.cachedAt };
+    } catch {
+        return null;
+    }
+}
+
+export function pruneOfflineTourCache() {
+    if (typeof window === 'undefined' || !window.localStorage) return 0;
+    let removed = 0;
+    try {
+        const keysToRemove = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (!k || !k.startsWith(OFFLINE_CACHE_CONFIG.PREFIX)) continue;
+            try {
+                const parsed = JSON.parse(window.localStorage.getItem(k) || 'null');
+                if (
+                    !parsed ||
+                    parsed.version !== OFFLINE_CACHE_CONFIG.VERSION ||
+                    typeof parsed.cachedAt !== 'number' ||
+                    Date.now() - parsed.cachedAt > OFFLINE_CACHE_CONFIG.TTL_MS
+                ) {
+                    keysToRemove.push(k);
+                }
+            } catch {
+                keysToRemove.push(k);
+            }
+        }
+        keysToRemove.forEach((k) => {
+            window.localStorage.removeItem(k);
+            removed++;
+        });
+    } catch {
+        // Ignore storage access errors
+    }
+    return removed;
+}
+
+export function getOfflineTourCacheSummary() {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return { entries: [], totalEntries: 0, totalBytes: 0, version: OFFLINE_CACHE_CONFIG.VERSION };
+    }
+    const entries = [];
+    let totalBytes = 0;
+    try {
+        for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (!k || !k.startsWith(OFFLINE_CACHE_CONFIG.PREFIX)) continue;
+            const raw = window.localStorage.getItem(k) || '';
+            totalBytes += raw.length;
+            try {
+                const parsed = JSON.parse(raw);
+                entries.push({
+                    key: k.slice(OFFLINE_CACHE_CONFIG.PREFIX.length),
+                    version: parsed?.version || 'unknown',
+                    cachedAt: parsed?.cachedAt || null,
+                    itemCount: Array.isArray(parsed?.data) ? parsed.data.length : (parsed?.data ? 1 : 0),
+                    sizeBytes: raw.length
+                });
+            } catch {
+                // Ignore malformed entry
+            }
+        }
+    } catch {
+        // Ignore storage access errors
+    }
+    return {
+        entries,
+        totalEntries: entries.length,
+        totalBytes,
+        version: OFFLINE_CACHE_CONFIG.VERSION,
+        ttlHours: OFFLINE_CACHE_CONFIG.TTL_MS / 3600000
+    };
+}
+
+export function clearOfflineTourCache() {
+    if (typeof window === 'undefined' || !window.localStorage) return 0;
+    let cleared = 0;
+    try {
+        const keys = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+            const k = window.localStorage.key(i);
+            if (k && k.startsWith(OFFLINE_CACHE_CONFIG.PREFIX)) {
+                keys.push(k);
+            }
+        }
+        keys.forEach((k) => {
+            window.localStorage.removeItem(k);
+            cleared++;
+        });
+    } catch {
+        // Ignore storage errors
+    }
+    return cleared;
+}
+
+// Automatically prune stale or outdated offline tour cache entries on module load
+pruneOfflineTourCache();
+
 const AREA_COLORS = {
     'A': '#15803D',
     'B': '#B45309',
@@ -76,14 +232,22 @@ export const ZooApi = {
     // 0. HEALTH CHECK
     async checkHealth() {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/health`);
+            const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+            const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+            const res = await fetch(`${API_CONFIG.BASE_URL}/health`, controller ? { signal: controller.signal } : undefined);
+            if (timeoutId) clearTimeout(timeoutId);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return await res.json();
+            const data = await res.json();
+            notifyApiStatus(true, { status: data?.status || 'Healthy' });
+            return data;
         } catch (err) {
-            console.error('Health check error:', err);
+            notifyApiStatus(false, { error: err.message });
             return { status: 'Unhealthy', databaseConnected: false, error: err.message };
         }
     },
+    getOfflineTourCacheSummary,
+    clearOfflineTourCache,
+    pruneOfflineTourCache,
 
     // 1. TICKET & SESSION
     async validateTicket(ticketCode) {
@@ -136,6 +300,7 @@ export const ZooApi = {
 
     // 2. GET AREAS
     async getAreas(lang = 'vi') {
+        const cacheKey = `areas:${lang || 'vi'}`;
         try {
             const qs = lang ? `?lang=${encodeURIComponent(lang)}` : '';
             const res = await fetch(`${API_CONFIG.BASE_URL}/areas${qs}`);
@@ -193,15 +358,30 @@ export const ZooApi = {
                 };
             });
 
-            return { success: true, count: mapped.length, data: mapped };
+            saveOfflineTourCache(cacheKey, mapped);
+            notifyApiStatus(true);
+            return { success: true, count: mapped.length, data: mapped, fromOfflineCache: false };
         } catch (err) {
             console.error('ZooApi.getAreas error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey) || readOfflineTourCache('areas:vi');
+            if (cached && Array.isArray(cached.data)) {
+                return {
+                    success: true,
+                    count: cached.data.length,
+                    data: cached.data,
+                    fromOfflineCache: true,
+                    cachedAt: cached.cachedAt
+                };
+            }
             return { success: false, data: [], message: 'Không thể tải danh sách khu vực từ cơ sở dữ liệu.' };
         }
     },
 
     // 2.1 GET ENCLOSURES (Chuồng Trại)
     async getEnclosures(filters = {}) {
+        const lang = filters.lang || 'vi';
+        const cacheKey = `enclosures:${filters.areaId || 'all'}:${filters.status || 'all'}:${lang}`;
         try {
             const params = new URLSearchParams();
             if (filters.areaId) params.append('areaId', filters.areaId);
@@ -236,9 +416,34 @@ export const ZooApi = {
                 animals: (e.animals || []).map(mapAnimalDto)
             }));
 
-            return { success: true, count: mapped.length, data: mapped };
+            if (!filters.search) {
+                saveOfflineTourCache(cacheKey, mapped);
+            }
+            notifyApiStatus(true);
+            return { success: true, count: mapped.length, data: mapped, fromOfflineCache: false };
         } catch (err) {
             console.error('ZooApi.getEnclosures error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey) || readOfflineTourCache(`enclosures:all:all:${lang}`) || readOfflineTourCache('enclosures:all:all:vi');
+            if (cached && Array.isArray(cached.data)) {
+                let list = cached.data;
+                if (filters.areaId) list = list.filter(item => Number(item.areaId) === Number(filters.areaId));
+                if (filters.status) list = list.filter(item => item.status === filters.status);
+                if (filters.search) {
+                    const q = String(filters.search).toLowerCase();
+                    list = list.filter(item =>
+                        (item.name || '').toLowerCase().includes(q) ||
+                        (item.code || '').toLowerCase().includes(q)
+                    );
+                }
+                return {
+                    success: true,
+                    count: list.length,
+                    data: list,
+                    fromOfflineCache: true,
+                    cachedAt: cached.cachedAt
+                };
+            }
             return { success: false, data: [], message: 'Không thể tải danh sách chuồng nuôi từ máy chủ.' };
         }
     },
@@ -363,6 +568,8 @@ export const ZooApi = {
 
     // 3. GET ANIMALS (with filters)
     async getAnimals(filters = {}) {
+        const lang = filters.lang || 'vi';
+        const cacheKey = `animals:${filters.areaId || 'all'}:${filters.enclosureId || 'all'}:${filters.zoneId || 'all'}:${filters.speciesId || 'all'}:${filters.iucnStatus || 'all'}:${lang}`;
         try {
             const params = new URLSearchParams();
             if (filters.search) params.append('search', filters.search);
@@ -380,9 +587,41 @@ export const ZooApi = {
             const rawList = Array.isArray(animalsData) ? animalsData : (animalsData.data || []);
 
             const results = rawList.map(mapAnimalDto);
-            return { success: true, count: results.length, data: results };
+            if (!filters.search) {
+                saveOfflineTourCache(cacheKey, results);
+            }
+            notifyApiStatus(true);
+            return { success: true, count: results.length, data: results, fromOfflineCache: false };
         } catch (err) {
             console.error('Live API /animals error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached =
+                readOfflineTourCache(cacheKey) ||
+                readOfflineTourCache(`animals:all:all:all:all:all:${lang}`) ||
+                readOfflineTourCache('animals:all:all:all:all:all:vi');
+            if (cached && Array.isArray(cached.data)) {
+                let list = cached.data;
+                if (filters.areaId) list = list.filter(a => Number(a.areaId) === Number(filters.areaId));
+                if (filters.enclosureId) list = list.filter(a => Number(a.enclosureId) === Number(filters.enclosureId));
+                if (filters.zoneId && filters.zoneId !== 'all') list = list.filter(a => a.zoneId === filters.zoneId);
+                if (filters.speciesId) list = list.filter(a => Number(a.speciesId) === Number(filters.speciesId));
+                if (filters.iucnStatus && filters.iucnStatus !== 'all') list = list.filter(a => a.iucnStatus === filters.iucnStatus);
+                if (filters.search) {
+                    const q = String(filters.search).toLowerCase();
+                    list = list.filter(a =>
+                        (a.name || '').toLowerCase().includes(q) ||
+                        (a.scientificName || '').toLowerCase().includes(q) ||
+                        (a.species || '').toLowerCase().includes(q)
+                    );
+                }
+                return {
+                    success: true,
+                    count: list.length,
+                    data: list,
+                    fromOfflineCache: true,
+                    cachedAt: cached.cachedAt
+                };
+            }
             return { success: false, data: [], message: 'Không thể kết nối đến máy chủ danh sách động vật.' };
         }
     },
@@ -395,9 +634,18 @@ export const ZooApi = {
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const json = await res.json();
             const a = json.data || json;
-            return { success: true, data: mapAnimalDto(a) };
+            notifyApiStatus(true);
+            return { success: true, data: mapAnimalDto(a), fromOfflineCache: false };
         } catch (err) {
             console.error('ZooApi.getAnimalById error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(`animals:all:all:all:all:all:${lang || 'vi'}`) || readOfflineTourCache('animals:all:all:all:all:all:vi');
+            if (cached && Array.isArray(cached.data)) {
+                const found = cached.data.find(item => Number(item.id) === Number(id) || Number(item.animalId) === Number(id));
+                if (found) {
+                    return { success: true, data: found, fromOfflineCache: true, cachedAt: cached.cachedAt };
+                }
+            }
             return { success: false, message: 'Không tìm thấy hồ sơ động vật.' };
         }
     },
@@ -601,6 +849,8 @@ export const ZooApi = {
 
     // 8. ADMIN: SPECIES CRUD
     async getSpecies(filters = {}) {
+        const lang = filters.lang || 'vi';
+        const cacheKey = `species:${filters.conservationStatus || 'all'}:${lang}`;
         try {
             const params = new URLSearchParams();
             if (filters.search) params.append('search', filters.search);
@@ -630,9 +880,29 @@ export const ZooApi = {
                 languageCode: s.languageCode || filters.lang || 'vi',
                 hasTranslation: s.hasTranslation !== false
             }));
-            return { success: true, data: mapped };
+            if (!filters.search) {
+                saveOfflineTourCache(cacheKey, mapped);
+            }
+            notifyApiStatus(true);
+            return { success: true, data: mapped, fromOfflineCache: false };
         } catch (err) {
             console.error('getSpecies API error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey) || readOfflineTourCache(`species:all:${lang}`) || readOfflineTourCache('species:all:vi');
+            if (cached && Array.isArray(cached.data)) {
+                let list = cached.data;
+                if (filters.conservationStatus && filters.conservationStatus !== 'all') {
+                    list = list.filter(s => s.conservationStatus === filters.conservationStatus);
+                }
+                if (filters.search) {
+                    const q = String(filters.search).toLowerCase();
+                    list = list.filter(s =>
+                        (s.name || '').toLowerCase().includes(q) ||
+                        (s.scientificName || '').toLowerCase().includes(q)
+                    );
+                }
+                return { success: true, data: list, fromOfflineCache: true, cachedAt: cached.cachedAt };
+            }
             return { success: false, data: [], error: err.message, message: 'Không thể tải danh sách loài từ máy chủ.' };
         }
     },
@@ -1519,26 +1789,43 @@ export const ZooApi = {
 
     // 17. LANGUAGES & TRANSLATIONS
     async getLanguages() {
+        const cacheKey = 'languages:all';
         try {
             const res = await fetch(`${API_CONFIG.BASE_URL}/languages`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const list = Array.isArray(data) ? data : (data.data || []);
-            return { success: true, data: list };
+            saveOfflineTourCache(cacheKey, list);
+            notifyApiStatus(true);
+            return { success: true, data: list, fromOfflineCache: false };
         } catch (err) {
             console.error('getLanguages error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey);
+            if (cached && Array.isArray(cached.data)) {
+                return { success: true, data: cached.data, fromOfflineCache: true, cachedAt: cached.cachedAt };
+            }
             return { success: false, data: [], error: err.message };
         }
     },
 
     async getUiTranslations(code) {
+        const cacheKey = `ui_translations:${code || 'vi'}`;
         try {
             const res = await fetch(`${API_CONFIG.BASE_URL}/languages/${encodeURIComponent(code)}/ui`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return { success: true, data: data.data || data || {} };
+            const payload = data.data || data || {};
+            saveOfflineTourCache(cacheKey, payload);
+            notifyApiStatus(true);
+            return { success: true, data: payload, fromOfflineCache: false };
         } catch (err) {
             console.error('getUiTranslations error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey);
+            if (cached && cached.data) {
+                return { success: true, data: cached.data, fromOfflineCache: true, cachedAt: cached.cachedAt };
+            }
             return { success: false, data: {}, error: err.message };
         }
     },
@@ -1635,6 +1922,7 @@ export const ZooApi = {
 
     // 20. POINTS OF INTEREST (POI) & NARRATIONS
     async getPois(filter = {}) {
+        const cacheKey = `pois:${filter.category || 'all'}:${filter.isActive ?? 'all'}:${filter.areaId || 'all'}`;
         try {
             const params = new URLSearchParams();
             if (filter.category && filter.category !== 'all') params.append('category', filter.category);
@@ -1647,9 +1935,36 @@ export const ZooApi = {
             const res = await fetch(`${API_CONFIG.BASE_URL}/pois${qs}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return { success: true, data: data.data || data || [] };
+            const list = data.data || data || [];
+            if (!filter.search) {
+                saveOfflineTourCache(cacheKey, list);
+            }
+            notifyApiStatus(true);
+            return { success: true, data: list, fromOfflineCache: false };
         } catch (err) {
             console.error('getPois error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache(cacheKey) || readOfflineTourCache('pois:all:true:all') || readOfflineTourCache('pois:all:all:all');
+            if (cached && Array.isArray(cached.data)) {
+                let list = cached.data;
+                if (filter.category && filter.category !== 'all') {
+                    list = list.filter(p => p.category === filter.category);
+                }
+                if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') {
+                    list = list.filter(p => Boolean(p.isActive) === Boolean(filter.isActive));
+                }
+                if (filter.areaId) {
+                    list = list.filter(p => Number(p.areaId) === Number(filter.areaId));
+                }
+                if (filter.search) {
+                    const q = String(filter.search).toLowerCase();
+                    list = list.filter(p =>
+                        (p.name || '').toLowerCase().includes(q) ||
+                        (p.code || '').toLowerCase().includes(q)
+                    );
+                }
+                return { success: true, data: list, fromOfflineCache: true, cachedAt: cached.cachedAt };
+            }
             return { success: false, data: [], error: err.message };
         }
     },
@@ -1659,9 +1974,18 @@ export const ZooApi = {
             const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${id}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
-            return { success: true, data: data.data || data };
+            notifyApiStatus(true);
+            return { success: true, data: data.data || data, fromOfflineCache: false };
         } catch (err) {
             console.error('getPoiById error:', err);
+            notifyApiStatus(false, { error: err.message });
+            const cached = readOfflineTourCache('pois:all:true:all') || readOfflineTourCache('pois:all:all:all');
+            if (cached && Array.isArray(cached.data)) {
+                const found = cached.data.find(p => Number(p.poiId || p.id) === Number(id));
+                if (found) {
+                    return { success: true, data: found, fromOfflineCache: true, cachedAt: cached.cachedAt };
+                }
+            }
             return { success: false, error: err.message };
         }
     },

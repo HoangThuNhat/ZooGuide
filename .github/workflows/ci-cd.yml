@@ -1,0 +1,200 @@
+name: ZooGuide CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # JOB 1: BACKEND CI (.NET 8 Restore, Build & Automated Unit/Integration Tests)
+  # ============================================================================
+  backend-ci:
+    name: Backend (.NET 8 Build & Test)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore Backend & Test dependencies
+        run: dotnet restore tests/IntegrationTests/ZooGuide.IntegrationTests.csproj
+
+      - name: Build Backend API & Test Suite (Release)
+        run: dotnet build tests/IntegrationTests/ZooGuide.IntegrationTests.csproj --configuration Release --no-restore
+
+      - name: Run Unit & Integration Tests
+        run: dotnet test tests/IntegrationTests/ZooGuide.IntegrationTests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload Backend Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-results
+          path: "**/TestResults/*.trx"
+          retention-days: 7
+
+  # ============================================================================
+  # JOB 2: FRONTEND CI (Node 20, npm ci, PWA Manifest/SW Check & Vite Build)
+  # ============================================================================
+  frontend-ci:
+    name: Frontend (React 18 + Vite + PWA Build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install Frontend dependencies
+        run: npm ci
+
+      - name: Verify PWA Manifest & Service Worker files
+        run: |
+          node -e "
+            const fs = require('fs');
+            const manifest = JSON.parse(fs.readFileSync('public/manifest.webmanifest', 'utf8'));
+            if (!manifest.name || !manifest.short_name || manifest.display !== 'standalone') {
+              throw new Error('Invalid Web App Manifest configuration');
+            }
+            if (!fs.existsSync('public/sw.js')) {
+              throw new Error('Missing Service Worker file public/sw.js');
+            }
+            console.log('PWA Manifest & Service Worker verified:', manifest.short_name, manifest.display);
+          "
+
+      - name: Build Production Frontend Bundle
+        env:
+          VITE_API_BASE_URL: /api
+        run: npm run build
+
+      - name: Upload Frontend Dist Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 7
+
+  # ============================================================================
+  # JOB 3: DOCKER & COMPOSE VALIDATION (Multi-stage Image Builds & Compose Config)
+  # ============================================================================
+  docker-ci:
+    name: Docker Compose & Image Build Validation
+    runs-on: ubuntu-latest
+    needs:
+      - backend-ci
+      - frontend-ci
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate docker-compose.yml syntax & service graph
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+          echo "docker-compose.yml configuration is valid."
+
+      - name: Build Backend Docker Image (zooguide-api)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./src/API/Dockerfile
+          push: false
+          tags: zooguide-api:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build Frontend Docker Image (zooguide-frontend)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web
+          file: ./web/Dockerfile
+          push: false
+          build-args: |
+            VITE_API_BASE_URL=/api
+          tags: zooguide-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # JOB 4: CONTINUOUS DELIVERY (CD) - Gated on main branch & configured secrets
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production Server (CD)
+    runs-on: ubuntu-latest
+    needs:
+      - backend-ci
+      - frontend-ci
+      - docker-ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Deployment Credentials Availability
+        id: check_secrets
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_KEY" ]; then
+            echo "configured=false" >> $GITHUB_OUTPUT
+            echo "::notice::CD deployment skipped because DEPLOY_SSH_HOST / DEPLOY_SSH_USER / DEPLOY_SSH_KEY secrets are not configured in GitHub Repository Settings."
+          else
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Execute Remote Docker Compose Deployment via SSH
+        if: steps.check_secrets.outputs.configured == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
+          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_APP_PATH || '/opt/zooguide' }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH && git fetch origin main && git checkout main && git pull origin main && docker compose up -d --build && docker compose ps"

@@ -637,4 +637,133 @@ public class EndToEndIntegrationTests : IDisposable
         Assert.Equal("InProgress", matchingAlert.Status);
         Assert.Equal("Đang xử lý", matchingAlert.StatusLabel);
     }
+
+    // ==========================================
+    // J. TEST MULTILINGUAL FALLBACK, SESSION EXIT & TRANSLATION SERVICE (TASK 8)
+    // ==========================================
+    [Fact]
+    public async Task Narration_MultilingualFallback_ShouldFallbackToVietnameseOrEnglishAndExcludeDrafts()
+    {
+        // 1. Add French language
+        _context.Languages.Add(new Language { LanguageId = 3, Code = "fr", Name = "Français", NativeName = "Français", IsActive = true });
+        await _context.SaveChangesAsync();
+
+        // 2. Create Draft French narration (must NOT be returned to visitors)
+        await _narrationService.CreateAsync(new CreateNarrationDto
+        {
+            AnimalId = 1,
+            LanguageId = 3,
+            Title = "Bản nháp tiếng Pháp",
+            Content = "Nội dung nháp chưa xuất bản",
+            AudioUrl = "/assets/audio/simba_fr_draft.mp3",
+            DurationSeconds = 60,
+            Status = "Draft"
+        });
+
+        // 3. Create Published Vietnamese narration with audio
+        await _narrationService.CreateAsync(new CreateNarrationDto
+        {
+            AnimalId = 1,
+            LanguageId = 1,
+            Title = "Thuyết minh Sư tử Châu Phi",
+            Content = "Sư tử Châu Phi là loài thú ăn thịt đầu bảng tại Thảo Cầm Viên Sài Gòn.",
+            AudioUrl = "/assets/audio/simba_vi_published.mp3",
+            DurationSeconds = 95,
+            Status = "Published"
+        });
+
+        // 4. Request French ('fr') for SpeciesId = 1 -> Draft 'fr' must be skipped and fallback to Published 'vi' must occur
+        var fallbackResult = await _narrationService.GetBySpeciesAndLanguageAsync(1, "fr");
+        Assert.NotNull(fallbackResult);
+        Assert.Equal("vi", fallbackResult.LanguageCode);
+        Assert.True(fallbackResult.IsFallbackLanguage);
+        Assert.Equal("fr", fallbackResult.OriginalRequestedLanguage);
+        Assert.Contains("FR", fallbackResult.FallbackMessage ?? "");
+
+        // 5. Request Vietnamese ('vi') directly -> Exact match, IsFallbackLanguage == false
+        var directResult = await _narrationService.GetBySpeciesAndLanguageAsync(1, "vi");
+        Assert.NotNull(directResult);
+        Assert.Equal("vi", directResult.LanguageCode);
+        Assert.False(directResult.IsFallbackLanguage);
+    }
+
+    [Fact]
+    public async Task Narration_DuplicateAnimalAndLanguage_ShouldThrowInvalidOperationException()
+    {
+        await _narrationService.CreateAsync(new CreateNarrationDto
+        {
+            AnimalId = 1,
+            LanguageId = 1,
+            Title = "Bản thuyết minh đầu tiên",
+            Content = "Nội dung thuyết minh 1",
+            Status = "Published"
+        });
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _narrationService.CreateAsync(new CreateNarrationDto
+            {
+                AnimalId = 1,
+                LanguageId = 1,
+                Title = "Bản thuyết minh trùng lặp",
+                Content = "Nội dung thuyết minh 2",
+                Status = "Published"
+            }));
+    }
+
+    [Fact]
+    public async Task TicketSession_ExpiredSession_ShouldAutomaticallyTransitionToExpiredAndRejectAccess()
+    {
+        var session = await _ticketSessionService.CreateSessionAsync(1);
+        Assert.NotNull(session);
+        Assert.Equal(SessionStatus.Active, session.Status);
+
+        // Simulate time expiration
+        session.ExpiredAt = DateTime.UtcNow.AddMinutes(-5);
+        await _context.SaveChangesAsync();
+
+        var verifyAfterExpire = await _ticketSessionService.GetValidSessionAsync(session.SessionId);
+        Assert.Null(verifyAfterExpire);
+
+        var dbSession = await _context.TicketSessions.FirstOrDefaultAsync(s => s.SessionId == session.SessionId);
+        Assert.NotNull(dbSession);
+        Assert.Equal(SessionStatus.Expired, dbSession.Status);
+        Assert.NotNull(dbSession.EndedAt);
+    }
+
+    [Fact]
+    public async Task TranslationService_UpsertAndRetrieveContentAndUiTranslations_ShouldWorkAccurately()
+    {
+        var translationService = new TranslationService(_context);
+
+        var upserted = await translationService.UpsertTranslationAsync(new UpsertContentTranslationDto
+        {
+            EntityType = "Area",
+            EntityId = 1,
+            EntityKey = "Name",
+            LanguageCode = "en",
+            Title = "African Lion & Predator Zone",
+            Description = "Top carnivore zone at Saigon Zoo",
+            IsPublished = true
+        });
+
+        Assert.NotNull(upserted);
+        Assert.Equal("African Lion & Predator Zone", upserted.Title);
+
+        // Upsert existing record updates text instead of duplicating
+        var updated = await translationService.UpsertTranslationAsync(new UpsertContentTranslationDto
+        {
+            EntityType = "Area",
+            EntityId = 1,
+            EntityKey = "Name",
+            LanguageCode = "en",
+            Title = "Royal Carnivore Sanctuary",
+            Description = "Updated description",
+            IsPublished = true
+        });
+        Assert.Equal("Royal Carnivore Sanctuary", updated.Title);
+
+        var translations = await translationService.GetTranslationsAsync("en", "Area", 1);
+        Assert.Single(translations);
+        Assert.Equal("Royal Carnivore Sanctuary", translations.First().Title);
+    }
 }
