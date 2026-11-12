@@ -23,6 +23,8 @@ public class AuthService : IAuthService
     public const string DefaultSecretKey = "ZooGuide_Secret_Key_For_JWT_Authentication_Token_2026_Secure!";
     public const string DefaultIssuer = "ZooGuideAPI";
     public const string DefaultAudience = "ZooGuideClients";
+    public const int AdminAbsoluteSessionHours = 8;
+    public const int AdminInactivityTimeoutMinutes = 15;
 
     public AuthService(ZooGuideDbContext context, IConfiguration configuration)
     {
@@ -81,14 +83,24 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Tài khoản không có quyền truy cập vào phân hệ quản trị viên.");
         }
 
-        // Cập nhật thời điểm đăng nhập gần nhất
-        user.LastLoginAt = DateTime.UtcNow;
-        user.UpdatedAt = DateTime.UtcNow;
+        // Cập nhật thời điểm đăng nhập gần nhất (làm tròn mili-giây để đồng nhất giữa .NET và PostgreSQL TIMESTAMPTZ)
+        var loginTime = TruncateToMillisecond(DateTime.UtcNow);
+        if (user.UpdatedAt.HasValue && loginTime <= user.UpdatedAt.Value.ToUniversalTime())
+        {
+            loginTime = TruncateToMillisecond(user.UpdatedAt.Value.ToUniversalTime()).AddMilliseconds(1);
+        }
+        if (user.LastLoginAt.HasValue && loginTime <= user.LastLoginAt.Value.ToUniversalTime())
+        {
+            loginTime = TruncateToMillisecond(user.LastLoginAt.Value.ToUniversalTime()).AddMilliseconds(1);
+        }
+
+        user.LastLoginAt = loginTime;
+        user.UpdatedAt = loginTime;
         await _context.SaveChangesAsync();
 
-        // Tạo JWT Token
-        var tokenExpiry = DateTime.UtcNow.AddHours(24);
-        var token = GenerateJwtToken(user, tokenExpiry);
+        // Tạo JWT Token với giới hạn phiên tuyệt đối tối đa 8 giờ kể từ lúc đăng nhập
+        var tokenExpiry = loginTime.AddHours(AdminAbsoluteSessionHours);
+        var token = GenerateJwtToken(user, loginTime, tokenExpiry);
 
         var profile = new UserProfileDto
         {
@@ -132,12 +144,22 @@ public class AuthService : IAuthService
         var user = await _context.Users.FindAsync(userId);
         if (user == null) return false;
 
-        user.UpdatedAt = DateTime.UtcNow;
+        var logoutTime = TruncateToMillisecond(DateTime.UtcNow);
+        if (user.LastLoginAt.HasValue && logoutTime <= user.LastLoginAt.Value.ToUniversalTime())
+        {
+            logoutTime = TruncateToMillisecond(user.LastLoginAt.Value.ToUniversalTime()).AddMilliseconds(1);
+        }
+        if (user.UpdatedAt.HasValue && logoutTime <= user.UpdatedAt.Value.ToUniversalTime())
+        {
+            logoutTime = TruncateToMillisecond(user.UpdatedAt.Value.ToUniversalTime()).AddMilliseconds(1);
+        }
+
+        user.UpdatedAt = logoutTime;
         await _context.SaveChangesAsync();
         return true;
     }
 
-    private string GenerateJwtToken(User user, DateTime expiresAt)
+    private string GenerateJwtToken(User user, DateTime issuedAt, DateTime expiresAt)
     {
         var secretKey = _configuration["Jwt:SecretKey"] 
             ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
@@ -148,6 +170,9 @@ public class AuthService : IAuthService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+        var iatUnix = new DateTimeOffset(issuedAt).ToUnixTimeSeconds();
+        var absExpUnix = new DateTimeOffset(expiresAt).ToUnixTimeSeconds();
+
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
@@ -156,12 +181,18 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.Email, user.Email),
             new Claim("FullName", user.FullName ?? string.Empty),
             new Claim("Status", user.Status.ToString()),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, iatUnix.ToString(), ClaimValueTypes.Integer64),
+            new Claim("abs_exp", absExpUnix.ToString(), ClaimValueTypes.Integer64),
+            new Claim("login_ticks", issuedAt.Ticks.ToString()),
+            new Claim("abs_exp_ticks", expiresAt.Ticks.ToString())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
+            NotBefore = issuedAt,
+            IssuedAt = issuedAt,
             Expires = expiresAt,
             Issuer = issuer,
             Audience = audience,
@@ -171,6 +202,12 @@ public class AuthService : IAuthService
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
+    }
+
+    private static DateTime TruncateToMillisecond(DateTime dt)
+    {
+        var utc = dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+        return new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerMillisecond), DateTimeKind.Utc);
     }
 
     private static string HashRaw(string password)

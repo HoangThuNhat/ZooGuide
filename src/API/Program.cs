@@ -100,6 +100,90 @@ builder.Services.AddAuthentication(options =>
         ValidateLifetime = true,
         ClockSkew = TimeSpan.Zero
     };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var principal = context.Principal;
+            if (principal == null)
+            {
+                context.Fail("Không tìm thấy thông tin xác thực trong token.");
+                return;
+            }
+
+            var userIdClaim = principal.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrWhiteSpace(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+            {
+                context.Fail("Token không chứa định danh người dùng hợp lệ.");
+                return;
+            }
+
+            // Kiểm tra giới hạn phiên tuyệt đối (Absolute Session Timeout: 8 giờ)
+            var nowUtc = DateTime.UtcNow;
+            var absExpTicksClaim = principal.FindFirst("abs_exp_ticks")?.Value;
+            if (!string.IsNullOrWhiteSpace(absExpTicksClaim) && long.TryParse(absExpTicksClaim, out var absExpTicks))
+            {
+                if (nowUtc.Ticks >= absExpTicks)
+                {
+                    context.Fail("Phiên đăng nhập quản trị đã vượt quá thời hạn tối đa 8 giờ.");
+                    return;
+                }
+            }
+
+            if (context.SecurityToken != null)
+            {
+                var validFrom = context.SecurityToken.ValidFrom;
+                if (validFrom != DateTime.MinValue &&
+                    (nowUtc - validFrom.ToUniversalTime()) > TimeSpan.FromHours(AuthService.AdminAbsoluteSessionHours))
+                {
+                    context.Fail("Phiên đăng nhập quản trị đã vượt quá thời hạn tối đa 8 giờ.");
+                    return;
+                }
+            }
+
+            var dbContext = context.HttpContext.RequestServices.GetService<ZooGuideDbContext>();
+            if (dbContext != null)
+            {
+                var user = await dbContext.Users
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(u => u.UserId == userId);
+
+                if (user == null || user.Status == ZooGuide.Domain.Enums.UserStatus.Locked)
+                {
+                    context.Fail("Tài khoản không tồn tại hoặc đã bị khóa.");
+                    return;
+                }
+
+                if (user.Role != ZooGuide.Domain.Enums.UserRole.Admin &&
+                    user.Role != ZooGuide.Domain.Enums.UserRole.Staff)
+                {
+                    context.Fail("Tài khoản không có quyền truy cập phân hệ quản trị.");
+                    return;
+                }
+
+                // Kiểm tra thu hồi phiên sau khi Logout (lưu bền vững trong bảng USERS trên PostgreSQL)
+                var loginTicksClaim = principal.FindFirst("login_ticks")?.Value;
+                if (!string.IsNullOrWhiteSpace(loginTicksClaim) && long.TryParse(loginTicksClaim, out var loginTicks))
+                {
+                    if (!user.LastLoginAt.HasValue ||
+                        (user.UpdatedAt.HasValue && user.UpdatedAt.Value.ToUniversalTime().Ticks > loginTicks))
+                    {
+                        context.Fail("Phiên làm việc đã kết thúc hoặc bị thu hồi.");
+                        return;
+                    }
+                }
+                else
+                {
+                    if (user.UpdatedAt.HasValue &&
+                        (!user.LastLoginAt.HasValue || user.UpdatedAt.Value.ToUniversalTime() > user.LastLoginAt.Value.ToUniversalTime()))
+                    {
+                        context.Fail("Phiên làm việc đã đăng xuất.");
+                        return;
+                    }
+                }
+            }
+        }
+    };
 });
 
 // Application & Auth Services

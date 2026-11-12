@@ -5,7 +5,7 @@
  */
 
 export const API_CONFIG = {
-    BASE_URL: import.meta.env.VITE_API_BASE_URL || '/api',
+    BASE_URL: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL) || '/api',
     TIMEOUT_MS: 12000
 };
 
@@ -167,35 +167,291 @@ pruneOfflineTourCache();
 
 export const AUTH_STORAGE_KEY = 'zooguide_admin_auth_token';
 export const AUTH_USER_KEY = 'zooguide_admin_user_profile';
+export const AUTH_SESSION_META_KEY = 'zooguide_admin_session_meta';
+export const AUTH_BROADCAST_CHANNEL = 'zooguide_admin_auth_channel';
 
-export function getAuthToken() {
+export const ADMIN_INACTIVITY_TIMEOUT_MS = 15 * 60 * 1000; // 15 phút không thao tác
+export const ADMIN_ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 giờ tối đa kể từ lúc đăng nhập
+const ACTIVITY_WRITE_THROTTLE_MS = 1000;
+
+let authBroadcastChannel = null;
+function getAuthBroadcastChannel() {
+    if (typeof window === 'undefined' || typeof window.BroadcastChannel !== 'function') {
+        return null;
+    }
+    if (!authBroadcastChannel) {
+        try {
+            authBroadcastChannel = new window.BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+        } catch {
+            authBroadcastChannel = null;
+        }
+    }
+    return authBroadcastChannel;
+}
+
+export function broadcastAdminAuthEvent(payload) {
+    const channel = getAuthBroadcastChannel();
+    if (!channel) return;
     try {
-        return localStorage.getItem(AUTH_STORAGE_KEY);
+        channel.postMessage({ ...payload, timestamp: Date.now() });
+    } catch {
+        // Ignore broadcast errors
+    }
+}
+
+export function decodeJwtPayload(token) {
+    if (!token || typeof token !== 'string') return null;
+    try {
+        const parts = token.split('.');
+        if (parts.length !== 3) return null;
+        const base64Url = parts[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+        const jsonStr = typeof atob === 'function'
+            ? decodeURIComponent(
+                Array.prototype.map
+                    .call(atob(padded), (c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+                    .join('')
+            )
+            : '';
+        return jsonStr ? JSON.parse(jsonStr) : null;
     } catch {
         return null;
     }
 }
 
-export function setAuthSession(token, user) {
+export function getAdminSessionMeta() {
+    if (typeof window === 'undefined' || !window.localStorage) return null;
     try {
-        if (token) localStorage.setItem(AUTH_STORAGE_KEY, token);
-        if (user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        const raw = window.localStorage.getItem(AUTH_SESSION_META_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (
+            !parsed ||
+            typeof parsed.loginAt !== 'number' ||
+            typeof parsed.absoluteExpiresAt !== 'number' ||
+            typeof parsed.lastActivityAt !== 'number' ||
+            !Number.isFinite(parsed.loginAt) ||
+            !Number.isFinite(parsed.absoluteExpiresAt) ||
+            !Number.isFinite(parsed.lastActivityAt)
+        ) {
+            return null;
+        }
+        // Không bao giờ cho phép absoluteExpiresAt vượt quá 8 giờ kể từ loginAt
+        const maxAllowedAbsolute = parsed.loginAt + ADMIN_ABSOLUTE_TIMEOUT_MS;
+        const clampedAbsoluteExpiresAt = Math.min(parsed.absoluteExpiresAt, maxAllowedAbsolute);
+        return {
+            loginAt: parsed.loginAt,
+            absoluteExpiresAt: clampedAbsoluteExpiresAt,
+            lastActivityAt: parsed.lastActivityAt
+        };
+    } catch {
+        return null;
+    }
+}
+
+export function checkAdminSessionValidity(now = Date.now()) {
+    if (typeof window === 'undefined' || !window.localStorage) {
+        return { valid: false, reason: 'no_storage' };
+    }
+    try {
+        const rawToken = window.localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!rawToken) {
+            return { valid: false, reason: 'no_token' };
+        }
+
+        const payload = decodeJwtPayload(rawToken);
+        if (!payload) {
+            return { valid: false, reason: 'invalid_token' };
+        }
+
+        // Kiểm tra hạn JWT chuẩn (exp) và hạn tuyệt đối từ claim (abs_exp)
+        if (typeof payload.exp === 'number' && now >= payload.exp * 1000) {
+            return { valid: false, reason: 'absolute_timeout' };
+        }
+        if (typeof payload.abs_exp === 'number' && now >= payload.abs_exp * 1000) {
+            return { valid: false, reason: 'absolute_timeout' };
+        }
+        if (typeof payload.iat === 'number' && now - payload.iat * 1000 >= ADMIN_ABSOLUTE_TIMEOUT_MS) {
+            return { valid: false, reason: 'absolute_timeout' };
+        }
+
+        let meta = getAdminSessionMeta();
+        if (!meta) {
+            return { valid: false, reason: 'session_expired' };
+        }
+
+        // Giữ nguyên mốc loginAt của phiên nhưng không cho phép vượt quá hạn JWT hoặc giới hạn tuyệt đối 8 giờ
+        const jwtExpMs = typeof payload.exp === 'number' ? payload.exp * 1000 : meta.absoluteExpiresAt;
+        const effectiveLoginAt = meta.loginAt;
+        const effectiveAbsoluteExpiresAt = Math.min(
+            meta.absoluteExpiresAt,
+            effectiveLoginAt + ADMIN_ABSOLUTE_TIMEOUT_MS,
+            jwtExpMs
+        );
+
+        // Điều kiện B: Absolute Session Timeout (8 giờ) - kiểm tra độc lập
+        if (now >= effectiveAbsoluteExpiresAt || now - effectiveLoginAt >= ADMIN_ABSOLUTE_TIMEOUT_MS) {
+            return { valid: false, reason: 'absolute_timeout' };
+        }
+
+        // Điều kiện A: Inactivity Timeout (15 phút) - kiểm tra độc lập
+        if (now - meta.lastActivityAt >= ADMIN_INACTIVITY_TIMEOUT_MS) {
+            return { valid: false, reason: 'inactivity_timeout' };
+        }
+
+        return {
+            valid: true,
+            reason: null,
+            meta: {
+                loginAt: effectiveLoginAt,
+                absoluteExpiresAt: effectiveAbsoluteExpiresAt,
+                lastActivityAt: meta.lastActivityAt
+            },
+            remainingInactivityMs: Math.max(0, ADMIN_INACTIVITY_TIMEOUT_MS - (now - meta.lastActivityAt)),
+            remainingAbsoluteMs: Math.max(0, effectiveAbsoluteExpiresAt - now)
+        };
+    } catch {
+        return { valid: false, reason: 'session_expired' };
+    }
+}
+
+export function clearAuthSession(options = {}) {
+    const { broadcast = false, reason = 'manual_logout' } = options;
+    try {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem(AUTH_USER_KEY);
+        localStorage.removeItem(AUTH_SESSION_META_KEY);
+    } catch (e) {
+        console.warn('Cannot clear auth session:', e);
+    }
+    if (broadcast) {
+        broadcastAdminAuthEvent({ type: 'ADMIN_SESSION_ENDED', reason });
+    }
+}
+
+export function expireAdminSession(reason = 'session_expired') {
+    let rawToken = null;
+    try {
+        rawToken = localStorage.getItem(AUTH_STORAGE_KEY);
+    } catch {
+        rawToken = null;
+    }
+
+    clearAuthSession({ broadcast: true, reason });
+
+    // Thu hồi phiên trên Backend nếu vẫn còn giữ token trước khi xóa
+    if (rawToken && typeof fetch === 'function') {
+        fetch(`${API_CONFIG.BASE_URL}/auth/logout`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${rawToken}` }
+        }).catch(() => {});
+    }
+
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new CustomEvent('zooguide:unauthorized', { detail: { reason } }));
+    }
+}
+
+export function recordAdminActivity(force = false) {
+    if (typeof window === 'undefined' || !window.localStorage) return false;
+    const now = Date.now();
+    const validity = checkAdminSessionValidity(now);
+    if (!validity.valid) {
+        if (validity.reason && validity.reason !== 'no_token' && validity.reason !== 'no_storage') {
+            expireAdminSession(validity.reason);
+        }
+        return false;
+    }
+
+    const currentMeta = validity.meta;
+    if (!force && now - currentMeta.lastActivityAt < ACTIVITY_WRITE_THROTTLE_MS) {
+        return true;
+    }
+
+    // Chỉ cập nhật lastActivityAt, tuyệt đối KHÔNG thay đổi loginAt và absoluteExpiresAt
+    const updatedMeta = {
+        loginAt: currentMeta.loginAt,
+        absoluteExpiresAt: currentMeta.absoluteExpiresAt,
+        lastActivityAt: now
+    };
+
+    try {
+        window.localStorage.setItem(AUTH_SESSION_META_KEY, JSON.stringify(updatedMeta));
+        broadcastAdminAuthEvent({
+            type: 'ADMIN_ACTIVITY',
+            lastActivityAt: now,
+            loginAt: updatedMeta.loginAt,
+            absoluteExpiresAt: updatedMeta.absoluteExpiresAt
+        });
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+export function getAuthToken() {
+    try {
+        const rawToken = localStorage.getItem(AUTH_STORAGE_KEY);
+        if (!rawToken) return null;
+
+        const validity = checkAdminSessionValidity();
+        if (!validity.valid) {
+            expireAdminSession(validity.reason || 'session_expired');
+            return null;
+        }
+        return rawToken;
+    } catch {
+        return null;
+    }
+}
+
+export function setAuthSession(token, user, options = {}) {
+    const { isNewLogin = false, expiresAt = null } = options;
+    try {
+        if (token) {
+            localStorage.setItem(AUTH_STORAGE_KEY, token);
+            const existingMeta = getAdminSessionMeta();
+            const now = Date.now();
+            const payload = decodeJwtPayload(token);
+            const jwtIatMs = typeof payload?.iat === 'number' ? payload.iat * 1000 : now;
+            const jwtExpMs = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
+            const serverExpMs = expiresAt ? new Date(expiresAt).getTime() : null;
+
+            if (isNewLogin || !existingMeta) {
+                const loginAt = isNewLogin ? now : jwtIatMs;
+                let absoluteExpiresAt = loginAt + ADMIN_ABSOLUTE_TIMEOUT_MS;
+                if (jwtExpMs && Number.isFinite(jwtExpMs)) {
+                    absoluteExpiresAt = Math.min(absoluteExpiresAt, jwtExpMs);
+                }
+                if (serverExpMs && Number.isFinite(serverExpMs)) {
+                    absoluteExpiresAt = Math.min(absoluteExpiresAt, serverExpMs);
+                }
+                const newMeta = {
+                    loginAt,
+                    absoluteExpiresAt,
+                    lastActivityAt: isNewLogin ? now : (existingMeta?.lastActivityAt || now)
+                };
+                localStorage.setItem(AUTH_SESSION_META_KEY, JSON.stringify(newMeta));
+                if (isNewLogin) {
+                    broadcastAdminAuthEvent({
+                        type: 'ADMIN_LOGIN',
+                        meta: newMeta
+                    });
+                }
+            }
+        }
+        if (user) {
+            localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
+        }
     } catch (e) {
         console.warn('Cannot write auth session to localStorage:', e);
     }
 }
 
-export function clearAuthSession() {
-    try {
-        localStorage.removeItem(AUTH_STORAGE_KEY);
-        localStorage.removeItem(AUTH_USER_KEY);
-    } catch (e) {
-        console.warn('Cannot clear auth session:', e);
-    }
-}
-
 export function getStoredUser() {
     try {
+        if (!getAuthToken()) return null;
         const raw = localStorage.getItem(AUTH_USER_KEY);
         return raw ? JSON.parse(raw) : null;
     } catch {
@@ -213,13 +469,28 @@ export function getAuthHeaders(extraHeaders = {}) {
 }
 
 export async function authFetch(url, options = {}) {
+    // Kiểm tra tính hợp lệ của phiên trước khi gửi request
+    const validity = checkAdminSessionValidity();
+    if (!validity.valid) {
+        const reason = validity.reason && validity.reason !== 'no_token' ? validity.reason : 'session_expired';
+        expireAdminSession(reason);
+        return new Response(
+            JSON.stringify({
+                success: false,
+                message: 'Phiên làm việc quản trị đã hết hạn. Vui lòng đăng nhập lại.'
+            }),
+            {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            }
+        );
+    }
+
     const headers = getAuthHeaders(options.headers || {});
     const res = await fetch(url, { ...options, headers });
+    // Chỉ thu hồi phiên khi 401 Unauthorized; với 403 Forbidden (ví dụ Staff gọi API chỉ dành cho Admin) giữ nguyên phiên
     if (res.status === 401) {
-        clearAuthSession();
-        if (typeof window !== 'undefined' && window.dispatchEvent) {
-            window.dispatchEvent(new CustomEvent('zooguide:unauthorized'));
-        }
+        expireAdminSession('session_expired');
     }
     return res;
 }
@@ -305,7 +576,10 @@ export const ZooApi = {
                 };
             }
             if (json.data?.token) {
-                setAuthSession(json.data.token, json.data.user);
+                setAuthSession(json.data.token, json.data.user, {
+                    isNewLogin: true,
+                    expiresAt: json.data.expiresAt
+                });
             }
             return {
                 success: true,
@@ -323,16 +597,18 @@ export const ZooApi = {
     async getCurrentUser() {
         try {
             const token = getAuthToken();
-            if (!token) return { success: false, message: 'Chưa đăng nhập' };
+            if (!token) return { success: false, status: 401, message: 'Chưa đăng nhập hoặc phiên đã hết hạn' };
 
             const res = await authFetch(`${API_CONFIG.BASE_URL}/auth/me`);
             if (!res.ok) {
-                clearAuthSession();
+                if (res.status === 401 || res.status === 404) {
+                    clearAuthSession({ broadcast: true, reason: 'session_expired' });
+                }
                 return { success: false, status: res.status };
             }
             const json = await res.json();
             if (json.data) {
-                setAuthSession(token, json.data);
+                setAuthSession(token, json.data, { isNewLogin: false });
             }
             return { success: true, data: json.data, user: json.data };
         } catch (err) {
@@ -341,25 +617,39 @@ export const ZooApi = {
         }
     },
 
-    async logout() {
+    async logout(options = {}) {
+        const reason = options.reason || 'manual_logout';
         try {
-            const token = getAuthToken();
-            if (token) {
-                await authFetch(`${API_CONFIG.BASE_URL}/auth/logout`, { method: 'POST' }).catch(() => {});
+            let rawToken = null;
+            try {
+                rawToken = localStorage.getItem(AUTH_STORAGE_KEY);
+            } catch {
+                rawToken = null;
+            }
+            if (rawToken) {
+                await fetch(`${API_CONFIG.BASE_URL}/auth/logout`, {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${rawToken}` }
+                }).catch(() => {});
             }
         } finally {
-            clearAuthSession();
+            clearAuthSession({ broadcast: true, reason });
         }
         return { success: true };
     },
 
     isAuthenticated() {
-        return Boolean(getAuthToken());
+        return checkAdminSessionValidity().valid;
     },
 
     getStoredUser() {
         return getStoredUser();
     },
+
+    checkAdminSessionValidity,
+    recordAdminActivity,
+    getAdminSessionMeta,
+    expireAdminSession,
 
     // 0. HEALTH CHECK
     async checkHealth() {

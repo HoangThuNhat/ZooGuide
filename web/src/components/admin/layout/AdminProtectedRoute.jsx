@@ -1,19 +1,46 @@
 import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation, Outlet } from 'react-router-dom';
-import ZooApi, { getAuthToken, getStoredUser, clearAuthSession } from '../../../services/api';
+import {
+    ZooApi,
+    getAuthToken,
+    getStoredUser,
+    clearAuthSession,
+    checkAdminSessionValidity,
+    AUTH_STORAGE_KEY,
+    AUTH_SESSION_META_KEY,
+    AUTH_BROADCAST_CHANNEL
+} from '../../../services/api';
 
 export default function AdminProtectedRoute() {
     const location = useLocation();
     const [isVerifying, setIsVerifying] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [redirectReason, setRedirectReason] = useState('unauthorized');
 
     useEffect(() => {
         let isMounted = true;
 
         const checkSession = async () => {
+            const validity = checkAdminSessionValidity();
+            if (!validity.valid) {
+                const isExpired =
+                    validity.reason === 'inactivity_timeout' ||
+                    validity.reason === 'absolute_timeout' ||
+                    validity.reason === 'session_expired' ||
+                    validity.reason === 'invalid_token';
+                clearAuthSession();
+                if (isMounted) {
+                    setRedirectReason(isExpired ? 'session_expired' : 'unauthorized');
+                    setIsAuthorized(false);
+                    setIsVerifying(false);
+                }
+                return;
+            }
+
             const token = getAuthToken();
             if (!token) {
                 if (isMounted) {
+                    setRedirectReason('session_expired');
                     setIsAuthorized(false);
                     setIsVerifying(false);
                 }
@@ -24,6 +51,7 @@ export default function AdminProtectedRoute() {
             if (storedUser && storedUser.role !== 'Admin' && storedUser.role !== 'Staff') {
                 clearAuthSession();
                 if (isMounted) {
+                    setRedirectReason('unauthorized');
                     setIsAuthorized(false);
                     setIsVerifying(false);
                 }
@@ -41,19 +69,22 @@ export default function AdminProtectedRoute() {
                         setIsAuthorized(true);
                     } else {
                         clearAuthSession();
+                        setRedirectReason('unauthorized');
                         setIsAuthorized(false);
                     }
                 } else {
                     clearAuthSession();
+                    setRedirectReason('session_expired');
                     setIsAuthorized(false);
                 }
             } catch (err) {
                 console.warn('Session verification network error:', err);
-                // If offline or network error, but token exists and stored role is Admin/Staff, fallback to stored session
-                if (storedUser && (storedUser.role === 'Admin' || storedUser.role === 'Staff')) {
+                const stillValid = checkAdminSessionValidity().valid;
+                if (stillValid && storedUser && (storedUser.role === 'Admin' || storedUser.role === 'Staff')) {
                     setIsAuthorized(true);
                 } else {
                     clearAuthSession();
+                    setRedirectReason('session_expired');
                     setIsAuthorized(false);
                 }
             } finally {
@@ -63,15 +94,57 @@ export default function AdminProtectedRoute() {
 
         checkSession();
 
-        const handleUnauthorized = () => {
+        const handleUnauthorized = (event) => {
+            const reason = event?.detail?.reason;
             clearAuthSession();
-            setIsAuthorized(false);
+            if (isMounted) {
+                setRedirectReason(reason === 'manual_logout' ? 'logged_out' : 'session_expired');
+                setIsAuthorized(false);
+            }
         };
 
+        const handleStorageChange = (event) => {
+            if (
+                event.key === null ||
+                event.key === AUTH_STORAGE_KEY ||
+                event.key === AUTH_SESSION_META_KEY
+            ) {
+                const validity = checkAdminSessionValidity();
+                if (!validity.valid && isMounted) {
+                    setRedirectReason('session_expired');
+                    setIsAuthorized(false);
+                }
+            }
+        };
+
+        let channel = null;
+        if (typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function') {
+            try {
+                channel = new window.BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+                channel.onmessage = (event) => {
+                    const msg = event?.data;
+                    if (msg?.type === 'ADMIN_SESSION_ENDED' && isMounted) {
+                        clearAuthSession();
+                        setRedirectReason(msg.reason === 'manual_logout' ? 'logged_out' : 'session_expired');
+                        setIsAuthorized(false);
+                    }
+                };
+            } catch {
+                channel = null;
+            }
+        }
+
         window.addEventListener('zooguide:unauthorized', handleUnauthorized);
+        window.addEventListener('storage', handleStorageChange);
         return () => {
             isMounted = false;
             window.removeEventListener('zooguide:unauthorized', handleUnauthorized);
+            window.removeEventListener('storage', handleStorageChange);
+            if (channel) {
+                try {
+                    channel.close();
+                } catch {}
+            }
         };
     }, []);
 
@@ -101,8 +174,11 @@ export default function AdminProtectedRoute() {
     }
 
     if (!isAuthorized) {
+        if (redirectReason === 'logged_out') {
+            return <Navigate to="/admin/login" replace />;
+        }
         const redirectParam = encodeURIComponent(location.pathname + location.search);
-        return <Navigate to={`/admin/login?redirect=${redirectParam}&reason=unauthorized`} replace />;
+        return <Navigate to={`/admin/login?redirect=${redirectParam}&reason=${redirectReason}`} replace />;
     }
 
     return <Outlet />;
