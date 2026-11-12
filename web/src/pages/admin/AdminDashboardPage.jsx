@@ -113,10 +113,14 @@ export default function AdminDashboardPage() {
         }
     }, [periodFilter]);
 
-    // Kết nối SignalR Realtime Hub
+    // Kết nối SignalR Realtime Hub (/hubs/online) với debounce chống gọi API quá nhiều
     useEffect(() => {
         let isMounted = true;
-        const hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?role=Admin&userId=admin_dashboard_${Date.now()}`;
+        let refreshDebounceTimer = null;
+        const adminVisitorId = localStorage.getItem('zooguide_admin_visitor_id') || `admin_dashboard_${Date.now()}`;
+        localStorage.setItem('zooguide_admin_visitor_id', adminVisitorId);
+
+        const hubUrl = `/hubs/online?visitorId=${encodeURIComponent(adminVisitorId)}&role=Admin`;
 
         const connection = new signalR.HubConnectionBuilder()
             .withUrl(hubUrl)
@@ -124,22 +128,45 @@ export default function AdminDashboardPage() {
             .configureLogging(signalR.LogLevel.Warning)
             .build();
 
-        const handleRealtimeRefresh = () => {
+        const scheduleDebouncedRefresh = () => {
             if (!isMounted) return;
-            fetchDashboardData(periodFilter, customFromDate, customToDate, true);
+            if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
+            refreshDebounceTimer = setTimeout(() => {
+                if (isMounted) {
+                    fetchDashboardData(periodFilter, customFromDate, customToDate, true);
+                }
+            }, 1500);
         };
 
-        connection.on('ActiveBuyersUpdated', handleRealtimeRefresh);
-        connection.on('ActiveDevicesUpdated', handleRealtimeRefresh);
-        connection.on('DashboardTelemetryUpdated', () => {
+        connection.on('ActiveBuyersUpdated', (buyerCount) => {
             if (!isMounted) return;
-            fetchDashboardData(periodFilter, customFromDate, customToDate, true);
+            if (typeof buyerCount === 'number') {
+                setStats(prev => prev ? { ...prev, activeTicketBuyers: buyerCount, activeBuyers: buyerCount } : prev);
+                setLastSyncTime(new Date());
+            }
+        });
+
+        connection.on('ActiveDevicesUpdated', (deviceCount) => {
+            if (!isMounted) return;
+            if (typeof deviceCount === 'number') {
+                setStats(prev => prev ? { ...prev, activeDevices: deviceCount } : prev);
+                setLastSyncTime(new Date());
+            }
+        });
+
+        connection.on('OnlineUsersUpdated', () => {
+            if (!isMounted) return;
+            setLastSyncTime(new Date());
+        });
+
+        connection.on('DashboardTelemetryUpdated', () => {
+            scheduleDebouncedRefresh();
         });
 
         connection.onreconnected(() => {
             if (isMounted) {
                 setSignalRConnected(true);
-                handleRealtimeRefresh();
+                fetchDashboardData(periodFilter, customFromDate, customToDate, true);
             }
         });
 
@@ -157,15 +184,17 @@ export default function AdminDashboardPage() {
 
         hubConnectionRef.current = connection;
 
+        // Cơ chế refresh dự phòng định kỳ (30 giây/lần khi có SignalR, 15 giây/lần khi mất kết nối SignalR)
         const pollTimer = setInterval(() => {
             if (isMounted) {
                 fetchDashboardData(periodFilter, customFromDate, customToDate, true);
             }
-        }, 20000);
+        }, 25000);
 
         return () => {
             isMounted = false;
             clearInterval(pollTimer);
+            if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
             if (hubConnectionRef.current) {
                 hubConnectionRef.current.stop().catch(() => {});
             }
@@ -526,9 +555,116 @@ export default function AdminDashboardPage() {
             ) : (
                 <>
                     {/* ================================================================
-                        A. TỔNG QUAN VẬN HÀNH — 8 THẺ THỐNG KÊ ĐỒNG NHẤT
+                        A. TỔNG QUAN VẬN HÀNH — CHỈ SỐ VẬN HÀNH CỐT LÕI & THUYẾT MINH
                        ================================================================ */}
                     <div id="sec-overview">
+                        {/* 6 Chỉ số Vận hành Cốt lõi (Khách tham quan, Phiên vé, Vé bán ra, Đơn hàng, Thiết bị kết nối, Người mua online) */}
+                        <div className="saas-kpi-grid" style={{ marginBottom: '16px' }}>
+                            {/* C1. Tổng số khách tham quan */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #15803D' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Tổng số khách tham quan</span>
+                                        <Link to="/admin/users" className="saas-kpi-link">Tài khoản →</Link>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value">{stats?.totalVisitorsCount ?? 0}</span>
+                                        <span className="saas-kpi-unit">khách ({periodLabel})</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Tài khoản hệ thống: <strong>{stats?.totalUsers ?? 0}</strong> • Không đếm trùng giữa đơn vé, phiên & thiết bị
+                                </div>
+                            </div>
+
+                            {/* C2. Số phiên tham quan đang hoạt động */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0284C7' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Phiên tham quan đang hoạt động</span>
+                                        <Link to="/admin/ticket-sessions" className="saas-kpi-link">Giám sát →</Link>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value" style={{ color: (stats?.activeSessions ?? 0) > 0 ? '#15803D' : '#0F172A' }}>
+                                            {stats?.activeSessions ?? 0}
+                                        </span>
+                                        <span className="saas-kpi-unit">phiên còn hạn</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Tổng phiên trong kỳ: <strong>{stats?.totalSessions ?? 0}</strong> (TICKET_SESSIONS Active & chưa hết hạn)
+                                </div>
+                            </div>
+
+                            {/* C3. Số lượng vé đã bán */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #7C3AED' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Số lượng vé đã bán</span>
+                                        <Link to="/admin/ticket-orders" className="saas-kpi-link">Đơn vé →</Link>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value">{stats?.totalTicketsSold ?? 0}</span>
+                                        <span className="saas-kpi-unit">vé đã thanh toán</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Đã quét dùng: <strong>{stats?.usedTickets ?? 0}</strong> • Còn hiệu lực: <strong>{stats?.validTickets ?? 0}</strong> • Hủy: <strong>{stats?.cancelledTickets ?? 0}</strong>
+                                </div>
+                            </div>
+
+                            {/* C4. Số lượng đơn hàng & Doanh thu */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #D97706' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Số lượng đơn hàng & Doanh thu</span>
+                                        <Link to="/admin/ticket-orders" className="saas-kpi-link">Chi tiết →</Link>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value">{stats?.paidOrders ?? 0}</span>
+                                        <span className="saas-kpi-unit">/ {stats?.totalOrders ?? 0} đơn hàng</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Doanh thu: <strong>{Number(stats?.totalRevenue ?? 0).toLocaleString('vi-VN')} đ</strong> • Chờ: <strong>{stats?.pendingOrders ?? 0}</strong> • Lỗi/Hết hạn: <strong>{stats?.failedOrExpiredOrders ?? 0}</strong>
+                                </div>
+                            </div>
+
+                            {/* C5. Số lượng thiết bị đang kết nối */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #059669' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Số lượng thiết bị đang kết nối</span>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value" style={{ color: '#059669' }}>
+                                            {stats?.activeDevices ?? 0}
+                                        </span>
+                                        <span className="saas-kpi-unit">thiết bị trực tuyến</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Hoạt động 5p gần nhất: <strong>{kpis.activeDevices5Min ?? 0}</strong> • Nguồn: SignalR Hub & DEVICE_ACTIVITIES
+                                </div>
+                            </div>
+
+                            {/* C6. Khách đang đặt vé trực tuyến */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0D9488' }}>
+                                <div>
+                                    <div className="saas-kpi-top">
+                                        <span className="saas-kpi-title">Khách đang ở cổng tham quan / mua vé</span>
+                                    </div>
+                                    <div className="saas-kpi-value-row">
+                                        <span className="saas-kpi-value">{stats?.activeTicketBuyers ?? stats?.activeBuyers ?? 0}</span>
+                                        <span className="saas-kpi-unit">phiên trình duyệt</span>
+                                    </div>
+                                </div>
+                                <div className="saas-kpi-meta">
+                                    Kết nối trực tiếp qua <strong>/hubs/online</strong> ({stats?.onlineUsers ?? 0} online) • Loài: <strong>{stats?.totalSpecies ?? 0}</strong> • Cá thể: <strong>{stats?.totalAnimals ?? 0}</strong>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="saas-kpi-grid">
                             {/* 1. Khách đang dùng thuyết minh */}
                             <div className="saas-kpi-card">
@@ -683,6 +819,87 @@ export default function AdminDashboardPage() {
                                     Hợp lệ: <strong>{kpis.sessionsWithValidGpsCount ?? 0}/{kpis.totalEvaluatedSessionsCount ?? 0}</strong> phiên • Lỗi GPS: <strong>{kpis.gpsUnavailableEventsCount ?? 0}</strong>
                                 </div>
                             </div>
+                        </div>
+
+                        {/* Biểu đồ thống kê Vé bán ra, Đơn hàng thành công & Phiên tham quan theo ngày */}
+                        <div style={{
+                            background: '#FFFFFF',
+                            borderRadius: '10px',
+                            border: '1px solid #E2E8F0',
+                            padding: '16px 20px',
+                            marginTop: '16px',
+                            marginBottom: '20px'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
+                                <div>
+                                    <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0F172A' }}>
+                                        Biểu đồ thống kê Vé bán ra, Đơn hàng thanh toán & Phiên tham quan theo ngày
+                                    </div>
+                                    <div style={{ fontSize: '0.76rem', color: '#64748B' }}>
+                                        Dữ liệu thực tế từ bảng TICKET_ORDERS, TICKETS và TICKET_SESSIONS ({periodLabel})
+                                    </div>
+                                </div>
+                                <div style={{ display: 'flex', gap: '14px', fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#7C3AED' }} /> Vé đã bán
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#15803D' }} /> Đơn thanh toán
+                                    </span>
+                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#0284C7' }} /> Phiên tham quan
+                                    </span>
+                                </div>
+                            </div>
+
+                            {(() => {
+                                const dailyList = stats?.dailyTicketStats || [];
+                                if (dailyList.length === 0 || dailyList.every(d => !d.ticketsSold && !d.ordersCount && !d.sessionsCount)) {
+                                    return (
+                                        <div style={{ padding: '24px', textAlign: 'center', background: '#F8FAFC', borderRadius: '8px', color: '#64748B', fontSize: '0.82rem' }}>
+                                            Chưa phát sinh giao dịch vé hoặc phiên tham quan trong khoảng thời gian đang chọn ({periodLabel}).
+                                        </div>
+                                    );
+                                }
+                                const maxDailyVal = Math.max(5, ...dailyList.map(d => Math.max(d.ticketsSold || 0, d.ordersCount || 0, d.sessionsCount || 0)));
+                                return (
+                                    <div style={{ width: '100%', overflowX: 'auto' }}>
+                                        <svg viewBox={`0 0 ${Math.max(680, dailyList.length * 76)} 195`} style={{ width: '100%', minWidth: '560px', height: '195px', display: 'block' }}>
+                                            {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+                                                const y = 155 - ratio * 125;
+                                                const labelVal = Math.round(maxDailyVal * ratio);
+                                                return (
+                                                    <g key={i}>
+                                                        <line x1="38" y1={y} x2="98%" y2={y} stroke="#E2E8F0" strokeDasharray="3,3" />
+                                                        <text x="32" y={y + 4} textAnchor="end" fontSize="10" fill="#64748B">{labelVal}</text>
+                                                    </g>
+                                                );
+                                            })}
+                                            {dailyList.map((day, idx) => {
+                                                const groupX = 52 + idx * 68;
+                                                const tH = Math.round(((day.ticketsSold || 0) / maxDailyVal) * 125);
+                                                const oH = Math.round(((day.ordersCount || 0) / maxDailyVal) * 125);
+                                                const sH = Math.round(((day.sessionsCount || 0) / maxDailyVal) * 125);
+                                                return (
+                                                    <g key={idx}>
+                                                        <rect x={groupX} y={155 - tH} width="13" height={Math.max(2, tH)} rx="2" fill="#7C3AED" />
+                                                        <rect x={groupX + 15} y={155 - oH} width="13" height={Math.max(2, oH)} rx="2" fill="#15803D" />
+                                                        <rect x={groupX + 30} y={155 - sH} width="13" height={Math.max(2, sH)} rx="2" fill="#0284C7" />
+                                                        {(day.ticketsSold > 0 || day.ordersCount > 0 || day.sessionsCount > 0) && (
+                                                            <text x={groupX + 21} y={Math.min(150, 150 - Math.max(tH, oH, sH))} textAnchor="middle" fontSize="9.5" fontWeight="600" fill="#0F172A">
+                                                                {day.ticketsSold}/{day.ordersCount}/{day.sessionsCount}
+                                                            </text>
+                                                        )}
+                                                        <text x={groupX + 21} y="176" textAnchor="middle" fontSize="10" fontWeight="500" fill="#64748B">
+                                                            {day.label}
+                                                        </text>
+                                                    </g>
+                                                );
+                                            })}
+                                        </svg>
+                                    </div>
+                                );
+                            })()}
                         </div>
                     </div>
 
@@ -1536,6 +1753,7 @@ export default function AdminDashboardPage() {
                                         style={{ padding: '5px 9px', borderRadius: '6px', border: '1px solid #E2E8F0', fontSize: '0.78rem', background: '#FFFFFF', color: '#0F172A' }}
                                     >
                                         <option value="all">Tất cả phân nhóm</option>
+                                        <option value="TICKET">Đơn vé & Phiên tham quan (TICKET)</option>
                                         <option value="AUDIO">Phát âm thanh (AUDIO)</option>
                                         <option value="GPS">Kích hoạt GPS (GPS)</option>
                                         <option value="LANGUAGE">Đổi ngôn ngữ (LANGUAGE)</option>

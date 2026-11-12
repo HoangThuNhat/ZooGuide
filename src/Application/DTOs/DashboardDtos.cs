@@ -15,9 +15,21 @@ public class DashboardStatsDto
     public int ActiveDevices5Min { get; set; }
     public int TotalTrackedDevices { get; set; }
     public int ActiveSessions { get; set; }
+    public int TotalSessions { get; set; }
+    public int TotalUsers { get; set; }
+    public int TotalVisitorsCount { get; set; }
+    public int TotalOrders { get; set; }
+    public int PaidOrders { get; set; }
+    public int PendingOrders { get; set; }
+    public int FailedOrExpiredOrders { get; set; }
+    public decimal TotalRevenue { get; set; }
     public int TotalTickets { get; set; }
     public int ActiveTickets { get; set; }
+    public int ValidTickets { get; set; }
+    public int UsedTickets { get; set; }
+    public int CancelledTickets { get; set; }
     public int ExpiredTickets { get; set; }
+    public List<DashboardDailyTicketStatDto> DailyTicketStats { get; set; } = new();
     public int TotalAnimals { get; set; }
     public int TotalSpecies { get; set; }
     public int TotalAreas { get; set; }
@@ -524,4 +536,15 @@ public class OnlineUsersSummaryDto
     public int ActiveConnections { get; set; }
     public int ActiveTicketBuyerDevices { get; set; }
     public DateTime CalculatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public class DashboardDailyTicketStatDto
+{
+    public string DateLabel { get; set; } = string.Empty;
+    public DateTime DateUtc { get; set; }
+    public int OrdersCount { get; set; }
+    public int PaidOrdersCount { get; set; }
+    public int TicketsSold { get; set; }
+    public decimal Revenue { get; set; }
+    public int SessionsCount { get; set; }
 }

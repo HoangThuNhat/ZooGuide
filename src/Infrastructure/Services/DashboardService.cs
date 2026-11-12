@@ -95,6 +95,7 @@ public class DashboardService : IDashboardService
         }
 
         // 2. Dữ liệu vé và đơn hàng (giữ tương thích ngược cho bộ kiểm thử hiện có)
+        var allOrdersQuery = _context.TicketOrders.AsNoTracking().AsQueryable();
         var paidOrdersQuery = _context.TicketOrders
             .AsNoTracking()
             .Where(o => o.PaymentStatus == PaymentStatus.Paid);
@@ -104,12 +105,21 @@ public class DashboardService : IDashboardService
         {
             ticketQuery = ticketQuery.Where(t => t.IssuedAt >= utcFrom.Value || t.CreatedAt >= utcFrom.Value);
             paidOrdersQuery = paidOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) >= utcFrom.Value);
+            allOrdersQuery = allOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) >= utcFrom.Value);
         }
         if (utcTo.HasValue)
         {
             ticketQuery = ticketQuery.Where(t => t.IssuedAt <= utcTo.Value && t.CreatedAt <= utcTo.Value);
             paidOrdersQuery = paidOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) <= utcTo.Value);
+            allOrdersQuery = allOrdersQuery.Where(o => (o.PaidAt ?? o.CreatedAt) <= utcTo.Value);
         }
+
+        var filteredOrdersList = await allOrdersQuery.OrderByDescending(o => o.CreatedAt).ToListAsync();
+        var totalOrders = filteredOrdersList.Count;
+        var paidOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Paid);
+        var pendingOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Pending);
+        var failedOrExpiredOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Failed || o.PaymentStatus == PaymentStatus.Expired);
+        var totalRevenue = filteredOrdersList.Where(o => o.PaymentStatus == PaymentStatus.Paid).Sum(o => o.TotalAmount);
 
         var totalTicketBuyers = await paidOrdersQuery
             .Where(o => !string.IsNullOrEmpty(o.CustomerEmail))
@@ -120,12 +130,17 @@ public class DashboardService : IDashboardService
         var totalTicketsSold = await paidOrdersQuery.SumAsync(o => (int?)o.Quantity) ?? 0;
 
         var activeTicketBuyers = _onlineTracker?.GetActiveTicketBuyersCount() ?? 0;
-        var activeDevices = activeDevices60Sec;
+        var trackerActiveDevices = _onlineTracker?.GetActiveDevicesCount() ?? 0;
+        var activeDevices = Math.Max(trackerActiveDevices, activeDevices60Sec);
         var activeBuyerConnections = _onlineTracker?.GetActiveBuyerConnectionsCount() ?? 0;
 
         var totalTickets = await ticketQuery.CountAsync();
+        var validTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid && t.ValidUntil >= now);
+        var usedTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Used);
+        var cancelledTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Cancelled);
         var activeTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
         var expiredTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
+        var totalUsers = await _context.Users.AsNoTracking().CountAsync();
 
         // 3. Dữ liệu danh mục gốc (Inventory)
         var allAnimals = await _context.Animals
@@ -843,7 +858,7 @@ public class DashboardService : IDashboardService
         // TASK 9: GIÁM SÁT DỊCH VỤ, NHẬT KÝ HOẠT ĐỘNG & CẢNH BÁO HỆ THỐNG
         // ====================================================================
         var serviceMonitoring = await BuildServiceMonitoringAsync(dbLatencyMs, now);
-        var activityLogs = BuildOperationLogs(filteredTelemetry, allAnimalNarrations, allPoiNarrations, allPois, now);
+        var activityLogs = BuildOperationLogs(filteredTelemetry, allAnimalNarrations, allPoiNarrations, allPois, filteredOrdersList, filteredSessions, now);
         var systemAlerts = BuildSystemAlerts(
             allTelemetryEvents,
             poiMonitoring,
@@ -852,6 +867,44 @@ public class DashboardService : IDashboardService
             overviewKpis,
             serviceMonitoring,
             now);
+
+        // Thống kê đơn hàng, vé bán ra & phiên tham quan theo ngày (7 ngày gần nhất hoặc theo bộ lọc)
+        var dailyStart = utcFrom?.Date ?? now.Date.AddDays(-6);
+        var dailyEnd = utcTo?.Date ?? now.Date;
+        if (dailyEnd < dailyStart) dailyEnd = dailyStart;
+        var totalDaysSpan = (int)(dailyEnd - dailyStart).TotalDays + 1;
+        if (totalDaysSpan > 14)
+        {
+            dailyStart = dailyEnd.AddDays(-13);
+            totalDaysSpan = 14;
+        }
+
+        var dailyTicketStats = new List<DashboardDailyTicketStatDto>();
+        for (int i = 0; i < totalDaysSpan; i++)
+        {
+            var dayStart = dailyStart.AddDays(i);
+            var dayEnd = dayStart.AddDays(1);
+            var dayOrders = filteredOrdersList.Where(o =>
+            {
+                var dt = o.PaidAt ?? o.CreatedAt;
+                return dt >= dayStart && dt < dayEnd;
+            }).ToList();
+            var dayPaidOrders = dayOrders.Where(o => o.PaymentStatus == PaymentStatus.Paid).ToList();
+            var daySessionsCount = filteredSessions.Count(s => s.StartedAt >= dayStart && s.StartedAt < dayEnd);
+
+            dailyTicketStats.Add(new DashboardDailyTicketStatDto
+            {
+                DateLabel = dayStart.ToString("dd/MM"),
+                DateUtc = dayStart,
+                OrdersCount = dayOrders.Count,
+                PaidOrdersCount = dayPaidOrders.Count,
+                TicketsSold = dayPaidOrders.Sum(o => o.Quantity),
+                Revenue = dayPaidOrders.Sum(o => o.TotalAmount),
+                SessionsCount = daySessionsCount
+            });
+        }
+
+        var totalVisitorsCount = Math.Max(totalTicketsSold, Math.Max(activeTickets, filteredSessions.Count));
 
         // ====================================================================
         // GIỮ TƯƠNG THÍCH NGƯỢC CHO CÁC TEST HIỆN CÓ (RecentHealthLogs & RecentActivities)
@@ -906,9 +959,21 @@ public class DashboardService : IDashboardService
             ActiveDevices5Min = activeDevices5Min,
             TotalTrackedDevices = totalTrackedDevices,
             ActiveSessions = activeSessions,
+            TotalSessions = filteredSessions.Count,
+            TotalUsers = totalUsers,
+            TotalVisitorsCount = totalVisitorsCount,
+            TotalOrders = totalOrders,
+            PaidOrders = paidOrders,
+            PendingOrders = pendingOrders,
+            FailedOrExpiredOrders = failedOrExpiredOrders,
+            TotalRevenue = totalRevenue,
             TotalTickets = totalTickets,
             ActiveTickets = activeTickets,
+            ValidTickets = validTickets,
+            UsedTickets = usedTickets,
+            CancelledTickets = cancelledTickets,
             ExpiredTickets = expiredTickets,
+            DailyTicketStats = dailyTicketStats,
             TotalAnimals = totalAnimals,
             TotalSpecies = totalSpecies,
             TotalAreas = totalAreas,
@@ -1540,7 +1605,7 @@ public class DashboardService : IDashboardService
             new DashboardServiceStatusItemDto
             {
                 ServiceKey = "signalr-hub",
-                ServiceName = "SignalR Realtime Hub (/api/hubs/online)",
+                ServiceName = "SignalR Realtime Hub (/hubs/online)",
                 Category = "Realtime Messaging",
                 Status = "Healthy",
                 ResponseTimeMs = 1,
@@ -1563,9 +1628,51 @@ public class DashboardService : IDashboardService
         List<Narration> narrations,
         List<PoiNarration> poiNarrations,
         List<PointOfInterest> pois,
+        List<TicketOrder> recentOrders,
+        List<TicketSession> recentSessions,
         DateTime now)
     {
         var logs = new List<DashboardOperationLogDto>();
+
+        // 0. Nhật ký đơn hàng mua vé (TICKET_ORDERS) & phiên tham quan (TICKET_SESSIONS)
+        foreach (var ord in recentOrders.OrderByDescending(o => o.PaidAt ?? o.CreatedAt).Take(10))
+        {
+            bool isPaid = ord.PaymentStatus == PaymentStatus.Paid;
+            bool isFailed = ord.PaymentStatus == PaymentStatus.Failed || ord.PaymentStatus == PaymentStatus.Expired;
+            logs.Add(new DashboardOperationLogDto
+            {
+                LogId = $"ORD-{ord.OrderId}",
+                Timestamp = ord.PaidAt ?? ord.CreatedAt,
+                Category = "TICKET",
+                EventType = isPaid ? "ORDER_PAID" : $"ORDER_{ord.PaymentStatus.ToString().ToUpperInvariant()}",
+                EventLabel = isPaid ? "Thanh toán đơn vé thành công" : $"Đơn hàng vé ({ord.PaymentStatus})",
+                ActorOrSession = !string.IsNullOrEmpty(ord.CustomerEmail) ? ord.CustomerEmail : (ord.CustomerName ?? "Khách mua vé"),
+                TargetEntity = "TICKET_ORDER",
+                TargetId = ord.OrderCode,
+                TargetName = $"Đơn {ord.OrderCode} ({ord.Quantity} vé)",
+                ResultStatus = isPaid ? "Success" : (isFailed ? "Failed" : "Skipped"),
+                Details = $"Số lượng: {ord.Quantity} vé • Tổng tiền: {ord.TotalAmount:N0} ₫ • Trạng thái: {ord.PaymentStatus}"
+            });
+        }
+
+        foreach (var sess in recentSessions.OrderByDescending(s => s.StartedAt).Take(8))
+        {
+            bool isActive = sess.Status == SessionStatus.Active && sess.EndedAt == null && sess.ExpiredAt > now;
+            logs.Add(new DashboardOperationLogDto
+            {
+                LogId = $"SESS-{sess.SessionId.ToString()[..8]}",
+                Timestamp = sess.StartedAt,
+                Category = "TICKET",
+                EventType = isActive ? "SESSION_ACTIVE" : $"SESSION_{sess.Status.ToString().ToUpperInvariant()}",
+                EventLabel = isActive ? "Phiên tham quan đang hoạt động" : $"Phiên tham quan ({sess.Status})",
+                ActorOrSession = $"Session {sess.SessionId.ToString()[..8]}",
+                TargetEntity = "TICKET_SESSION",
+                TargetId = sess.TicketId.ToString(),
+                TargetName = $"Vé #{sess.TicketId}",
+                ResultStatus = sess.Status == SessionStatus.Revoked ? "Failed" : "Success",
+                Details = $"Trạng thái: {(isActive ? "Active (Còn hạn)" : sess.Status.ToString())} • Hết hạn: {sess.ExpiredAt:dd/MM HH:mm}"
+            });
+        }
 
         // 1. Nhật ký từ AuditLogService (các thao tác của Admin)
         if (_auditLogService != null)

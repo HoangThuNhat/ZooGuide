@@ -906,6 +906,97 @@ export const ZooApi = {
         return this.getSpeciesNarration(id, lang, sessionId);
     },
 
+    // 5c. GET NARRATION BY ANIMAL ID DIRECTLY
+    async getAnimalNarration(animalId, lang = 'vi', sessionId = null) {
+        try {
+            const aId = parseInt(animalId);
+            if (!sessionId) {
+                try {
+                    const raw = localStorage.getItem('zooguide_session_v1') || sessionStorage.getItem('zooguide_session_v1');
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        if (parsed?.sessionId && new Date(parsed.expiresAt) > new Date()) {
+                            sessionId = parsed.sessionId;
+                        }
+                    }
+                } catch (e) {}
+            }
+            if (!sessionId) {
+                return {
+                    success: false,
+                    unauthorized: true,
+                    message: 'Bạn cần có vé tham quan hợp lệ để nghe thuyết minh.'
+                };
+            }
+            const headers = { 'X-Session-Id': sessionId };
+            const res = await fetch(
+                `${API_CONFIG.BASE_URL}/narrations/animal/${aId}?lang=${encodeURIComponent(lang)}&sessionId=${encodeURIComponent(sessionId)}`,
+                { headers }
+            );
+            if (!res.ok) {
+                return this.getSpeciesNarration(aId, lang, sessionId);
+            }
+            const json = await res.json();
+            const n = json.data || json;
+            if (!n) return this.getSpeciesNarration(aId, lang, sessionId);
+            const primaryAudio = n.audios && n.audios.length > 0 ? n.audios[0] : null;
+            const publicAudioUrl = primaryAudio?.publicUrl || n.publicUrl || (primaryAudio?.fileUrl && primaryAudio.fileUrl.startsWith('http') ? primaryAudio.fileUrl : null) || (n.audioUrl && n.audioUrl.startsWith('http') ? n.audioUrl : null);
+            const hasRealAudio = Boolean(n.hasAudio || n.audioUrl || publicAudioUrl);
+            const streamUrl = hasRealAudio
+                ? `${API_CONFIG.BASE_URL}/narrations/${n.narrationId}/stream?sessionId=${encodeURIComponent(sessionId)}`
+                : null;
+            const durationSec = n.durationSeconds || 0;
+            const paragraphs = (n.content || '')
+                .split(/\n+/)
+                .map(p => p.trim())
+                .filter(Boolean);
+            const stepSec = paragraphs.length > 0 && durationSec > 0
+                ? Math.max(5, Math.floor(durationSec / paragraphs.length))
+                : 10;
+
+            return {
+                success: true,
+                data: {
+                    narrationId: n.narrationId,
+                    animalId: n.animalId,
+                    speciesId: n.speciesId || aId,
+                    speciesName: n.speciesName || n.animalName || '',
+                    animalName: n.animalName || '',
+                    scientificName: n.scientificName || '',
+                    conservationStatus: n.conservationStatus || '',
+                    languageCode: n.languageCode || lang,
+                    languageName: n.languageName || lang,
+                    title: n.title,
+                    narrator: n.voiceName || n.creatorName || 'ZooGuide Audio',
+                    voiceName: n.voiceName || '',
+                    ttsProvider: n.ttsProvider || '',
+                    summary: n.content,
+                    content: n.content,
+                    durationSec,
+                    durationFormatted: durationSec > 0
+                        ? `${Math.floor(durationSec / 60).toString().padStart(2, '0')}:${(durationSec % 60).toString().padStart(2, '0')}`
+                        : '--:--',
+                    hasAudio: hasRealAudio,
+                    audioSrc: publicAudioUrl || streamUrl,
+                    audioUrl: publicAudioUrl || n.audioUrl || null,
+                    publicUrl: publicAudioUrl || n.publicUrl || null,
+                    storageBucket: n.storageBucket || null,
+                    objectPath: n.objectPath || null,
+                    referenceSource: n.referenceSource || '',
+                    imageUrl: n.animalImageUrl || '',
+                    transcript: paragraphs.length > 0
+                        ? paragraphs.map((text, idx) => ({ time: idx * stepSec, text }))
+                        : [{ time: 0, text: n.content || n.title }],
+                    isFallbackLanguage: Boolean(n.isFallbackLanguage),
+                    originalRequestedLanguage: n.originalRequestedLanguage || null,
+                    fallbackMessage: n.fallbackMessage || null,
+                }
+            };
+        } catch (err) {
+            return this.getSpeciesNarration(animalId, lang, sessionId);
+        }
+    },
+
     // 6. STAFF: GET HEALTH LOGS (via real Dashboard stats from Supabase)
     async getHealthLogs() {
         const statsRes = await this.getDashboardStats();
@@ -1724,7 +1815,9 @@ export const ZooApi = {
         try {
             let installationId = payload.installationId;
             if (!installationId && typeof window !== 'undefined' && window.localStorage) {
-                installationId = window.localStorage.getItem('zooguide_device_installation_id_v1') || null;
+                installationId = window.localStorage.getItem('zooguide_device_installation_id')
+                    || window.localStorage.getItem('zooguide_device_installation_id_v1')
+                    || null;
             }
             const body = {
                 category: payload.category || 'AUDIO',

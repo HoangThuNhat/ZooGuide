@@ -185,6 +185,7 @@ app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHub<ZooGuide.API.Hubs.OnlineTrackerHub>("/hubs/online");
 app.MapHub<ZooGuide.API.Hubs.OnlineTrackerHub>("/api/hubs/online");
 
 // Lắng nghe sự kiện timeout dọn dẹp session để broadcast realtime tới Admin Dashboard

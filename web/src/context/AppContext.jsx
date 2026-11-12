@@ -1156,9 +1156,15 @@ export function AppProvider({ children }) {
         animal: null,
         narration: null,
         isPlaying: false,
+        isLoading: false,
+        error: null,
         currentTime: 0,
         duration: 0,
         playbackRate: 1.0,
+        volume: 1.0,
+        isMuted: false,
+        loadDurationMs: null,
+        entityType: null,
         isVisible: false
     });
 
