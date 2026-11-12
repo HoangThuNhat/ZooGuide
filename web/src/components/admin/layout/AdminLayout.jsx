@@ -216,7 +216,7 @@ export default function AdminLayout() {
                         </nav>
                     </div>
 
-                    <div className="admin-header-right">
+                    {/* <div className="admin-header-right">
                         {currentUser && (
                             <div className="admin-header-user" title={`Đang đăng nhập: ${currentUser.fullName || currentUser.username}`}>
                                 <div className="admin-user-avatar-small">
@@ -242,7 +242,7 @@ export default function AdminLayout() {
                         <Link to="/" className="admin-header-primary-btn">
                             Mở Trang Khách
                         </Link>
-                    </div>
+                    </div> */}
                 </header>
 
                 {/* Main Dynamic View */}
