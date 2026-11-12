@@ -11,6 +11,7 @@ export default function AdminDashboardPage() {
 
     // Thanh điều hướng phụ (6 phân khu)
     const [activeSectionTab, setActiveSectionTab] = useState('sec-overview');
+    const [overviewChartMode, setOverviewChartMode] = useState('volume'); // volume | revenue
 
     // Bộ lọc thời gian đồng nhất cho toàn Dashboard
     const [periodFilter, setPeriodFilter] = useState('all'); // today | last7days | last30days | thisMonth | custom | all
@@ -138,19 +139,29 @@ export default function AdminDashboardPage() {
             }, 1500);
         };
 
-        connection.on('ActiveBuyersUpdated', (buyerCount) => {
+        connection.on('ActiveBuyersUpdated', (payload) => {
             if (!isMounted) return;
-            if (typeof buyerCount === 'number') {
-                setStats(prev => prev ? { ...prev, activeTicketBuyers: buyerCount, activeBuyers: buyerCount } : prev);
+            const buyerCount = typeof payload === 'number'
+                ? payload
+                : (typeof payload?.activeTicketBuyers === 'number' ? payload.activeTicketBuyers : null);
+            if (buyerCount !== null) {
+                setStats(prev => prev ? {
+                    ...prev,
+                    activeTicketBuyers: buyerCount,
+                    activeBuyers: buyerCount,
+                    activeBuyerConnections: typeof payload?.activeBuyerConnections === 'number'
+                        ? payload.activeBuyerConnections
+                        : prev.activeBuyerConnections
+                } : prev);
                 setLastSyncTime(new Date());
             }
         });
 
-        connection.on('ActiveDevicesUpdated', (deviceCount) => {
+        connection.on('ActiveDevicesUpdated', (payload) => {
             if (!isMounted) return;
-            if (typeof deviceCount === 'number') {
-                setStats(prev => prev ? { ...prev, activeDevices: deviceCount } : prev);
+            if (typeof payload === 'number' || typeof payload?.activeDevices === 'number') {
                 setLastSyncTime(new Date());
+                scheduleDebouncedRefresh();
             }
         });
 
@@ -550,276 +561,214 @@ export default function AdminDashboardPage() {
                         Đang đồng bộ số liệu từ PostgreSQL, Supabase Storage và SignalR Hub.
                     </div>
                 </div>
+            ) : !stats ? (
+                <div className="saas-section" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748B' }}>
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0F172A', marginBottom: '6px' }}>
+                        Chưa có dữ liệu thống kê khả dụng
+                    </div>
+                    <div style={{ fontSize: '0.825rem', marginBottom: '14px' }}>
+                        Hệ thống chưa nhận được dữ liệu phản hồi cho khoảng thời gian đang chọn ({periodLabel}).
+                    </div>
+                    <button
+                        type="button"
+                        className="saas-btn"
+                        onClick={() => fetchDashboardData(periodFilter, customFromDate, customToDate)}
+                    >
+                        Tải lại dữ liệu
+                    </button>
+                </div>
             ) : (
                 <>
                     {/* ================================================================
-                        A. TỔNG QUAN VẬN HÀNH — CHỈ SỐ VẬN HÀNH CỐT LÕI & THUYẾT MINH
+                        A. TỔNG QUAN VẬN HÀNH — 7 NHÓM KPI QUẢN TRỊ CỐT LÕI
                        ================================================================ */}
                     <div id="sec-overview">
-                        {/* 6 Chỉ số Vận hành Cốt lõi (Khách tham quan, Phiên vé, Vé bán ra, Đơn hàng, Thiết bị kết nối, Người mua online) */}
+                        {/* Hàng 1: 4 nhóm KPI Khách, Phiên tham quan, Vé bán & Doanh thu */}
                         <div className="saas-kpi-grid" style={{ marginBottom: '16px' }}>
-                            {/* C1. Tổng số khách tham quan */}
+                            {/* 1. Tổng số khách tham quan */}
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #15803D' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Tổng số khách tham quan</span>
-                                        <Link to="/admin/users" className="saas-kpi-link">Tài khoản →</Link>
+                                        <span className="saas-kpi-title">1. Tổng số khách tham quan</span>
+                                        <Link to="/admin/ticket-sessions" className="saas-kpi-link">Phiên →</Link>
                                     </div>
                                     <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{stats?.totalVisitorsCount ?? 0}</span>
-                                        <span className="saas-kpi-unit">khách ({periodLabel})</span>
+                                        <span className="saas-kpi-value">{stats.totalVisitorsCount ?? 0}</span>
+                                        <span className="saas-kpi-unit">khách duy nhất ({periodLabel})</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Tài khoản hệ thống: <strong>{stats?.totalUsers ?? 0}</strong> • Không đếm trùng giữa đơn vé, phiên & thiết bị
+                                    TK khách: <strong>{stats.visitorAccountsCount ?? 0}</strong> • Nội bộ (Admin/Staff): <strong>{stats.internalAccountsCount ?? 0}</strong> • Người mua vé: <strong>{stats.totalTicketBuyers ?? 0}</strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#94A3B8' }}>
+                                        Đã khử trùng giữa đơn vé, vé & phiên tham quan (không cộng trùng thiết bị)
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* C2. Số phiên tham quan đang hoạt động */}
+                            {/* 2. Phiên tham quan */}
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0284C7' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Phiên tham quan đang hoạt động</span>
+                                        <span className="saas-kpi-title">2. Phiên tham quan</span>
                                         <Link to="/admin/ticket-sessions" className="saas-kpi-link">Giám sát →</Link>
                                     </div>
                                     <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value" style={{ color: (stats?.activeSessions ?? 0) > 0 ? '#15803D' : '#0F172A' }}>
-                                            {stats?.activeSessions ?? 0}
+                                        <span className="saas-kpi-value" style={{ color: (stats.activeSessions ?? 0) > 0 ? '#15803D' : '#0F172A' }}>
+                                            {stats.activeSessions ?? 0}
                                         </span>
-                                        <span className="saas-kpi-unit">phiên còn hạn</span>
+                                        <span className="saas-kpi-unit">đang hoạt động</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Tổng phiên trong kỳ: <strong>{stats?.totalSessions ?? 0}</strong> (TICKET_SESSIONS Active & chưa hết hạn)
+                                    Tổng phiên trong kỳ: <strong>{stats.totalSessions ?? 0}</strong> • Kết thúc/Hết hạn: <strong>{stats.endedOrExpiredSessionsCount ?? Math.max(0, (stats.totalSessions ?? 0) - (stats.activeSessions ?? 0))}</strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#94A3B8' }}>
+                                        Chỉ tính TICKET_SESSIONS Active, chưa kết thúc & còn hạn{(stats.internalExcludedSessionsCount ?? 0) > 0 ? ` (loại trừ ${stats.internalExcludedSessionsCount} phiên nội bộ)` : ''}
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* C3. Số lượng vé đã bán */}
+                            {/* 3. Vé đã bán */}
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #7C3AED' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Số lượng vé đã bán</span>
-                                        <Link to="/admin/ticket-orders" className="saas-kpi-link">Đơn vé →</Link>
+                                        <span className="saas-kpi-title">3. Vé đã bán</span>
+                                        <Link to="/admin/tickets" className="saas-kpi-link">Quản lý vé →</Link>
                                     </div>
                                     <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{stats?.totalTicketsSold ?? 0}</span>
-                                        <span className="saas-kpi-unit">vé đã thanh toán</span>
+                                        <span className="saas-kpi-value">{stats.totalTicketsSold ?? 0}</span>
+                                        <span className="saas-kpi-unit">vé thanh toán ({periodLabel})</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Đã quét dùng: <strong>{stats?.usedTickets ?? 0}</strong> • Còn hiệu lực: <strong>{stats?.validTickets ?? 0}</strong> • Hủy: <strong>{stats?.cancelledTickets ?? 0}</strong>
+                                    Đã dùng: <strong>{stats.paidTicketsUsedCount ?? 0}</strong> • Còn hiệu lực: <strong>{stats.paidTicketsValidCount ?? 0}</strong> • Đã hủy: <strong>{stats.paidTicketsCancelledCount ?? 0}</strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#94A3B8' }}>
+                                        Hết hạn dùng: <strong>{stats.paidTicketsExpiredCount ?? 0}</strong> • Tổng vé xuất theo đơn Paid: <strong>{stats.paidTicketsIssuedCount ?? 0}</strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* C4. Số lượng đơn hàng & Doanh thu */}
+                            {/* 4. Đơn hàng và doanh thu */}
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #D97706' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Số lượng đơn hàng & Doanh thu</span>
-                                        <Link to="/admin/ticket-orders" className="saas-kpi-link">Chi tiết →</Link>
+                                        <span className="saas-kpi-title">4. Đơn hàng & Doanh thu thực thu</span>
+                                        <Link to="/admin/tickets" className="saas-kpi-link">Chi tiết →</Link>
                                     </div>
                                     <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{stats?.paidOrders ?? 0}</span>
-                                        <span className="saas-kpi-unit">/ {stats?.totalOrders ?? 0} đơn hàng</span>
+                                        <span className="saas-kpi-value" style={{ fontSize: '1.55rem' }}>
+                                            {Number(stats.netRevenue ?? stats.totalRevenue ?? 0).toLocaleString('vi-VN')}
+                                        </span>
+                                        <span className="saas-kpi-unit">đ</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Doanh thu: <strong>{Number(stats?.totalRevenue ?? 0).toLocaleString('vi-VN')} đ</strong> • Chờ: <strong>{stats?.pendingOrders ?? 0}</strong> • Lỗi/Hết hạn: <strong>{stats?.failedOrExpiredOrders ?? 0}</strong>
+                                    Hoàn tất: <strong>{stats.paidOrders ?? 0}/{stats.totalOrders ?? 0}</strong> đơn ({stats.orderCompletionRatePercent != null ? `${stats.orderCompletionRatePercent}%` : 'Chưa có đơn'})
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#64748B' }}>
+                                        Chờ: <strong>{stats.pendingOrders ?? 0}</strong> • Lỗi/Hết hạn: <strong>{stats.failedOrExpiredOrders ?? 0}</strong> • Hoàn tiền: <strong>{stats.refundedOrders ?? 0}</strong> ({Number(stats.refundedAmount ?? 0).toLocaleString('vi-VN')} đ)
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            {/* C5. Số lượng thiết bị đang kết nối */}
+                        {/* Hàng 2: 3 nhóm KPI Thiết bị trực tuyến, Hoạt động thuyết minh & Tình trạng nội dung */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(290px, 1fr))', gap: '16px', marginBottom: '20px' }}>
+                            {/* 5. Thiết bị trực tuyến */}
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #059669' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Số lượng thiết bị đang kết nối</span>
+                                        <span className="saas-kpi-title">5. Thiết bị trực tuyến (5 phút gần nhất)</span>
+                                        <span className="saas-status-dot-badge" style={{ fontSize: '0.73rem', color: signalRConnected ? '#15803D' : '#64748B' }}>
+                                            <span className={`saas-dot ${signalRConnected ? 'success' : 'neutral'}`} />
+                                            {signalRConnected ? 'SignalR Live' : 'Polling'}
+                                        </span>
                                     </div>
                                     <div className="saas-kpi-value-row">
                                         <span className="saas-kpi-value" style={{ color: '#059669' }}>
-                                            {stats?.activeDevices ?? 0}
+                                            {stats.onlineDevicesCombined5MinCount ?? stats.activeDevices ?? 0}
                                         </span>
-                                        <span className="saas-kpi-unit">thiết bị trực tuyến</span>
+                                        <span className="saas-kpi-unit">thiết bị đang hoạt động</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Hoạt động 5p gần nhất: <strong>{kpis.activeDevices5Min ?? 0}</strong> • Nguồn: SignalR Hub & DEVICE_ACTIVITIES
+                                    Lịch sử tương tác 5p (DB): <strong>{stats.dbActiveDevices5MinCount ?? stats.activeDevices5Min ?? 0}</strong> • SignalR có heartbeat: <strong>{stats.signalRVerifiedDevicesCount ?? 0}</strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#94A3B8' }}>
+                                        Kết hợp SignalR & DEVICE_ACTIVITIES (không tính socket rỗi không có heartbeat; socket mở: {stats.signalRConnectedDevicesCount ?? 0})
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* C6. Khách đang đặt vé trực tuyến */}
-                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0D9488' }}>
+                            {/* 6. Hoạt động thuyết minh */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0EA5E9' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Khách đang ở cổng tham quan / mua vé</span>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{stats?.activeTicketBuyers ?? stats?.activeBuyers ?? 0}</span>
-                                        <span className="saas-kpi-unit">phiên trình duyệt</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    Kết nối trực tiếp qua <strong>/hubs/online</strong> ({stats?.onlineUsers ?? 0} online) • Loài: <strong>{stats?.totalSpecies ?? 0}</strong> • Cá thể: <strong>{stats?.totalAnimals ?? 0}</strong>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="saas-kpi-grid">
-                            {/* 1. Khách đang dùng thuyết minh */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Khách đang dùng thuyết minh</span>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{kpis.activeNarrationUsersCount ?? 0}</span>
-                                        <span className="saas-kpi-unit">khách</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    Tương tác 15p: <strong>{kpis.activeTelemetryUsers15Min ?? 0}</strong> • Thiết bị: <strong>{kpis.activeDevices5Min ?? 0}</strong> • Phiên vé: <strong>{kpis.activeTicketSessionsCount ?? 0}</strong>
-                                </div>
-                            </div>
-
-                            {/* 2. Tổng lượt phát âm thanh */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Tổng lượt phát âm thanh</span>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{kpis.totalAudioPlayRequests ?? 0}</span>
-                                        <span className="saas-kpi-unit">lượt</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    {(kpis.totalAudioPlayRequests ?? 0) === 0 ? (
-                                        <span>Chưa phát sinh yêu cầu phát trong kỳ ({periodLabel})</span>
-                                    ) : (
-                                        <span>
-                                            Bắt đầu: <strong>{kpis.totalAudioPlayStarted ?? 0}</strong> • Hoàn tất: <strong>{kpis.totalAudioPlayCompleted ?? 0}</strong> • Dừng sớm: <strong>{kpis.totalAudioPlayStoppedEarly ?? 0}</strong>
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 3. Ngôn ngữ thuyết minh khả dụng */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Ngôn ngữ thuyết minh khả dụng</span>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{kpis.availableLanguagesCount ?? 0} / {kpis.totalSupportedLanguagesCount ?? 12}</span>
-                                        <span className="saas-kpi-unit">ngôn ngữ</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    Động vật: <strong>{kpis.availableLanguagesCount ?? 0}/12</strong> • POI: <strong>{kpis.languagesWithPoiNarrationCount ?? 0}/12</strong> (VI, EN)
-                                </div>
-                            </div>
-
-                            {/* 4. POI đủ điều kiện kích hoạt */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">POI đủ điều kiện kích hoạt</span>
-                                        <Link to="/admin/pois" className="saas-kpi-link">Quản lý →</Link>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{kpis.readyPoisCount ?? 0} / {kpis.totalPoisCount ?? 0}</span>
-                                        <span className="saas-kpi-unit">POI</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    Sẵn sàng VI/EN: <strong>{kpis.readyPoisCount ?? 0}/{kpis.totalPoisCount ?? 0}</strong> • Đủ 12 ngôn ngữ: <strong>{kpis.fullyMultilingualPoisCount ?? 0}/{kpis.totalPoisCount ?? 0}</strong>
-                                </div>
-                            </div>
-
-                            {/* 5. Tỷ lệ phát âm thanh thành công */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Tỷ lệ phát âm thanh thành công</span>
-                                    </div>
-                                    {kpis.hasPlayRateData && kpis.audioPlaySuccessRatePercent != null ? (
-                                        <div className="saas-kpi-value-row">
-                                            <span className="saas-kpi-value">{kpis.audioPlaySuccessRatePercent.toFixed(1)}</span>
-                                            <span className="saas-kpi-unit">%</span>
-                                        </div>
-                                    ) : (
-                                        <div className="saas-kpi-empty">Chưa đủ dữ liệu thống kê</div>
-                                    )}
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    {kpis.hasPlayRateData ? (
-                                        <span>Thành công: <strong>{kpis.successfulPlayOutcomesCount}</strong> / <strong>{kpis.validPlayOutcomesCount}</strong> lượt có kết quả</span>
-                                    ) : (
-                                        <span>Chưa có lượt phát kết thúc trong kỳ ({periodLabel})</span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* 6. Số lượt phát âm thanh thất bại */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Số lượt phát âm thanh thất bại</span>
-                                    </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span
-                                            className="saas-kpi-value"
-                                            style={{ color: (kpis.failedAudioPlaysCount ?? 0) > 0 ? '#DC2626' : '#0F172A' }}
+                                        <span className="saas-kpi-title">6. Hoạt động thuyết minh ({periodLabel})</span>
+                                        <button
+                                            type="button"
+                                            className="saas-kpi-link"
+                                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+                                            onClick={() => handleSelectSection('sec-activity')}
                                         >
-                                            {kpis.failedAudioPlaysCount ?? 0}
-                                        </span>
-                                        <span className="saas-kpi-unit">lỗi</span>
+                                            Phân tích →
+                                        </button>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                        <div className="saas-kpi-value-row" style={{ marginBottom: 0 }}>
+                                            <span className="saas-kpi-value">{kpis.totalAudioPlayStarted ?? 0}</span>
+                                            <span className="saas-kpi-unit">lượt bắt đầu phát</span>
+                                        </div>
+                                        <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                                            Tỷ lệ thành công:{' '}
+                                            <strong style={{ color: '#0F172A', fontSize: '0.95rem' }}>
+                                                {kpis.hasPlayRateData && kpis.audioPlaySuccessRatePercent != null
+                                                    ? `${kpis.audioPlaySuccessRatePercent.toFixed(1)}%`
+                                                    : 'Chưa đủ dữ liệu'}
+                                            </strong>
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Tải file: <strong>{kpis.fileLoadErrorCount ?? 0}</strong> • API: <strong>{kpis.apiErrorCount ?? 0}</strong> • Giải mã: <strong>{kpis.playbackErrorCount ?? 0}</strong>
+                                    Hoàn tất: <strong>{kpis.totalAudioPlayCompleted ?? 0}</strong> • Dừng sớm: <strong>{kpis.totalAudioPlayStoppedEarly ?? 0}</strong> • Thất bại:{' '}
+                                    <strong style={{ color: (kpis.failedAudioPlaysCount ?? 0) > 0 ? '#DC2626' : '#0F172A' }}>
+                                        {kpis.failedAudioPlaysCount ?? 0}
+                                    </strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#64748B' }}>
+                                        Khách đang nghe (15p):{' '}
+                                        <strong>
+                                            {kpis.hasActiveNarrationUsersData
+                                                ? `${kpis.activeNarrationUsersCount} khách`
+                                                : 'Chưa đủ dữ liệu xác định'}
+                                        </strong>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* 7. Bài thuyết minh đã xuất bản */}
-                            <div className="saas-kpi-card">
+                            {/* 7. Tình trạng nội dung thuyết minh */}
+                            <div className="saas-kpi-card" style={{ borderLeft: '3px solid #4F46E5' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Bài thuyết minh đã xuất bản</span>
+                                        <span className="saas-kpi-title">7. Tình trạng nội dung thuyết minh</span>
                                         <Link to="/admin/narration" className="saas-kpi-link">Kho bài →</Link>
                                     </div>
-                                    <div className="saas-kpi-value-row">
-                                        <span className="saas-kpi-value">{kpis.publishedNarrationsCount ?? 0}</span>
-                                        <span className="saas-kpi-unit">/ {kpis.expectedTotalNarrationsCount ?? 432} bài</span>
-                                    </div>
-                                </div>
-                                <div className="saas-kpi-meta">
-                                    Động vật: <strong>{kpis.publishedAnimalNarrationsCount ?? 0}</strong> • POI: <strong>{kpis.publishedPoiNarrationsCount ?? 0}</strong> • Nháp: <strong>{kpis.unpublishedNarrationsCount ?? 0}</strong>
-                                </div>
-                            </div>
-
-                            {/* 8. Tỷ lệ phiên có GPS khả dụng */}
-                            <div className="saas-kpi-card">
-                                <div>
-                                    <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">Tỷ lệ phiên có GPS khả dụng</span>
-                                        <Link to="/admin/ticket-sessions" className="saas-kpi-link">Phiên →</Link>
-                                    </div>
-                                    {kpis.hasGpsSessionData && kpis.gpsAvailableSessionRatePercent != null ? (
-                                        <div className="saas-kpi-value-row">
-                                            <span className="saas-kpi-value">{kpis.gpsAvailableSessionRatePercent.toFixed(1)}</span>
-                                            <span className="saas-kpi-unit">%</span>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '12px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                        <div className="saas-kpi-value-row" style={{ marginBottom: 0 }}>
+                                            <span className="saas-kpi-value">{kpis.publishedNarrationsCount ?? 0}</span>
+                                            <span className="saas-kpi-unit">/ {kpis.totalAllNarrationsCount ?? 0} bài xuất bản</span>
                                         </div>
-                                    ) : (
-                                        <div className="saas-kpi-empty">Chưa có dữ liệu phiên</div>
-                                    )}
+                                        <div style={{ fontSize: '0.82rem', color: '#64748B' }}>
+                                            Nháp: <strong style={{ color: '#0F172A' }}>{kpis.draftNarrationsCount ?? 0}</strong>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Hợp lệ: <strong>{kpis.sessionsWithValidGpsCount ?? 0}/{kpis.totalEvaluatedSessionsCount ?? 0}</strong> phiên • Lỗi GPS: <strong>{kpis.gpsUnavailableEventsCount ?? 0}</strong>
+                                    Động vật: <strong>{kpis.publishedAnimalNarrationsCount ?? 0}</strong>/{kpis.totalAnimalNarrationsCount ?? 0} • POI: <strong>{kpis.publishedPoiNarrationsCount ?? 0}</strong>/{kpis.totalPoiNarrationsCount ?? 0} • Sẵn sàng kích hoạt: <strong>{kpis.readyPoisCount ?? 0}/{kpis.totalPoisCount ?? 0}</strong> POI
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#64748B' }}>
+                                        Đa ngôn ngữ: <strong>{kpis.availableLanguagesCount ?? 0}/{kpis.totalSupportedLanguagesCount ?? 12}</strong> ngôn ngữ có audio ({kpis.multilingualCompletionRatePercent ?? 0}% mục tiêu toàn kho)
+                                    </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Biểu đồ thống kê Vé bán ra, Đơn hàng thành công & Phiên tham quan theo ngày */}
+                        {/* Biểu đồ thống kê Vé bán ra, Doanh thu, Đơn hàng & Phiên tham quan theo ngày */}
                         <div style={{
                             background: '#FFFFFF',
                             borderRadius: '10px',
@@ -831,31 +780,93 @@ export default function AdminDashboardPage() {
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px', marginBottom: '12px' }}>
                                 <div>
                                     <div style={{ fontWeight: 700, fontSize: '0.92rem', color: '#0F172A' }}>
-                                        Biểu đồ thống kê Vé bán ra, Đơn hàng thanh toán & Phiên tham quan theo ngày
+                                        {overviewChartMode === 'revenue'
+                                            ? 'Biểu đồ Doanh thu thực thu theo ngày (VNĐ)'
+                                            : 'Biểu đồ Vé bán ra, Đơn thanh toán & Phiên tham quan theo ngày'}
                                     </div>
                                     <div style={{ fontSize: '0.76rem', color: '#64748B' }}>
                                         Dữ liệu thực tế từ bảng TICKET_ORDERS, TICKETS và TICKET_SESSIONS ({periodLabel})
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', gap: '14px', fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#7C3AED' }} /> Vé đã bán
-                                    </span>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#15803D' }} /> Đơn thanh toán
-                                    </span>
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
-                                        <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#0284C7' }} /> Phiên tham quan
-                                    </span>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                                    <div className="saas-segmented-group" role="group" aria-label="Chế độ biểu đồ tổng quan">
+                                        <button
+                                            type="button"
+                                            className={`saas-segmented-btn ${overviewChartMode === 'volume' ? 'active' : ''}`}
+                                            onClick={() => setOverviewChartMode('volume')}
+                                        >
+                                            Vé & Phiên
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`saas-segmented-btn ${overviewChartMode === 'revenue' ? 'active' : ''}`}
+                                            onClick={() => setOverviewChartMode('revenue')}
+                                        >
+                                            Doanh thu
+                                        </button>
+                                    </div>
+                                    {overviewChartMode === 'volume' && (
+                                        <div style={{ display: 'flex', gap: '14px', fontSize: '0.75rem', color: '#64748B', fontWeight: 600 }}>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                                <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#7C3AED' }} /> Vé đã bán
+                                            </span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                                <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#15803D' }} /> Đơn thanh toán
+                                            </span>
+                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                                                <span style={{ width: '9px', height: '9px', borderRadius: '2px', background: '#0284C7' }} /> Phiên tham quan
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
                             {(() => {
                                 const dailyList = stats?.dailyTicketStats || [];
-                                if (dailyList.length === 0 || dailyList.every(d => !d.ticketsSold && !d.ordersCount && !d.sessionsCount)) {
+                                const hasAnyData = overviewChartMode === 'revenue'
+                                    ? dailyList.some(d => (d.revenue || 0) > 0)
+                                    : dailyList.some(d => (d.ticketsSold || 0) > 0 || (d.ordersCount || 0) > 0 || (d.sessionsCount || 0) > 0);
+                                if (dailyList.length === 0 || !hasAnyData) {
                                     return (
                                         <div style={{ padding: '24px', textAlign: 'center', background: '#F8FAFC', borderRadius: '8px', color: '#64748B', fontSize: '0.82rem' }}>
-                                            Chưa phát sinh giao dịch vé hoặc phiên tham quan trong khoảng thời gian đang chọn ({periodLabel}).
+                                            Chưa phát sinh {overviewChartMode === 'revenue' ? 'doanh thu thanh toán' : 'giao dịch vé hoặc phiên tham quan'} trong khoảng thời gian đang chọn ({periodLabel}).
+                                        </div>
+                                    );
+                                }
+                                if (overviewChartMode === 'revenue') {
+                                    const maxRev = Math.max(100000, ...dailyList.map(d => Number(d.revenue || 0)));
+                                    return (
+                                        <div style={{ width: '100%', overflowX: 'auto' }}>
+                                            <svg viewBox={`0 0 ${Math.max(680, dailyList.length * 76)} 195`} style={{ width: '100%', minWidth: '560px', height: '195px', display: 'block' }}>
+                                                {[0, 0.25, 0.5, 0.75, 1].map((ratio, i) => {
+                                                    const y = 155 - ratio * 125;
+                                                    const labelVal = Math.round((maxRev * ratio) / 1000);
+                                                    return (
+                                                        <g key={i}>
+                                                            <line x1="48" y1={y} x2="98%" y2={y} stroke="#E2E8F0" strokeDasharray="3,3" />
+                                                            <text x="42" y={y + 4} textAnchor="end" fontSize="10" fill="#64748B">{labelVal}k</text>
+                                                        </g>
+                                                    );
+                                                })}
+                                                {dailyList.map((day, idx) => {
+                                                    const groupX = 62 + idx * 68;
+                                                    const rev = Number(day.revenue || 0);
+                                                    const rH = Math.round((rev / maxRev) * 125);
+                                                    return (
+                                                        <g key={idx}>
+                                                            <rect x={groupX} y={155 - rH} width="32" height={Math.max(2, rH)} rx="3" fill="#D97706" />
+                                                            {rev > 0 && (
+                                                                <text x={groupX + 16} y={Math.min(148, 148 - rH)} textAnchor="middle" fontSize="9.5" fontWeight="600" fill="#0F172A">
+                                                                    {Math.round(rev / 1000)}k
+                                                                </text>
+                                                            )}
+                                                            <text x={groupX + 16} y="176" textAnchor="middle" fontSize="10" fontWeight="500" fill="#64748B">
+                                                                {day.label}
+                                                            </text>
+                                                        </g>
+                                                    );
+                                                })}
+                                            </svg>
                                         </div>
                                     );
                                 }
@@ -1181,8 +1192,19 @@ export default function AdminDashboardPage() {
                             ))}
                         </div>
 
-                        {/* 4 chỉ số kiểm soát chống lặp & ngoại lệ GPS */}
-                        <div className="saas-stat-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))' }}>
+                        {/* 5 chỉ số kiểm soát kỹ thuật GPS: Tỷ lệ phiên GPS khả dụng + chống lặp & ngoại lệ */}
+                        <div className="saas-stat-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))' }}>
+                            <div className="saas-stat-box">
+                                <span className="saas-stat-label">Tỷ lệ phiên có GPS khả dụng</span>
+                                <span className="saas-stat-num" style={{ fontSize: '1.15rem', color: '#0F172A' }}>
+                                    {kpis.hasGpsSessionData && kpis.gpsAvailableSessionRatePercent != null
+                                        ? `${kpis.gpsAvailableSessionRatePercent.toFixed(1)}%`
+                                        : 'Chưa có dữ liệu'}
+                                </span>
+                                <span className="saas-stat-sub">
+                                    Hợp lệ: {kpis.sessionsWithValidGpsCount ?? 0}/{kpis.totalEvaluatedSessionsCount ?? 0} phiên
+                                </span>
+                            </div>
                             <div className="saas-stat-box">
                                 <span className="saas-stat-label">Bỏ qua do Cooldown</span>
                                 <span className="saas-stat-num" style={{ fontSize: '1.15rem' }}>{gpsTrigger.skippedCooldownCount ?? 0} <span className="saas-stat-sub">lần</span></span>
@@ -1576,17 +1598,36 @@ export default function AdminDashboardPage() {
                     </section>
 
                     {/* ================================================================
-                        E. GIÁM SÁT DỊCH VỤ
+                        E. GIÁM SÁT DỊCH VỤ & TRUY CẬP TRỰC TUYẾN
                        ================================================================ */}
                     <section id="sec-services" className="saas-section">
                         <div className="saas-section-header">
                             <div>
-                                <h2 className="saas-section-title">E. Giám sát trạng thái dịch vụ</h2>
+                                <h2 className="saas-section-title">E. Giám sát trạng thái dịch vụ & Truy cập trực tuyến</h2>
                                 <p className="saas-section-desc">
-                                    Kiểm tra kết nối thực tế và độ trễ phản hồi (ms) của 4 dịch vụ nền tảng.
+                                    Kiểm tra kết nối thực tế, độ trễ phản hồi (ms) của 4 dịch vụ nền tảng và lượng khách đang ở cổng tham quan / mua vé.
                                 </p>
                             </div>
                             {renderServiceStatus(svcMon.overallStatus || 'Healthy')}
+                        </div>
+
+                        {/* Chỉ số Analytics/Monitoring cho cổng tham quan & mua vé trực tuyến (đã tinh gọn khỏi Dashboard chính) */}
+                        <div className="saas-stat-strip" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', marginBottom: '16px' }}>
+                            <div className="saas-stat-box">
+                                <span className="saas-stat-label">Khách đang ở cổng tham quan / mua vé</span>
+                                <span className="saas-stat-num">{stats.activeTicketBuyers ?? stats.activeBuyers ?? 0} <span className="saas-stat-sub">phiên trình duyệt</span></span>
+                                <span className="saas-stat-sub">Kết nối qua /hubs/online ({stats.onlineUsers ?? 0} online)</span>
+                            </div>
+                            <div className="saas-stat-box">
+                                <span className="saas-stat-label">Kết nối tab người mua vé</span>
+                                <span className="saas-stat-num">{stats.activeBuyerConnections ?? 0} <span className="saas-stat-sub">kết nối</span></span>
+                                <span className="saas-stat-sub">Tổng thiết bị ghi nhận (DB): {stats.totalTrackedDevices ?? 0}</span>
+                            </div>
+                            <div className="saas-stat-box">
+                                <span className="saas-stat-label">Danh mục vườn thú</span>
+                                <span className="saas-stat-num">{stats.totalSpecies ?? 0} <span className="saas-stat-sub">loài</span></span>
+                                <span className="saas-stat-sub">{stats.totalAnimals ?? 0} cá thể • {stats.totalAreas ?? 0} khu vực</span>
+                            </div>
                         </div>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '16px' }}>

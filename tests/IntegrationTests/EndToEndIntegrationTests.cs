@@ -766,4 +766,104 @@ public class EndToEndIntegrationTests : IDisposable
         Assert.Single(translations);
         Assert.Equal("Royal Carnivore Sanctuary", translations.First().Title);
     }
+
+    [Fact]
+    public async Task Dashboard_Streamlined7Kpis_ShouldDeduplicateVisitors_HandleRefunds_CombineOnlineDevices_AndNotSpeculateAudioUsers()
+    {
+        // 1. Tài khoản nội bộ (Admin=1 đã seed + thêm Staff=2) vs tài khoản khách (Visitor=3)
+        _context.Users.AddRange(
+            new User { UserId = 2, Username = "staff1", Email = "staff1@zooguide.vn", PasswordHash = "h", FullName = "Nhân viên", Role = UserRole.Staff, Status = UserStatus.Active },
+            new User { UserId = 3, Username = "visitor1", Email = "visitor1@example.com", PasswordHash = "h", FullName = "Khách 1", Role = UserRole.Visitor, Status = UserStatus.Active }
+        );
+
+        // 2. Đơn hàng Paid (2 vé -> 1 Used, 1 Valid) và Đơn hàng Refunded (1 vé đã hoàn tiền)
+        _context.TicketOrders.AddRange(
+            new TicketOrder { OrderId = 501, OrderCode = "ZG-PAID-501", CustomerEmail = "buyer1@example.com", Quantity = 2, TotalAmount = 240000m, PaymentStatus = PaymentStatus.Paid, PaidAt = DateTime.UtcNow.AddMinutes(-10), CreatedAt = DateTime.UtcNow.AddMinutes(-12) },
+            new TicketOrder { OrderId = 502, OrderCode = "ZG-REF-502", CustomerEmail = "buyer2@example.com", Quantity = 1, TotalAmount = 120000m, PaymentStatus = PaymentStatus.Refunded, PaidAt = DateTime.UtcNow.AddMinutes(-20), CreatedAt = DateTime.UtcNow.AddMinutes(-22) }
+        );
+
+        _context.Tickets.AddRange(
+            new Ticket { TicketId = 5011, TicketCode = "T-5011", OrderId = 501, TicketTypeId = 1, Status = TicketStatus.Used, IssuedAt = DateTime.UtcNow.AddMinutes(-10), ValidFrom = DateTime.UtcNow.AddHours(-1), ValidUntil = DateTime.UtcNow.AddHours(5) },
+            new Ticket { TicketId = 5012, TicketCode = "T-5012", OrderId = 501, TicketTypeId = 1, Status = TicketStatus.Valid, IssuedAt = DateTime.UtcNow.AddMinutes(-10), ValidFrom = DateTime.UtcNow.AddHours(-1), ValidUntil = DateTime.UtcNow.AddHours(5) }
+        );
+
+        // Hai phiên cho CÙNG 1 vé 5011 (1 gắn với Visitor UserId=3) + 1 phiên nội bộ của Staff UserId=2
+        _context.TicketSessions.AddRange(
+            new TicketSession { SessionId = Guid.NewGuid(), TicketId = 5011, UserId = 3, StartedAt = DateTime.UtcNow.AddMinutes(-8), ExpiredAt = DateTime.UtcNow.AddHours(2), Status = SessionStatus.Active },
+            new TicketSession { SessionId = Guid.NewGuid(), TicketId = 5011, UserId = null, StartedAt = DateTime.UtcNow.AddMinutes(-4), ExpiredAt = DateTime.UtcNow.AddHours(2), Status = SessionStatus.Ended, EndedAt = DateTime.UtcNow.AddMinutes(-2) },
+            new TicketSession { SessionId = Guid.NewGuid(), TicketId = 1, UserId = 2, StartedAt = DateTime.UtcNow.AddMinutes(-5), ExpiredAt = DateTime.UtcNow.AddHours(2), Status = SessionStatus.Active }
+        );
+
+        // 3. Thiết bị trực tuyến 5 phút: 1 thiết bị trong DB + 1 SignalR có heartbeat + 1 SignalR rỗi chưa từng heartbeat
+        _context.DeviceActivities.Add(new DeviceActivity
+        {
+            InstallationId = "dev-db-active-1",
+            FirstSeenAt = DateTime.UtcNow.AddMinutes(-3),
+            LastSeenAt = DateTime.UtcNow.AddMinutes(-1),
+            HeartbeatCount = 3,
+            IsActive = true
+        });
+
+        // 4. Bài thuyết minh Draft (bản nháp) để kiểm tra KPI 7
+        _context.Narrations.Add(new Narration
+        {
+            NarrationId = 901,
+            AnimalId = 1,
+            LanguageId = 2,
+            Title = "Simba Draft",
+            Content = "Draft narration content",
+            Status = NarrationStatus.Draft
+        });
+
+        await _context.SaveChangesAsync();
+
+        using var tracker = new OnlineUserTracker();
+        // SignalR idle socket (chưa gửi heartbeat) -> KHÔNG được tính là thiết bị hoạt động độc lập
+        tracker.RegisterDeviceConnection("dev-signalr-idle-only", "conn-idle");
+        // SignalR có heartbeat thực tế -> ĐƯỢC tính kết hợp cùng dev-db-active-1
+        tracker.RegisterDeviceConnection("dev-signalr-verified", "conn-verified");
+        tracker.RefreshHeartbeat("dev-signalr-verified", "conn-verified", isTicketBuyer: false, buyerKey: null);
+
+        var svc = new DashboardService(_context, tracker);
+        var stats = await svc.GetStatsAsync();
+
+        // KPI 1: Chỉ có 2 khách duy nhất từ 2 vé Paid (5011, 5012); 2 session trùng vé 5011 và UserId=3 không bị cộng trùng; Admin/Staff & phiên nội bộ bị loại trừ
+        Assert.Equal(2, stats.TotalVisitorsCount);
+        Assert.Equal(1, stats.VisitorAccountsCount);
+        Assert.Equal(2, stats.InternalAccountsCount);
+        Assert.Equal(1, stats.InternalExcludedSessionsCount);
+
+        // KPI 2: Chỉ tính 1 phiên khách đang Active (loại trừ phiên Ended và phiên Staff nội bộ)
+        Assert.Equal(1, stats.ActiveSessions);
+        Assert.Equal(2, stats.TotalSessions);
+
+        // KPI 3: Vé bán theo đơn Paid = 2 (1 Used, 1 Valid, 0 Cancelled)
+        Assert.Equal(2, stats.TotalTicketsSold);
+        Assert.Equal(1, stats.PaidTicketsUsedCount);
+        Assert.Equal(1, stats.PaidTicketsValidCount);
+        Assert.Equal(0, stats.PaidTicketsCancelledCount);
+
+        // KPI 4: Đơn hàng & Doanh thu thực thu có xử lý hoàn tiền
+        Assert.Equal(2, stats.TotalOrders);
+        Assert.Equal(1, stats.PaidOrders);
+        Assert.Equal(1, stats.RefundedOrders);
+        Assert.Equal(120000m, stats.RefundedAmount);
+        Assert.Equal(240000m, stats.NetRevenue);
+        Assert.Equal(360000m, stats.GrossPaidRevenue);
+        Assert.Equal(50.0, stats.OrderCompletionRatePercent);
+
+        // KPI 5: Thiết bị trực tuyến 5 phút = DB (1) + SignalR verified (1) = 2 (loại trừ dev-signalr-idle-only)
+        Assert.Equal(2, stats.ActiveDevices);
+        Assert.Equal(2, stats.OnlineDevicesCombined5MinCount);
+        Assert.Equal(1, stats.DbActiveDevices5MinCount);
+        Assert.Equal(1, stats.SignalRVerifiedDevicesCount);
+        Assert.Equal(2, stats.SignalRConnectedDevicesCount);
+
+        // KPI 6: Không suy diễn khách đang nghe thuyết minh từ DeviceActivity khi chưa có sự kiện AUDIO
+        Assert.False(stats.OverviewKpis.HasActiveNarrationUsersData);
+        Assert.Equal(0, stats.OverviewKpis.ActiveNarrationUsersCount);
+
+        // KPI 7: Kiểm tra bản nháp thuyết minh
+        Assert.Equal(1, stats.OverviewKpis.DraftNarrationsCount);
+    }
 }

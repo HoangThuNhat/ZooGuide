@@ -14,21 +14,40 @@ public class DashboardStatsDto
     public int ActiveDevices { get; set; }
     public int ActiveDevices5Min { get; set; }
     public int TotalTrackedDevices { get; set; }
+    public int SignalRConnectedDevicesCount { get; set; }
+    public int SignalRVerifiedDevicesCount { get; set; }
+    public int DbActiveDevices5MinCount { get; set; }
+    public int TelemetryActiveDevices5MinCount { get; set; }
+    public int OnlineDevicesCombined5MinCount { get; set; }
     public int ActiveSessions { get; set; }
     public int TotalSessions { get; set; }
+    public int EndedOrExpiredSessionsCount { get; set; }
+    public int InternalExcludedSessionsCount { get; set; }
     public int TotalUsers { get; set; }
+    public int VisitorAccountsCount { get; set; }
+    public int InternalAccountsCount { get; set; }
     public int TotalVisitorsCount { get; set; }
     public int TotalOrders { get; set; }
     public int PaidOrders { get; set; }
     public int PendingOrders { get; set; }
     public int FailedOrExpiredOrders { get; set; }
+    public int RefundedOrders { get; set; }
     public decimal TotalRevenue { get; set; }
+    public decimal GrossPaidRevenue { get; set; }
+    public decimal RefundedAmount { get; set; }
+    public decimal NetRevenue { get; set; }
+    public double? OrderCompletionRatePercent { get; set; }
     public int TotalTickets { get; set; }
     public int ActiveTickets { get; set; }
     public int ValidTickets { get; set; }
     public int UsedTickets { get; set; }
     public int CancelledTickets { get; set; }
     public int ExpiredTickets { get; set; }
+    public int PaidTicketsIssuedCount { get; set; }
+    public int PaidTicketsUsedCount { get; set; }
+    public int PaidTicketsValidCount { get; set; }
+    public int PaidTicketsCancelledCount { get; set; }
+    public int PaidTicketsExpiredCount { get; set; }
     public List<DashboardDailyTicketStatDto> DailyTicketStats { get; set; } = new();
     public int TotalAnimals { get; set; }
     public int TotalSpecies { get; set; }
@@ -69,6 +88,7 @@ public class DashboardOverviewKpisDto
 {
     // 1. Khách đang sử dụng thuyết minh
     public int ActiveNarrationUsersCount { get; set; }
+    public bool HasActiveNarrationUsersData { get; set; }
     public int ActiveTelemetryUsers15Min { get; set; }
     public int ActiveDevices5Min { get; set; }
     public int ActiveTicketSessionsCount { get; set; }
@@ -106,12 +126,18 @@ public class DashboardOverviewKpisDto
     public int ApiErrorCount { get; set; }
     public int PlaybackErrorCount { get; set; }
 
-    // 7. Số bài thuyết minh đã xuất bản
+    // 7. Số bài thuyết minh đã xuất bản & tình trạng nội dung
+    public int TotalAllNarrationsCount { get; set; }
     public int PublishedNarrationsCount { get; set; }
     public int PublishedAnimalNarrationsCount { get; set; }
     public int PublishedPoiNarrationsCount { get; set; }
+    public int TotalAnimalNarrationsCount { get; set; }
+    public int TotalPoiNarrationsCount { get; set; }
+    public int DraftNarrationsCount { get; set; }
+    public int ArchivedNarrationsCount { get; set; }
     public int UnpublishedNarrationsCount { get; set; }
     public int ExpectedTotalNarrationsCount { get; set; }
+    public double MultilingualCompletionRatePercent { get; set; }
 
     // 8. Tỷ lệ phiên tham quan có GPS khả dụng
     public double? GpsAvailableSessionRatePercent { get; set; }
