@@ -216,33 +216,7 @@ export default function AdminLayout() {
                         </nav>
                     </div>
 
-                    {/* <div className="admin-header-right">
-                        {currentUser && (
-                            <div className="admin-header-user" title={`Đang đăng nhập: ${currentUser.fullName || currentUser.username}`}>
-                                <div className="admin-user-avatar-small">
-                                    {currentUser.fullName ? currentUser.fullName.charAt(0).toUpperCase() : 'A'}
-                                </div>
-                                <span className="admin-user-name-small">{currentUser.fullName || currentUser.username}</span>
-                                <span className="admin-badge-small">{currentUser.role}</span>
-                            </div>
-                        )}
-                        <button
-                            type="button"
-                            className="admin-header-logout-btn"
-                            onClick={handleLogout}
-                            title="Đăng xuất khỏi phân hệ quản trị"
-                        >
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                                <polyline points="16 17 21 12 16 7"></polyline>
-                                <line x1="21" y1="12" x2="9" y2="12"></line>
-                            </svg>
-                            <span>Đăng Xuất</span>
-                        </button>
-                        <Link to="/" className="admin-header-primary-btn">
-                            Mở Trang Khách
-                        </Link>
-                    </div> */}
+                    
                 </header>
 
                 {/* Main Dynamic View */}

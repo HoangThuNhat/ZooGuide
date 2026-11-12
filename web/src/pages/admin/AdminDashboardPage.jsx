@@ -381,9 +381,7 @@ export default function AdminDashboardPage() {
             <div className="saas-page-header">
                 <div>
                     <h1 className="saas-page-title">Tổng quan vận hành thuyết minh</h1>
-                    <p className="saas-page-subtitle">
-                        Giám sát hoạt động thuyết minh tự động đa ngôn ngữ, tín hiệu GPS, lưu trữ âm thanh và trạng thái dịch vụ.
-                    </p>
+                    
                 </div>
 
                 <div className="saas-header-actions">
