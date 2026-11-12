@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import ZooApi, {
     getStoredUser,
@@ -26,6 +26,11 @@ export default function AdminLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+    const locationPathRef = useRef(`${location.pathname}${location.search || ''}`);
+
+    useEffect(() => {
+        locationPathRef.current = `${location.pathname}${location.search || ''}`;
+    }, [location.pathname, location.search]);
 
     // Persistent desktop sidebar state (default: open on desktop)
     const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(() => {
@@ -46,13 +51,13 @@ export default function AdminLayout() {
 
     const redirectToLoginExpired = useCallback((reason = 'session_expired') => {
         setCurrentUser(null);
-        const redirectParam = encodeURIComponent(location.pathname + location.search);
+        const redirectParam = encodeURIComponent(locationPathRef.current || '/admin');
         if (reason === 'manual_logout') {
             navigate('/admin/login', { replace: true });
         } else {
             navigate(`/admin/login?redirect=${redirectParam}&reason=session_expired`, { replace: true });
         }
-    }, [location.pathname, location.search, navigate]);
+    }, [navigate]);
 
     useEffect(() => {
         const handleResize = () => {
@@ -70,7 +75,7 @@ export default function AdminLayout() {
     useEffect(() => {
         const validity = checkAdminSessionValidity();
         if (!validity.valid) {
-            expireAdminSession(validity.reason || 'session_expired');
+            expireAdminSession(validity.reason || 'session_expired', { notifyBackend: true });
             redirectToLoginExpired('session_expired');
             return;
         }
@@ -79,6 +84,7 @@ export default function AdminLayout() {
     }, [location.pathname, redirectToLoginExpired]);
 
     // Bộ giám sát Inactivity Timeout (15 phút), Absolute Session Timeout (8 giờ) và đồng bộ đa tab
+    // Giữ tham chiếu ổn định để không bị reset timer khi chuyển qua lại giữa các trang Admin
     useEffect(() => {
         let isDisposed = false;
 
@@ -86,7 +92,7 @@ export default function AdminLayout() {
             if (isDisposed) return false;
             const validity = checkAdminSessionValidity();
             if (!validity.valid) {
-                expireAdminSession(validity.reason || 'session_expired');
+                expireAdminSession(validity.reason || 'session_expired', { notifyBackend: true });
                 redirectToLoginExpired('session_expired');
                 return false;
             }
@@ -114,7 +120,7 @@ export default function AdminLayout() {
         const handleUnauthorizedEvent = (event) => {
             if (isDisposed) return;
             const reason = event?.detail?.reason || 'session_expired';
-            clearAuthSession();
+            clearAuthSession({ broadcast: false, reason });
             redirectToLoginExpired(reason);
         };
 
@@ -127,7 +133,7 @@ export default function AdminLayout() {
             ) {
                 const validity = checkAdminSessionValidity();
                 if (!validity.valid) {
-                    clearAuthSession();
+                    clearAuthSession({ broadcast: false });
                     redirectToLoginExpired('session_expired');
                 }
             }
@@ -141,8 +147,12 @@ export default function AdminLayout() {
                     if (isDisposed) return;
                     const msg = event?.data;
                     if (msg?.type === 'ADMIN_SESSION_ENDED') {
-                        clearAuthSession();
+                        // Chỉ đồng bộ trạng thái và chuyển về trang đăng nhập, không gửi lại POST /api/auth/logout
+                        clearAuthSession({ broadcast: false, reason: msg.reason || 'session_expired' });
                         redirectToLoginExpired(msg.reason || 'session_expired');
+                    } else if (msg?.type === 'ADMIN_LOGIN') {
+                        const u = getStoredUser();
+                        if (u) setCurrentUser(u);
                     }
                 };
             } catch {

@@ -576,6 +576,125 @@ public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
     }
 
+    // 21. Hai trình duyệt đăng nhập cùng tài khoản: logout một trình duyệt không làm logout trình duyệt còn lại
+    [Fact]
+    public async Task TwoBrowsersSameAdminAccount_LogoutFirstBrowser_DoesNotLogoutSecondBrowser()
+    {
+        var browser1 = _factory.CreateClient();
+        var browser2 = _factory.CreateClient();
+
+        var login1 = await browser1.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login1.StatusCode);
+        var token1 = (await login1.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        var login2 = await browser2.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login2.StatusCode);
+        var token2 = (await login2.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        browser1.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token1);
+        browser2.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token2);
+
+        // Cả 2 trình duyệt đều hoạt động bình thường
+        Assert.Equal(HttpStatusCode.OK, (await browser1.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/auth/me")).StatusCode);
+
+        // Trình duyệt 1 thực hiện Logout
+        var logout1 = await browser1.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logout1.StatusCode);
+
+        // Trình duyệt 1 bị từ chối (401 Unauthorized)
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser1.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser1.GetAsync("/api/admin/logs")).StatusCode);
+
+        // Trình duyệt 2 vẫn hoạt động bình thường (200 OK), không bị đăng xuất theo
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/admin/logs")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/dashboard/stats")).StatusCode);
+    }
+
+    // 22. Token cũ gọi logout SAU KHI token mới đã đăng nhập: token mới vẫn hoạt động bình thường
+    [Fact]
+    public async Task OldTokenLogoutAfterNewTokenLogin_NewTokenRemainsActiveAndOldTokenIsRevoked()
+    {
+        var client = _factory.CreateClient();
+
+        // Phiên cũ đăng nhập trước
+        var oldLogin = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var oldToken = (await oldLogin.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Phiên mới đăng nhập sau
+        var newLogin = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var newToken = (await newLogin.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Một tab/phiên cũ gửi POST /api/auth/logout bằng oldToken SAU KHI newToken đã được cấp
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", oldToken);
+        var oldLogoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, oldLogoutRes.StatusCode);
+
+        // oldToken bị thu hồi (401)
+        var oldCheck = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, oldCheck.StatusCode);
+
+        // newToken vẫn hoàn toàn hợp lệ (200 OK), không bị ảnh hưởng bởi lệnh logout của oldToken
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var newMeCheck = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, newMeCheck.StatusCode);
+
+        var newLogsCheck = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.OK, newLogsCheck.StatusCode);
+    }
+
+    // 23. Polling Dashboard (/api/dashboard/stats) và thay đổi User.UpdatedAt không làm mất hiệu lực JWT đang hoạt động
+    [Fact]
+    public async Task DashboardPollingAndUserUpdatedAtChanges_DoNotInvalidateActiveAdminJwt()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Giả lập User.UpdatedAt trong DB bị thay đổi sau khi đăng nhập
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.UpdatedAt = DateTime.UtcNow.AddMinutes(10);
+            await db.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Nhiều lần gọi polling /api/dashboard/stats liên tiếp đều trả về 200 OK
+        for (int i = 0; i < 3; i++)
+        {
+            var statsRes = await client.GetAsync("/api/dashboard/stats");
+            Assert.Equal(HttpStatusCode.OK, statsRes.StatusCode);
+        }
+
+        var meRes = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
+    }
+
     private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,

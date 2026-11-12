@@ -161,25 +161,14 @@ builder.Services.AddAuthentication(options =>
                     return;
                 }
 
-                // Kiểm tra thu hồi phiên sau khi Logout (lưu bền vững trong bảng USERS trên PostgreSQL)
-                var loginTicksClaim = principal.FindFirst("login_ticks")?.Value;
-                if (!string.IsNullOrWhiteSpace(loginTicksClaim) && long.TryParse(loginTicksClaim, out var loginTicks))
+                // Kiểm tra thu hồi đúng phiên JWT theo jti (không dùng User.UpdatedAt làm trạng thái của JWT session)
+                var jti = principal.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)?.Value
+                          ?? principal.FindFirst("jti")?.Value;
+                var authService = context.HttpContext.RequestServices.GetService<IAuthService>();
+                if (authService != null && authService.IsTokenRevoked(jti))
                 {
-                    if (!user.LastLoginAt.HasValue ||
-                        (user.UpdatedAt.HasValue && user.UpdatedAt.Value.ToUniversalTime().Ticks > loginTicks))
-                    {
-                        context.Fail("Phiên làm việc đã kết thúc hoặc bị thu hồi.");
-                        return;
-                    }
-                }
-                else
-                {
-                    if (user.UpdatedAt.HasValue &&
-                        (!user.LastLoginAt.HasValue || user.UpdatedAt.Value.ToUniversalTime() > user.LastLoginAt.Value.ToUniversalTime()))
-                    {
-                        context.Fail("Phiên làm việc đã đăng xuất.");
-                        return;
-                    }
+                    context.Fail("Phiên làm việc đã kết thúc hoặc bị thu hồi.");
+                    return;
                 }
             }
         }

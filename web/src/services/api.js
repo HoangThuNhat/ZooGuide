@@ -175,6 +175,9 @@ export const ADMIN_ABSOLUTE_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 giờ tối đ
 const ACTIVITY_WRITE_THROTTLE_MS = 1000;
 
 let authBroadcastChannel = null;
+let lastHandledExpiredToken = null;
+let isSessionExpiredHandled = false;
+
 function getAuthBroadcastChannel() {
     if (typeof window === 'undefined' || typeof window.BroadcastChannel !== 'function') {
         return null;
@@ -243,8 +246,54 @@ export function getAdminSessionMeta() {
         return {
             loginAt: parsed.loginAt,
             absoluteExpiresAt: clampedAbsoluteExpiresAt,
-            lastActivityAt: parsed.lastActivityAt
+            lastActivityAt: parsed.lastActivityAt,
+            tokenId: typeof parsed.tokenId === 'string' ? parsed.tokenId : null
         };
+    } catch {
+        return null;
+    }
+}
+
+export function recoverAdminSessionMetaFromToken(rawToken, now = Date.now()) {
+    if (typeof window === 'undefined' || !window.localStorage || !rawToken) return null;
+    try {
+        const payload = decodeJwtPayload(rawToken);
+        if (!payload || typeof payload.iat !== 'number' || !Number.isFinite(payload.iat)) {
+            return null;
+        }
+
+        const loginAt = payload.iat * 1000;
+        const jwtExpMs = typeof payload.exp === 'number' && Number.isFinite(payload.exp)
+            ? payload.exp * 1000
+            : loginAt + ADMIN_ABSOLUTE_TIMEOUT_MS;
+        const jwtAbsExpMs = typeof payload.abs_exp === 'number' && Number.isFinite(payload.abs_exp)
+            ? payload.abs_exp * 1000
+            : jwtExpMs;
+
+        // Khôi phục an toàn từ thông tin gốc của JWT, tuyệt đối không cấp lại 8 giờ mới từ thời điểm hiện tại
+        const absoluteExpiresAt = Math.min(
+            loginAt + ADMIN_ABSOLUTE_TIMEOUT_MS,
+            jwtExpMs,
+            jwtAbsExpMs
+        );
+        const lastActivityAt = loginAt;
+
+        if (
+            now >= absoluteExpiresAt ||
+            now - loginAt >= ADMIN_ABSOLUTE_TIMEOUT_MS ||
+            now - lastActivityAt >= ADMIN_INACTIVITY_TIMEOUT_MS
+        ) {
+            return null;
+        }
+
+        const recoveredMeta = {
+            loginAt,
+            absoluteExpiresAt,
+            lastActivityAt,
+            tokenId: typeof payload.jti === 'string' ? payload.jti : null
+        };
+        window.localStorage.setItem(AUTH_SESSION_META_KEY, JSON.stringify(recoveredMeta));
+        return recoveredMeta;
     } catch {
         return null;
     }
@@ -278,7 +327,10 @@ export function checkAdminSessionValidity(now = Date.now()) {
 
         let meta = getAdminSessionMeta();
         if (!meta) {
-            return { valid: false, reason: 'session_expired' };
+            meta = recoverAdminSessionMetaFromToken(rawToken, now);
+            if (!meta) {
+                return { valid: false, reason: 'session_expired' };
+            }
         }
 
         // Giữ nguyên mốc loginAt của phiên nhưng không cho phép vượt quá hạn JWT hoặc giới hạn tuyệt đối 8 giờ
@@ -306,7 +358,8 @@ export function checkAdminSessionValidity(now = Date.now()) {
             meta: {
                 loginAt: effectiveLoginAt,
                 absoluteExpiresAt: effectiveAbsoluteExpiresAt,
-                lastActivityAt: meta.lastActivityAt
+                lastActivityAt: meta.lastActivityAt,
+                tokenId: meta.tokenId || (typeof payload.jti === 'string' ? payload.jti : null)
             },
             remainingInactivityMs: Math.max(0, ADMIN_INACTIVITY_TIMEOUT_MS - (now - meta.lastActivityAt)),
             remainingAbsoluteMs: Math.max(0, effectiveAbsoluteExpiresAt - now)
@@ -330,7 +383,8 @@ export function clearAuthSession(options = {}) {
     }
 }
 
-export function expireAdminSession(reason = 'session_expired') {
+export function expireAdminSession(reason = 'session_expired', options = {}) {
+    const { notifyBackend = false } = options;
     let rawToken = null;
     try {
         rawToken = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -338,10 +392,20 @@ export function expireAdminSession(reason = 'session_expired') {
         rawToken = null;
     }
 
-    clearAuthSession({ broadcast: true, reason });
+    const alreadyHandled = isSessionExpiredHandled || Boolean(rawToken && lastHandledExpiredToken === rawToken);
+    isSessionExpiredHandled = true;
+    if (rawToken) {
+        lastHandledExpiredToken = rawToken;
+    }
 
-    // Thu hồi phiên trên Backend nếu vẫn còn giữ token trước khi xóa
-    if (rawToken && typeof fetch === 'function') {
+    clearAuthSession({ broadcast: !alreadyHandled, reason });
+
+    if (alreadyHandled) {
+        return;
+    }
+
+    // Chỉ gọi Backend logout khi hết hạn chủ động từ bộ đếm phiên và được yêu cầu notifyBackend: true
+    if (notifyBackend && rawToken && typeof fetch === 'function') {
         fetch(`${API_CONFIG.BASE_URL}/auth/logout`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${rawToken}` }
@@ -359,7 +423,7 @@ export function recordAdminActivity(force = false) {
     const validity = checkAdminSessionValidity(now);
     if (!validity.valid) {
         if (validity.reason && validity.reason !== 'no_token' && validity.reason !== 'no_storage') {
-            expireAdminSession(validity.reason);
+            expireAdminSession(validity.reason, { notifyBackend: true });
         }
         return false;
     }
@@ -373,7 +437,8 @@ export function recordAdminActivity(force = false) {
     const updatedMeta = {
         loginAt: currentMeta.loginAt,
         absoluteExpiresAt: currentMeta.absoluteExpiresAt,
-        lastActivityAt: now
+        lastActivityAt: now,
+        tokenId: currentMeta.tokenId || null
     };
 
     try {
@@ -397,7 +462,7 @@ export function getAuthToken() {
 
         const validity = checkAdminSessionValidity();
         if (!validity.valid) {
-            expireAdminSession(validity.reason || 'session_expired');
+            expireAdminSession(validity.reason || 'session_expired', { notifyBackend: false });
             return null;
         }
         return rawToken;
@@ -414,12 +479,14 @@ export function setAuthSession(token, user, options = {}) {
             const existingMeta = getAdminSessionMeta();
             const now = Date.now();
             const payload = decodeJwtPayload(token);
-            const jwtIatMs = typeof payload?.iat === 'number' ? payload.iat * 1000 : now;
+            const tokenId = typeof payload?.jti === 'string' ? payload.jti : null;
             const jwtExpMs = typeof payload?.exp === 'number' ? payload.exp * 1000 : null;
             const serverExpMs = expiresAt ? new Date(expiresAt).getTime() : null;
 
-            if (isNewLogin || !existingMeta) {
-                const loginAt = isNewLogin ? now : jwtIatMs;
+            if (isNewLogin) {
+                lastHandledExpiredToken = null;
+                isSessionExpiredHandled = false;
+                const loginAt = now;
                 let absoluteExpiresAt = loginAt + ADMIN_ABSOLUTE_TIMEOUT_MS;
                 if (jwtExpMs && Number.isFinite(jwtExpMs)) {
                     absoluteExpiresAt = Math.min(absoluteExpiresAt, jwtExpMs);
@@ -430,15 +497,17 @@ export function setAuthSession(token, user, options = {}) {
                 const newMeta = {
                     loginAt,
                     absoluteExpiresAt,
-                    lastActivityAt: isNewLogin ? now : (existingMeta?.lastActivityAt || now)
+                    lastActivityAt: now,
+                    tokenId
                 };
                 localStorage.setItem(AUTH_SESSION_META_KEY, JSON.stringify(newMeta));
-                if (isNewLogin) {
-                    broadcastAdminAuthEvent({
-                        type: 'ADMIN_LOGIN',
-                        meta: newMeta
-                    });
-                }
+                broadcastAdminAuthEvent({
+                    type: 'ADMIN_LOGIN',
+                    meta: newMeta
+                });
+            } else if (!existingMeta) {
+                // Nếu mất metadata khi reload, chỉ khôi phục an toàn dựa trên thông tin gốc của JWT, không cấp lại 8 giờ mới
+                recoverAdminSessionMetaFromToken(token, now);
             }
         }
         if (user) {
@@ -473,7 +542,7 @@ export async function authFetch(url, options = {}) {
     const validity = checkAdminSessionValidity();
     if (!validity.valid) {
         const reason = validity.reason && validity.reason !== 'no_token' ? validity.reason : 'session_expired';
-        expireAdminSession(reason);
+        expireAdminSession(reason, { notifyBackend: false });
         return new Response(
             JSON.stringify({
                 success: false,
@@ -486,11 +555,15 @@ export async function authFetch(url, options = {}) {
         );
     }
 
-    const headers = getAuthHeaders(options.headers || {});
+    const rawTokenBeforeFetch = localStorage.getItem(AUTH_STORAGE_KEY);
+    const headers = {
+        ...(options.headers || {}),
+        ...(rawTokenBeforeFetch ? { Authorization: `Bearer ${rawTokenBeforeFetch}` } : {})
+    };
     const res = await fetch(url, { ...options, headers });
-    // Chỉ thu hồi phiên khi 401 Unauthorized; với 403 Forbidden (ví dụ Staff gọi API chỉ dành cho Admin) giữ nguyên phiên
+    // Chỉ kết thúc phiên khi 401 Unauthorized (notifyBackend: false để không gọi lặp logout API); với 403 Forbidden giữ nguyên phiên
     if (res.status === 401) {
-        expireAdminSession('session_expired');
+        expireAdminSession('session_expired', { notifyBackend: false });
     }
     return res;
 }
