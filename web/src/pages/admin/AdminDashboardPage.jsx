@@ -554,11 +554,8 @@ export default function AdminDashboardPage() {
 
             {isLoading && !stats ? (
                 <div className="saas-section" style={{ textAlign: 'center', padding: '48px 24px', color: '#64748B' }}>
-                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0F172A', marginBottom: '4px' }}>
-                        Đang tải dữ liệu vận hành...
-                    </div>
-                    <div style={{ fontSize: '0.825rem' }}>
-                        Đang đồng bộ số liệu từ PostgreSQL, Supabase Storage và SignalR Hub.
+                    <div style={{ fontSize: '0.95rem', fontWeight: 600, color: '#0F172A' }}>
+                        Đang tải
                     </div>
                 </div>
             ) : !stats ? (
