@@ -164,7 +164,7 @@ jobs:
           cache-to: type=gha,mode=max
 
   # ============================================================================
-  # JOB 4: CD DEMO - Deploy to Windows Self-Hosted Runner (feature branch only)
+  # JOB 4: CD DEMO - Deploy to Windows Self-Hosted Runner (zooguide-demo)
   # ============================================================================
   deploy-demo:
     name: Deploy Demo on Windows Self-Hosted Runner (zooguide-demo)
@@ -174,11 +174,10 @@ jobs:
       - frontend-ci
       - docker-ci
     if: >
-      github.ref == 'refs/heads/feature' &&
       (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.deploy_demo != false)) &&
       vars.ENABLE_DEMO_DEPLOY != 'false'
     concurrency:
-      group: zooguide-demo-deployment
+      group: zooguide-selfhosted-deployment
       cancel-in-progress: false
     timeout-minutes: 20
     defaults:
@@ -360,46 +359,141 @@ jobs:
           docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
 
   # ============================================================================
-  # JOB 5: CONTINUOUS DELIVERY (PRODUCTION) - Strictly main branch only
+  # JOB 5: CONTINUOUS DELIVERY (PRODUCTION) - Self-Hosted Production Server
   # ============================================================================
   deploy-production:
     name: Deploy to Production Server (CD)
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Windows, X64, zooguide-demo]
     needs:
       - backend-ci
       - frontend-ci
       - docker-ci
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    environment:
-      name: production
+    if: >
+      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
+      vars.ENABLE_DEMO_DEPLOY != 'false'
+    concurrency:
+      group: zooguide-selfhosted-deployment
+      cancel-in-progress: false
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: powershell
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Check Deployment Credentials Availability
-        id: check_secrets
+      - name: Prepare & Validate Production Server Environment (.env)
         env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SECRET_SUPABASE_CONNECTION_STRING: ${{ secrets.SUPABASE_CONNECTION_STRING }}
+          SECRET_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SECRET_SUPABASE_STORAGE_BUCKET: ${{ secrets.SUPABASE_STORAGE_BUCKET }}
+          SECRET_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SECRET_VITE_CARTO_API_KEY: ${{ secrets.VITE_CARTO_API_KEY }}
+          VAR_API_PORT: ${{ vars.DEMO_API_PORT }}
+          VAR_FRONTEND_PORT: ${{ vars.DEMO_FRONTEND_PORT }}
         run: |
-          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_KEY" ]; then
-            echo "configured=false" >> $GITHUB_OUTPUT
-            echo "::notice::CD deployment skipped because DEPLOY_SSH_HOST / DEPLOY_SSH_USER / DEPLOY_SSH_KEY secrets are not configured in GitHub Repository Settings."
-          else
-            echo "configured=true" >> $GITHUB_OUTPUT
-          fi
+          $ErrorActionPreference = "Stop"
+          $workspaceEnv = Join-Path $PWD ".env"
 
-      - name: Execute Remote Docker Compose Deployment via SSH
-        if: steps.check_secrets.outputs.configured == 'true'
-        env:
-          DEPLOY_HOST: ${{ secrets.DEPLOY_SSH_HOST }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_SSH_USER }}
-          DEPLOY_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_PATH: ${{ secrets.DEPLOY_APP_PATH || '/opt/zooguide' }}
+          $candidateEnvPaths = @()
+          if ($env:ZOOGUIDE_DEMO_ENV_FILE) { $candidateEnvPaths += $env:ZOOGUIDE_DEMO_ENV_FILE }
+          $candidateEnvPaths += "C:\actions-runner\.env.zooguide-demo"
+          $candidateEnvPaths += "C:\Users\admin\Desktop\Study\Công nghệ phần mềm\ZooGuide\.env"
+
+          $sourceEnv = $candidateEnvPaths | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+          if ($sourceEnv -and ($sourceEnv -ne $workspaceEnv)) {
+              Copy-Item -Path $sourceEnv -Destination $workspaceEnv -Force
+              Write-Output "Loaded Production Server environment configuration from host file: $sourceEnv"
+          } elseif (-not (Test-Path $workspaceEnv)) {
+              New-Item -ItemType File -Path $workspaceEnv -Force | Out-Null
+              Write-Output "Initialized workspace .env file from GitHub Secrets/Variables."
+          }
+
+          $envMap = @{}
+          Get-Content $workspaceEnv | ForEach-Object {
+              $line = $_.Trim()
+              if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+                  $idx = $line.IndexOf("=")
+                  $k = $line.Substring(0, $idx).Trim()
+                  $v = $line.Substring($idx + 1).Trim()
+                  $envMap[$k] = $v
+              }
+          }
+
+          if ($env:SECRET_SUPABASE_CONNECTION_STRING) { $envMap["SUPABASE_CONNECTION_STRING"] = $env:SECRET_SUPABASE_CONNECTION_STRING }
+          if ($env:SECRET_SUPABASE_URL) { $envMap["SUPABASE_URL"] = $env:SECRET_SUPABASE_URL }
+          if ($env:SECRET_SUPABASE_STORAGE_BUCKET) { $envMap["SUPABASE_STORAGE_BUCKET"] = $env:SECRET_SUPABASE_STORAGE_BUCKET }
+          if ($env:SECRET_SUPABASE_SERVICE_ROLE_KEY) { $envMap["SUPABASE_SERVICE_ROLE_KEY"] = $env:SECRET_SUPABASE_SERVICE_ROLE_KEY }
+          if ($env:SECRET_VITE_CARTO_API_KEY) { $envMap["VITE_CARTO_API_KEY"] = $env:SECRET_VITE_CARTO_API_KEY }
+          if ($env:VAR_API_PORT) { $envMap["API_PORT"] = $env:VAR_API_PORT }
+          if ($env:VAR_FRONTEND_PORT) { $envMap["FRONTEND_PORT"] = $env:VAR_FRONTEND_PORT }
+
+          $envMap["COMPOSE_PROJECT_NAME"] = "zooguide-demo"
+          if (-not $envMap["API_PORT"]) { $envMap["API_PORT"] = "8080" }
+          if (-not $envMap["FRONTEND_PORT"]) { $envMap["FRONTEND_PORT"] = "3001" }
+          if (-not $envMap["VITE_API_BASE_URL"]) { $envMap["VITE_API_BASE_URL"] = "/api" }
+          if (-not $envMap["SUPABASE_STORAGE_BUCKET"]) { $envMap["SUPABASE_STORAGE_BUCKET"] = "narration-audio" }
+
+          $requiredKeys = @("SUPABASE_CONNECTION_STRING", "SUPABASE_URL", "SUPABASE_STORAGE_BUCKET", "SUPABASE_SERVICE_ROLE_KEY")
+          foreach ($reqKey in $requiredKeys) {
+              $val = $envMap[$reqKey]
+              if ([string]::IsNullOrWhiteSpace($val) -or $val -match "your_password|your_project_ref|your_username") {
+                  throw "Missing or placeholder value for required environment variable: $reqKey."
+              }
+          }
+
+          $outLines = foreach ($kv in $envMap.GetEnumerator()) { "$($kv.Key)=$($kv.Value)" }
+          Set-Content -Path $workspaceEnv -Value $outLines -Encoding UTF8
+          Write-Output "Production Server environment configuration verified."
+
+      - name: Synchronize & Verify Production Server Containers
         run: |
-          mkdir -p ~/.ssh
-          echo "$DEPLOY_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
-          ssh "$DEPLOY_USER@$DEPLOY_HOST" "cd $DEPLOY_PATH && git fetch origin main && git checkout main && git pull origin main && docker compose up -d --build && docker compose ps"
+          $ErrorActionPreference = "Stop"
+          docker compose -p zooguide-demo config --quiet
+          docker compose -p zooguide-demo up -d --build --remove-orphans
+          docker compose -p zooguide-demo ps
+
+      - name: Verify Production Server Endpoints & Database Connectivity
+        run: |
+          $ErrorActionPreference = "Stop"
+          $envLines = Get-Content ".env"
+          $apiPort = "8080"
+          $frontendPort = "3001"
+          foreach ($l in $envLines) {
+              if ($l -match "^API_PORT=(.+)$") { $apiPort = $Matches[1].Trim() }
+              if ($l -match "^FRONTEND_PORT=(.+)$") { $frontendPort = $Matches[1].Trim() }
+          }
+
+          $healthy = $false
+          $healthData = $null
+          for ($i = 1; $i -le 30; $i++) {
+              try {
+                  $healthData = Invoke-RestMethod -Uri "http://localhost:$apiPort/api/health" -Method Get -TimeoutSec 5
+                  if ($healthData.status -eq "Healthy" -and $healthData.databaseConnected -eq $true) {
+                      $healthy = $true
+                      break
+                  }
+              } catch {
+              }
+              Start-Sleep -Seconds 3
+          }
+
+          if (-not $healthy) {
+              docker compose -p zooguide-demo logs api --tail=50
+              throw "Production Server API did not report Healthy within 90 seconds."
+          }
+
+          $feResp = Invoke-WebRequest -Uri "http://localhost:$frontendPort/" -UseBasicParsing -TimeoutSec 10
+          if ($feResp.StatusCode -ne 200) {
+              throw "Production Frontend returned unexpected HTTP status: $($feResp.StatusCode)"
+          }
+
+          $proxyHealth = Invoke-RestMethod -Uri "http://localhost:$frontendPort/api/health" -Method Get -TimeoutSec 10
+          if (-not $proxyHealth.databaseConnected) {
+              throw "Production Proxy /api/health reported databaseConnected=false"
+          }
+
+          Write-Output "Production Server Deployment & Health Check PASSED:"
+          Write-Output "  - Production Frontend: http://localhost:$frontendPort/"
+          Write-Output "  - Production Backend API: http://localhost:$apiPort/api/health"
+          docker ps --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
