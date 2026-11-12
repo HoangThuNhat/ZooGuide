@@ -94,10 +94,7 @@ export function initDeviceTracker(role = 'Visitor') {
     const buyer = getStoredBuyerIdentity();
 
     // 1. Khởi tạo SignalR Realtime Hub Connection
-    let hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?visitorId=${encodeURIComponent(currentInstallationId)}`;
-    if (role === 'Admin') {
-        hubUrl += '&role=Admin';
-    }
+    let hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?visitorId=${encodeURIComponent(currentInstallationId)}&role=${encodeURIComponent(role || 'Visitor')}`;
     if (buyer?.orderCode) {
         hubUrl += `&orderCode=${encodeURIComponent(buyer.orderCode)}`;
     }

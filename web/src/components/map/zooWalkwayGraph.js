@@ -313,58 +313,169 @@ export function findShortestPathDijkstra(startNodeId, targetNodeId, customNodes 
 }
 
 /**
- * Tìm lộ trình đi bộ thực tế tới Khu vực (Area) hoặc Chuồng (Enclosure)
+ * Tính góc phương vị (Bearing 0-360 độ) và hướng la bàn tiếng Việt giữa 2 tọa độ GPS
+ */
+export function calculateBearingAndDirection(lat1, lon1, lat2, lon2) {
+    if (!lat1 || !lon1 || !lat2 || !lon2) {
+        return { bearingDegrees: 0, compassDirection: 'Bắc' };
+    }
+    const toRad = (deg) => (deg * Math.PI) / 180;
+    const toDeg = (rad) => (rad * 180) / Math.PI;
+
+    const dLon = toRad(lon2 - lon1);
+    const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+    const x =
+        Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+        Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+    const brng = (toDeg(Math.atan2(y, x)) + 360) % 360;
+    const bearingDegrees = Math.round(brng);
+
+    const directions = [
+        'Bắc',
+        'Đông Bắc',
+        'Đông',
+        'Đông Nam',
+        'Nam',
+        'Tây Nam',
+        'Tây',
+        'Tây Bắc'
+    ];
+    const index = Math.round(bearingDegrees / 45) % 8;
+    return {
+        bearingDegrees,
+        compassDirection: directions[index]
+    };
+}
+
+const POI_CODE_TO_NODE_MAP = {
+    'GATE-A': 'gate_a',
+    'GATE-B': 'gate_b',
+    'GATE-C': 'gate_c',
+    'GATE-E': 'gate_e',
+    'POI-HUNG': 'poi_hung',
+    'POI-MUSEUM': 'poi_museum',
+    'POI-TREE': 'poi_tree',
+    'POI-BOTANIC': 'poi_tree',
+    'POI-LAKE': 'poi_lake',
+    'POI-KIDS': 'gate_area_2'
+};
+
+/**
+ * Tìm lộ trình đi bộ thực tế tới Điểm tham quan (POI), Khu vực (Area) hoặc Chuồng (Enclosure)
  */
 export function planZooRoute({ startPoint, targetType, targetEntity, currentNodes = WALKWAY_NODES, currentEdges = WALKWAY_EDGES }) {
+    if (!targetEntity) return null;
+
     let startNodeId = typeof startPoint === 'string' ? startPoint : startPoint?.id;
+    let customStartNode = null;
+
     if (!startNodeId || !currentNodes[startNodeId]) {
-        const targetLat = startPoint?.lat ?? 10.7858;
-        const targetLng = startPoint?.lng ?? 106.7046;
-        const nearestStart = findNearestNode(currentNodes, targetLat, targetLng);
+        const startLat = Number(startPoint?.lat ?? startPoint?.latitude ?? 10.7858);
+        const startLng = Number(startPoint?.lng ?? startPoint?.longitude ?? 106.7046);
+        const nearestStart = findNearestNode(currentNodes, startLat, startLng);
         startNodeId = nearestStart ? nearestStart.id : 'gate_a';
+        if (startPoint && (startPoint.lat || startPoint.latitude)) {
+            customStartNode = {
+                id: startPoint.id || 'user_gps',
+                name: startPoint.name || 'Vị trí GPS của bạn',
+                lat: startLat,
+                lng: startLng
+            };
+        }
     }
 
     let targetNodeId = null;
+    const entityCode = (targetEntity.code || '').toUpperCase();
+    const targetLat = Number(targetEntity.lat ?? targetEntity.latitude ?? 0);
+    const targetLng = Number(targetEntity.lng ?? targetEntity.longitude ?? 0);
 
-    if (targetType === 'enclosure') {
+    if (targetType === 'enclosure' || targetEntity.enclosureId) {
         const encId = targetEntity.enclosureId || targetEntity.id;
         const staticEncNodeId = `enc_node_${encId}`;
         if (currentNodes[staticEncNodeId]) {
             targetNodeId = staticEncNodeId;
         } else if (targetEntity.areaId && currentNodes[`gate_area_${targetEntity.areaId}`]) {
             targetNodeId = `gate_area_${targetEntity.areaId}`;
-        } else if (targetEntity.latitude && targetEntity.longitude) {
-            const nearest = findNearestNode(currentNodes, Number(targetEntity.latitude), Number(targetEntity.longitude));
+        } else if (targetLat && targetLng) {
+            const nearest = findNearestNode(currentNodes, targetLat, targetLng);
             targetNodeId = nearest?.id;
         }
-    } else if (targetType === 'area') {
+    } else if (targetType === 'area' || (targetEntity.areaId && !targetEntity.poiId && !targetEntity.enclosureId)) {
         const areaId = targetEntity.areaId || targetEntity.id;
         const staticGateNodeId = `gate_area_${areaId}`;
         if (currentNodes[staticGateNodeId]) {
             targetNodeId = staticGateNodeId;
-        } else if (targetEntity.latitude && targetEntity.longitude) {
-            const nearest = findNearestNode(currentNodes, Number(targetEntity.latitude), Number(targetEntity.longitude));
+        } else if (targetLat && targetLng) {
+            const nearest = findNearestNode(currentNodes, targetLat, targetLng);
             targetNodeId = nearest?.id;
         }
-    } else if (targetType === 'node') {
-        targetNodeId = targetEntity.id;
+    } else {
+        const candidateId = targetEntity.nodeId || targetEntity.id;
+        if (candidateId && currentNodes[candidateId]) {
+            targetNodeId = candidateId;
+        } else if (entityCode && POI_CODE_TO_NODE_MAP[entityCode] && currentNodes[POI_CODE_TO_NODE_MAP[entityCode]]) {
+            targetNodeId = POI_CODE_TO_NODE_MAP[entityCode];
+        } else if (targetLat && targetLng) {
+            const nearest = findNearestNode(currentNodes, targetLat, targetLng);
+            targetNodeId = nearest?.id;
+        }
     }
 
-    if (!targetNodeId) {
-        console.warn("[planZooRoute] Không thể xác định điểm đích");
+    if (!targetNodeId || !currentNodes[targetNodeId]) {
+        console.warn("[planZooRoute] Không thể xác định điểm đích trên mạng lưới đường đi bộ");
         return null;
     }
 
     const result = findShortestPathDijkstra(startNodeId, targetNodeId, currentNodes, currentEdges);
     if (!result) return null;
 
+    const latlngs = [...result.latlngs];
+    const waypoints = [...result.waypoints];
+    let totalDistanceM = result.totalDistanceM;
+
+    if (customStartNode) {
+        const firstNode = currentNodes[startNodeId];
+        const snapDist = getHaversineDistance(customStartNode.lat, customStartNode.lng, firstNode.lat, firstNode.lng);
+        if (snapDist > 5) {
+            latlngs.unshift([customStartNode.lat, customStartNode.lng]);
+            totalDistanceM += Math.round(snapDist);
+            waypoints.unshift(customStartNode.name);
+        }
+    }
+
+    const lastGraphNode = currentNodes[targetNodeId];
+    const destinationName = targetEntity.nameVi || targetEntity.name || lastGraphNode?.name || 'Điểm đến';
+
+    if (targetLat && targetLng && lastGraphNode) {
+        const tailDist = getHaversineDistance(lastGraphNode.lat, lastGraphNode.lng, targetLat, targetLng);
+        if (tailDist > 5) {
+            latlngs.push([targetLat, targetLng]);
+            totalDistanceM += Math.round(tailDist);
+            if (waypoints[waypoints.length - 1] !== destinationName) {
+                waypoints.push(destinationName);
+            }
+        }
+    }
+
+    const timeMin = Math.max(1, Math.ceil(totalDistanceM / 65));
+    const originLat = customStartNode ? customStartNode.lat : currentNodes[startNodeId].lat;
+    const originLng = customStartNode ? customStartNode.lng : currentNodes[startNodeId].lng;
+    const destLat = targetLat || lastGraphNode.lat;
+    const destLng = targetLng || lastGraphNode.lng;
+    const { bearingDegrees, compassDirection } = calculateBearingAndDirection(originLat, originLng, destLat, destLng);
+
     return {
         ...result,
-        startNode: currentNodes[startNodeId],
+        latlngs,
+        waypoints,
+        totalDistanceM,
+        timeMin,
+        bearingDegrees,
+        compassDirection,
+        startNode: customStartNode || currentNodes[startNodeId],
+        endNode: lastGraphNode,
         targetEntity,
         targetType,
-        destinationName: targetType === 'enclosure' 
-            ? targetEntity.name 
-            : (targetEntity.nameVi || targetEntity.name || 'Điểm đến')
+        destinationName
     };
 }

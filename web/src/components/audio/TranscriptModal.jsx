@@ -13,12 +13,27 @@ export default function TranscriptModal({ onSeek }) {
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const isPoi = audioState.entityType === 'POI' || Boolean(narration.poiId);
+    const langCode = (narration.languageCode || 'vi').toUpperCase();
+
+    const transcriptLines = Array.isArray(narration.transcript)
+        ? narration.transcript
+        : (typeof narration.transcript === 'string' && narration.transcript.trim()
+            ? narration.transcript.split(/\n+/).filter(Boolean).map((text, idx) => ({ time: idx * 10, text }))
+            : (narration.content
+                ? narration.content.split(/\n+/).filter(Boolean).map((text, idx) => ({ time: idx * 10, text }))
+                : []));
+
     return (
         <div id="transcript-modal" className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-backdrop" onClick={() => setIsTranscriptModalOpen(false)}></div>
             <div className="modal-dialog">
                 <div className="modal-header">
                     <div>
+                        <div style={{ display: 'flex', gap: '6px', marginBottom: '4px' }}>
+                            <span className="chip text-xs">{isPoi ? '📍 Điểm tham quan' : '🐾 Động vật'}</span>
+                            <span className="chip text-xs">🌐 {langCode}</span>
+                        </div>
                         <h3 id="transcript-modal-title" className="font-bold text-base">{narration.title}</h3>
                         <p id="transcript-modal-narrator" className="text-xs text-muted">{t?.narratorLabel || 'Giọng đọc'}: {narration.narrator}</p>
                     </div>
@@ -34,9 +49,11 @@ export default function TranscriptModal({ onSeek }) {
                 <div className="modal-body">
                     <p className="text-xs text-muted mb-3">Nhấp vào bất kỳ câu nào để chuyển nhanh đoạn phát âm thanh đến mốc thời gian đó.</p>
                     <div id="transcript-lines-container" className="transcript-lines">
-                        {narration.transcript && narration.transcript.map((line, idx) => {
+                        {transcriptLines.length === 0 ? (
+                            <p className="text-xs text-muted">Chưa có nội dung văn bản cho ngôn ngữ này.</p>
+                        ) : transcriptLines.map((line, idx) => {
                             const isCurrent = audioState.currentTime >= line.time && 
-                                (!narration.transcript[idx + 1] || audioState.currentTime < narration.transcript[idx + 1].time);
+                                (!transcriptLines[idx + 1] || audioState.currentTime < transcriptLines[idx + 1].time);
                             return (
                                 <div 
                                     key={idx}

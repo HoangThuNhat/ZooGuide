@@ -70,9 +70,19 @@ export default function SpeciesNarrationModal({
 
                 const res = await ZooApi.getSpeciesNarration(species.id, selectedLang, currentSession.sessionId);
                 if (isMounted) {
-                    if (res.success) {
-                        setNarration(res.data);
-                        setNarrationError('');
+                    if (res.success && res.data) {
+                        const actualLang = (res.data.languageCode || '').toLowerCase();
+                        const reqLang = (selectedLang || '').toLowerCase();
+                        if (res.data.isFallbackLanguage || (actualLang && reqLang && actualLang !== reqLang)) {
+                            setNarration(null);
+                            setNarrationError(
+                                t?.narrationMissingDesc ||
+                                `Chưa có bản thu âm và nội dung thuyết minh cho ngôn ngữ "${selectedLang.toUpperCase()}".`
+                            );
+                        } else {
+                            setNarration(res.data);
+                            setNarrationError('');
+                        }
                     } else {
                         setNarration(null);
                         setNarrationError(res.message || t?.narrationMissingDesc || 'Chưa có bài thuyết minh cho ngôn ngữ này.');

@@ -177,8 +177,10 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const markersLayerRef = useRef(null);
     const routeLayerRef = useRef(null);
     const userLocationLayerRef = useRef(null);
+    const geofenceLayerRef = useRef(null);
 
-    // --- STATE THUYẾT MINH TỰ ĐỘNG THEO GPS (Task E) ---
+    // --- STATE ĐỊNH VỊ GPS & THUYẾT MINH TỰ ĐỘNG (Task 5) ---
+    const [userGpsLocation, setUserGpsLocation] = useState(null);
     const [isAutoNarrationActive, setIsAutoNarrationActive] = useState(false);
     const [autoNarrationStatus, setAutoNarrationStatus] = useState('');
     const [lastTriggeredTarget, setLastTriggeredTarget] = useState(null);
@@ -187,6 +189,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
     const watchIdRef = useRef(null);
     const audioCooldownMapRef = useRef(new Map());
+    const insideZonesRef = useRef(new Set());
     const isPlayingRef = useRef(false);
 
     useEffect(() => {
@@ -221,9 +224,34 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         loadMapData(currentLang);
     }, [loadMapData, currentLang]);
 
-    // 2. Hợp nhất Marker chuẩn với dữ liệu thực tế từ Supabase
+    // 2. Hợp nhất Marker chuẩn với dữ liệu thực tế từ Supabase (Areas, Enclosures, Animals, POIs)
     const mergedMarkers = useMemo(() => {
-        const markerList = [...REAL_MAP_LANDMARKS];
+        const markerList = REAL_MAP_LANDMARKS.map(lm => ({
+            ...lm,
+            radiusMeters: lm.radiusMeters || 40
+        }));
+
+        // Bổ sung các Phân khu (Areas) thực tế từ cơ sở dữ liệu
+        areas.forEach(dbArea => {
+            if (!dbArea.latitude || !dbArea.longitude) return;
+            const areaEnclosures = enclosures.filter(e => Number(e.areaId) === Number(dbArea.areaId));
+            const areaAnimals = animals.filter(a => Number(a.areaId) === Number(dbArea.areaId));
+            markerList.push({
+                id: `area_${dbArea.areaId}`,
+                nodeId: `gate_area_${dbArea.areaId}`,
+                areaId: dbArea.areaId,
+                code: dbArea.code || `AREA-0${dbArea.areaId}`,
+                name: dbArea.name,
+                description: dbArea.description || `Phân khu bảo tồn thuộc Thảo Cầm Viên Sài Gòn (${areaEnclosures.length} chuồng nuôi).`,
+                lat: Number(dbArea.latitude),
+                lng: Number(dbArea.longitude),
+                radiusMeters: Number(dbArea.radiusMeters) || 50,
+                category: 'area',
+                isVerified: true,
+                residentAnimals: areaAnimals,
+                animalCount: areaAnimals.length
+            });
+        });
 
         // Tạo marker từ toàn bộ chuồng thú thực tế được API trả về
         enclosures.forEach(dbEnc => {
@@ -259,6 +287,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 description: dbEnc.description || '',
                 lat: hasLatLong ? Number(dbEnc.latitude) : 10.7876,
                 lng: hasLatLong ? Number(dbEnc.longitude) : 106.7053,
+                radiusMeters: Number(dbEnc.radiusMeters) || 30,
                 category,
                 isVerified: hasLatLong,
                 imageUrl: dbEnc.imageUrl,
@@ -282,6 +311,9 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         markerList[matchIdx].lat = Number(poi.latitude);
                         markerList[matchIdx].lng = Number(poi.longitude);
                     }
+                    if (Number(poi.radiusMeters) > 0) {
+                        markerList[matchIdx].radiusMeters = Number(poi.radiusMeters);
+                    }
                     if (poi.description && !markerList[matchIdx].description) {
                         markerList[matchIdx].description = poi.description;
                     }
@@ -303,6 +335,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         description: poi.description || 'Điểm tham quan tại Thảo Cầm Viên Sài Gòn.',
                         lat: Number(poi.latitude) || 10.7876,
                         lng: Number(poi.longitude) || 106.7053,
+                        radiusMeters: Number(poi.radiusMeters) || 40,
                         category: (poi.category || 'landmark').toLowerCase(),
                         isVerified: Boolean(poi.isCoordinateVerified),
                         hasAudio: Boolean(poi.hasAudio),
@@ -359,30 +392,39 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             zoomControl: false // Sử dụng controls tùy biến
         });
 
-        // Nền bản đồ CARTO Voyager
-const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY;
+        // Nền bản đồ CARTO Voyager kèm fallback OpenStreetMap tự động nếu lỗi tile
+        const cartoApiKey = import.meta.env.VITE_CARTO_API_KEY;
+        const tileUrl = cartoApiKey
+            ? `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoApiKey)}`
+            : `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png`;
 
-if (!cartoApiKey) {
-    console.error('Thiếu VITE_CARTO_API_KEY trong cấu hình môi trường.');
-}
+        const tileLayer = L.tileLayer(tileUrl, {
+            attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        });
 
-const tileLayer = L.tileLayer(
-    `https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png?key=${encodeURIComponent(cartoApiKey || '')}`,
-    {
-        attribution:
-            '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19
-    }
-);
+        let osmFallbackAdded = false;
+        tileLayer.on('tileerror', () => {
+            if (!osmFallbackAdded && mapInstanceRef.current) {
+                osmFallbackAdded = true;
+                L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '&copy; OpenStreetMap contributors'
+                }).addTo(mapInstanceRef.current);
+            }
+        });
 
-tileLayer.addTo(map);
+        tileLayer.addTo(map);
 
-        // Lớp chứa Marker và Tuyến đường
-        const markersLayer = L.layerGroup().addTo(map);
+        // Lớp chứa Marker, Tuyến đường, Geofence và Vị trí GPS
+        const geofenceLayer = L.layerGroup().addTo(map);
         const routeLayer = L.layerGroup().addTo(map);
+        const markersLayer = L.layerGroup().addTo(map);
         const userLocationLayer = L.layerGroup().addTo(map);
 
+        geofenceLayerRef.current = geofenceLayer;
         markersLayerRef.current = markersLayer;
         routeLayerRef.current = routeLayer;
         userLocationLayerRef.current = userLocationLayer;
@@ -400,6 +442,7 @@ tileLayer.addTo(map);
         let label = marker.name?.split('(')[0]?.trim();
 
         if (marker.category === 'gate') bgColor = '#0284C7';
+        else if (marker.category === 'area') bgColor = '#0F766E';
         else if (marker.category === 'landmark' || marker.category === 'botanical' || marker.category === 'attraction') bgColor = '#B45309';
         else if (marker.category === 'carnivore') bgColor = '#DC2626';
         else if (marker.category === 'herbivore') bgColor = '#16A34A';
@@ -439,8 +482,9 @@ tileLayer.addTo(map);
         });
     }, []);
 
-    // 6. Xử lý chọn marker và vẽ tuyến đường
-    const handleSelectMarker = useCallback((marker) => {
+    // 6. Xử lý chọn marker, hiển thị phạm vi Geofence và vẽ tuyến đường đi bộ thực tế
+    const handleSelectMarker = useCallback((marker, overrideStartPointId = null) => {
+        if (!marker) return;
         setSelectedMarker(marker);
 
         if (mapInstanceRef.current) {
@@ -449,28 +493,43 @@ tileLayer.addTo(map);
             });
         }
 
-        // Tính toán lộ trình Dijkstra từ cổng xuất phát
-        let targetEntity = marker;
-        let targetType = 'node';
+        // Vẽ vòng tròn phạm vi Geofencing của điểm tham quan / khu vực được chọn
+        if (geofenceLayerRef.current) {
+            geofenceLayerRef.current.clearLayers();
+            const radiusM = Number(marker.radiusMeters) > 0 ? Number(marker.radiusMeters) : 35;
+            L.circle([marker.lat, marker.lng], {
+                radius: radiusM,
+                color: '#15803D',
+                weight: 1.5,
+                dashArray: '4, 4',
+                fillColor: '#22C55E',
+                fillOpacity: 0.1
+            }).addTo(geofenceLayerRef.current);
+        }
 
+        // Xác định điểm bắt đầu (Cổng xuất phát hoặc Vị trí GPS thực tế của du khách)
+        const startIdToUse = overrideStartPointId || selectedStartPointId;
+        let resolvedStartPoint = startIdToUse;
+        if (startIdToUse === 'user_gps' && userGpsLocation) {
+            resolvedStartPoint = {
+                id: 'user_gps',
+                name: 'Vị trí GPS của bạn',
+                lat: userGpsLocation.lat,
+                lng: userGpsLocation.lng
+            };
+        }
+
+        let targetType = 'node';
         if (marker.enclosureId) {
             targetType = 'enclosure';
-            targetEntity = {
-                enclosureId: marker.enclosureId,
-                name: marker.name,
-                latitude: marker.lat,
-                longitude: marker.lng,
-                areaId: marker.areaId
-            };
-        } else if (marker.nodeId) {
-            targetType = 'node';
-            targetEntity = { id: marker.nodeId, name: marker.name };
+        } else if (marker.category === 'area' || (marker.areaId && !marker.poiId)) {
+            targetType = 'area';
         }
 
         const route = planZooRoute({
-            startPoint: selectedStartPointId,
+            startPoint: resolvedStartPoint,
             targetType,
-            targetEntity,
+            targetEntity: marker,
             currentNodes: WALKWAY_NODES,
             currentEdges: WALKWAY_EDGES
         });
@@ -491,8 +550,9 @@ tileLayer.addTo(map);
         } else {
             setActiveRoute(null);
             if (routeLayerRef.current) routeLayerRef.current.clearLayers();
+            showToast('Không tìm thấy tuyến đường đi bộ phù hợp đến địa điểm này.', 'error');
         }
-    }, [selectedStartPointId]);
+    }, [selectedStartPointId, userGpsLocation, showToast]);
 
     // Tự động tải danh sách động vật thực tế thuộc chuồng được chọn từ API
     useEffect(() => {
@@ -601,58 +661,25 @@ tileLayer.addTo(map);
         }
     }, [navTargetAnimal, mergedMarkers, handleSelectMarker, setNavTargetAnimal, showToast]);
 
-    // 8. Định vị du khách thực tế (GPS Geolocation)
-    const handleLocateUser = () => {
-        if (!navigator.geolocation) {
-            showToast("Trình duyệt không hỗ trợ tính năng định vị GPS.", "error");
-            return;
-        }
+    // 8. Định vị du khách thực tế (GPS Geolocation - Task 5.2)
+    const isCoordinateWithinZooBounds = useCallback((lat, lng) => {
+        const [[minLat, minLng], [maxLat, maxLng]] = SAIGON_ZOO_BOUNDS;
+        return lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng;
+    }, []);
 
-        showToast("Đang tìm vị trí GPS của bạn...", "info");
+    const updateUserGpsMarker = useCallback((userLat, userLng, accuracy, heading = null) => {
+        if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) return;
+        const withinZoo = isCoordinateWithinZooBounds(userLat, userLng);
 
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const userLat = pos.coords.latitude;
-                const userLng = pos.coords.longitude;
-                const accuracy = pos.coords.accuracy;
+        setUserGpsLocation({
+            lat: userLat,
+            lng: userLng,
+            accuracy: Number(accuracy) || 15,
+            heading: Number.isFinite(heading) ? Math.round(heading) : null,
+            isWithinZoo: withinZoo,
+            updatedAt: Date.now()
+        });
 
-                if (!mapInstanceRef.current || !userLocationLayerRef.current) return;
-
-                userLocationLayerRef.current.clearLayers();
-
-                // Chấm xanh vị trí người dùng
-                const userIcon = L.divIcon({
-                    className: 'user-gps-marker',
-                    html: `
-                        <div style="
-                            width: 16px;
-                            height: 16px;
-                            background: #2563EB;
-                            border: 3px solid #FFFFFF;
-                            border-radius: 50%;
-                            box-shadow: 0 0 10px rgba(37,99,235,0.7);
-                        "></div>
-                    `,
-                    iconSize: [16, 16],
-                    iconAnchor: [8, 8]
-                });
-
-                L.marker([userLat, userLng], { icon: userIcon }).addTo(userLocationLayerRef.current);
-                L.circle([userLat, userLng], { radius: Math.min(accuracy, 80), color: '#3B82F6', fillOpacity: 0.15 }).addTo(userLocationLayerRef.current);
-
-                mapInstanceRef.current.flyTo([userLat, userLng], 18, { duration: 1.2 });
-                showToast("Đã xác định vị trí hiện tại của bạn.", "success");
-            },
-            (err) => {
-                console.warn("Geolocation error:", err);
-                showToast("Không thể lấy vị trí GPS. Vui lòng cho phép quyền truy cập vị trí trên trình duyệt.", "error");
-            },
-            { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-        );
-    };
-
-    // --- LOGIC THUYẾT MINH TỰ ĐỘNG THEO GPS (Task E) ---
-    const updateUserGpsMarker = useCallback((userLat, userLng, accuracy) => {
         if (!mapInstanceRef.current || !userLocationLayerRef.current) return;
         userLocationLayerRef.current.clearLayers();
 
@@ -662,34 +689,114 @@ tileLayer.addTo(map);
                 <div style="
                     width: 18px;
                     height: 18px;
-                    background: #15803D;
+                    background: #2563EB;
                     border: 3px solid #FFFFFF;
                     border-radius: 50%;
-                    box-shadow: 0 0 12px rgba(21,128,61,0.8);
-                "></div>
+                    box-shadow: 0 0 12px rgba(37,99,235,0.85);
+                " title="Vị trí hiện tại của bạn (${userLat.toFixed(5)}, ${userLng.toFixed(5)})"></div>
             `,
             iconSize: [18, 18],
             iconAnchor: [9, 9]
         });
 
-        L.marker([userLat, userLng], { icon: userIcon }).addTo(userLocationLayerRef.current);
-        L.circle([userLat, userLng], { 
-            radius: Math.min(accuracy, 60), 
-            color: '#15803D', 
-            fillColor: '#86EFAC', 
-            fillOpacity: 0.15 
-        }).addTo(userLocationLayerRef.current);
-    }, []);
+        L.marker([userLat, userLng], { icon: userIcon })
+            .bindTooltip(`Vị trí của bạn (±${Math.round(accuracy || 15)}m)`, { direction: 'top', offset: [0, -10] })
+            .addTo(userLocationLayerRef.current);
 
+        L.circle([userLat, userLng], { 
+            radius: Math.min(Math.max(Number(accuracy) || 15, 8), 80), 
+            color: '#2563EB', 
+            fillColor: '#60A5FA', 
+            fillOpacity: 0.15,
+            weight: 1.5
+        }).addTo(userLocationLayerRef.current);
+    }, [isCoordinateWithinZooBounds]);
+
+    const handleLocateUser = () => {
+        if (!navigator.geolocation) {
+            showToast("Thiết bị hoặc trình duyệt của bạn không hỗ trợ định vị GPS.", "error");
+            return;
+        }
+
+        showToast("Đang xác định tọa độ GPS thực tế của thiết bị...", "info");
+
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const userLat = pos?.coords?.latitude;
+                const userLng = pos?.coords?.longitude;
+                const accuracy = pos?.coords?.accuracy || 15;
+                const heading = pos?.coords?.heading;
+
+                if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+                    showToast("GPS không trả về tọa độ hợp lệ. Vui lòng thử lại ở nơi thoáng đãng.", "error");
+                    return;
+                }
+
+                updateUserGpsMarker(userLat, userLng, accuracy, heading);
+                setCurrentGpsAccuracy(accuracy);
+                setSelectedStartPointId('user_gps');
+
+                const withinZoo = isCoordinateWithinZooBounds(userLat, userLng);
+                if (mapInstanceRef.current) {
+                    if (withinZoo) {
+                        mapInstanceRef.current.flyTo([userLat, userLng], 18, { duration: 1.2 });
+                    } else {
+                        // Nếu người dùng đang ở ngoài khuôn viên Thảo Cầm Viên, mở rộng bounds tạm thời để vẫn thấy chấm vị trí
+                        mapInstanceRef.current.setMaxBounds(null);
+                        mapInstanceRef.current.flyTo([userLat, userLng], 16, { duration: 1.2 });
+                    }
+                }
+
+                if (selectedMarker) {
+                    handleSelectMarker(selectedMarker, 'user_gps');
+                }
+
+                const distToGateA = Math.round(calculateHaversineDistance(userLat, userLng, SAIGON_ZOO_CENTER[0], SAIGON_ZOO_CENTER[1]));
+                if (withinZoo) {
+                    showToast(`Đã định vị GPS tại Thảo Cầm Viên (±${Math.round(accuracy)}m).`, "success");
+                } else {
+                    showToast(`Đã lấy tọa độ GPS thực tế (±${Math.round(accuracy)}m, cách Thảo Cầm Viên ~${(distToGateA / 1000).toFixed(1)}km).`, "info");
+                }
+            },
+            (err) => {
+                console.warn("Geolocation error:", err);
+                if (err.code === 1) {
+                    showToast("Bạn đã từ chối cấp quyền vị trí. Vui lòng bật quyền Location trên trình duyệt để định vị.", "error");
+                } else if (err.code === 2) {
+                    showToast("Thiết bị hiện không thể xác định tín hiệu GPS. Vui lòng kiểm tra dịch vụ vị trí (Location Services).", "error");
+                } else if (err.code === 3) {
+                    showToast("Hết thời gian chờ phản hồi GPS. Vui lòng di chuyển ra khu vực thoáng và thử lại.", "error");
+                } else {
+                    showToast("Không thể lấy vị trí GPS của thiết bị.", "error");
+                }
+            },
+            { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 }
+        );
+    };
+
+    // --- LOGIC GEOFENCING & THUYẾT MINH TỰ ĐỘNG THEO GPS (Task 5.3) ---
     const evaluateAutoNarrationTrigger = useCallback((userLat, userLng, accuracy) => {
         if (!mergedMarkers || mergedMarkers.length === 0) return;
+        if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) return;
 
-        // Lọc các điểm nằm trong bán kính kích hoạt (sử dụng radiusMeters của POI hoặc mặc định 25m)
-        const nearbyTargets = mergedMarkers.filter(m => m.lat && m.lng).map(m => {
+        const EXIT_HYSTERESIS_METERS = 8; // Ngưỡng đệm 8m khi đi ra khỏi khu vực để xử lý trường hợp rời đi rồi quay lại
+        const nearbyTargets = [];
+
+        mergedMarkers.forEach(m => {
+            if (!m.lat || !m.lng) return;
             const dist = calculateHaversineDistance(userLat, userLng, m.lat, m.lng);
-            const triggerRadius = Number(m.radiusMeters) > 0 ? Math.min(Number(m.radiusMeters), 50) : 25;
-            return { ...m, dist, triggerRadius };
-        }).filter(m => m.dist <= m.triggerRadius);
+            const triggerRadius = Number(m.radiusMeters) > 0 ? Math.min(Number(m.radiusMeters), 60) : 30;
+
+            if (dist <= triggerRadius) {
+                nearbyTargets.push({ ...m, dist, triggerRadius });
+            } else if (dist > triggerRadius + EXIT_HYSTERESIS_METERS) {
+                // Khách tham quan đã đi ra khỏi khu vực -> xóa trạng thái đứng trong vùng để khi quay lại sẽ kích hoạt lại
+                if (insideZonesRef.current.has(m.id)) {
+                    insideZonesRef.current.delete(m.id);
+                    audioCooldownMapRef.current.delete(m.id);
+                }
+            }
+        });
 
         if (nearbyTargets.length === 0) return;
 
@@ -708,8 +815,8 @@ tileLayer.addTo(map);
                 eventType: 'PROXIMITY_DETECTED',
                 sessionId: currentSession?.sessionId || null,
                 languageCode: currentLang,
-                targetType: nearest.poiId ? 'POI' : 'Enclosure',
-                targetId: nearest.poiId || nearest.enclosureId || null,
+                targetType: nearest.poiId ? 'POI' : (nearest.enclosureId ? 'Enclosure' : 'Area'),
+                targetId: nearest.poiId || nearest.enclosureId || nearest.areaId || null,
                 targetCode: nearest.code || String(nearest.id),
                 targetName: nearest.name,
                 triggerSource: 'GPS_AUTO',
@@ -728,13 +835,16 @@ tileLayer.addTo(map);
 
         if (eligibleTargets.length === 0) return;
 
+        // Chỉ kích hoạt cho điểm mà du khách MỚI bước vào (chưa có trong insideZonesRef) và hết thời gian cooldown
         const candidate = eligibleTargets.find(t => {
+            if (insideZonesRef.current.has(t.id)) {
+                return false; // Đang đứng liên tục trong cùng một khu vực -> không thông báo lặp lại
+            }
             const lastTime = audioCooldownMapRef.current.get(t.id) || 0;
-            return (now - lastTime) > 120000; // Cooldown 120s (2 phút) để tránh lặp âm thanh
+            return (now - lastTime) > 120000;
         });
 
         if (!candidate) {
-            // Đang trong thời gian chờ Cooldown -> ghi nhận SKIPPED_COOLDOWN tối đa 1 lần / 90s
             const skipKey = `skip_${eligibleTargets[0].id}`;
             const lastSkipTime = audioCooldownMapRef.current.get(skipKey) || 0;
             if (now - lastSkipTime > 90000) {
@@ -756,10 +866,13 @@ tileLayer.addTo(map);
             return;
         }
 
+        // Đánh dấu du khách đã bước vào khu vực này để không thông báo lặp lại khi đứng yên
+        insideZonesRef.current.add(candidate.id);
+
         // Kiểm tra quyền nghe thuyết minh (yêu cầu phiên vé)
         if (!hasActiveSession) {
             audioCooldownMapRef.current.set(candidate.id, now);
-            showToast(`Bạn đang ở gần "${candidate.name}". Vui lòng mua hoặc kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
+            showToast(`Bạn đã vào khu vực "${candidate.name}" (${Math.round(candidate.dist)}m). Vui lòng kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
             return;
         }
 
@@ -836,19 +949,25 @@ tileLayer.addTo(map);
 
         watchIdRef.current = navigator.geolocation.watchPosition(
             (pos) => {
-                const userLat = pos.coords.latitude;
-                const userLng = pos.coords.longitude;
-                const accuracy = pos.coords.accuracy;
-                setCurrentGpsAccuracy(accuracy);
+                const userLat = pos?.coords?.latitude;
+                const userLng = pos?.coords?.longitude;
+                const accuracy = pos?.coords?.accuracy || 15;
+                const heading = pos?.coords?.heading;
 
-                updateUserGpsMarker(userLat, userLng, accuracy);
-
-                if (accuracy > 50) {
-                    setAutoNarrationStatus(`GPS đang ổn định (±${Math.round(accuracy)}m). Cần độ chính xác <50m để định vị chuồng...`);
+                if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+                    setAutoNarrationStatus("GPS chưa trả về tọa độ hợp lệ...");
                     return;
                 }
 
-                setAutoNarrationStatus(`Đang quét thuyết minh tự động (±${Math.round(accuracy)}m)`);
+                setCurrentGpsAccuracy(accuracy);
+                updateUserGpsMarker(userLat, userLng, accuracy, heading);
+
+                if (accuracy > 65) {
+                    setAutoNarrationStatus(`GPS đang ổn định (±${Math.round(accuracy)}m). Cần độ chính xác <65m để kích hoạt Geofence...`);
+                    return;
+                }
+
+                setAutoNarrationStatus(`Đang quét Geofence tự động (±${Math.round(accuracy)}m)`);
                 evaluateAutoNarrationTrigger(userLat, userLng, accuracy);
             },
             (err) => {
@@ -875,7 +994,7 @@ tileLayer.addTo(map);
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
         );
 
-        showToast("Đã bật chế độ thuyết minh tự động theo GPS.", "success");
+        showToast("Đã bật chế độ định vị & thuyết minh tự động (Geofencing GPS).", "success");
     }, [currentLang, currentSession?.sessionId, evaluateAutoNarrationTrigger, showToast, updateUserGpsMarker]);
 
     const stopAutoNarrationTracking = useCallback(() => {
@@ -883,6 +1002,7 @@ tileLayer.addTo(map);
             navigator.geolocation.clearWatch(watchIdRef.current);
             watchIdRef.current = null;
         }
+        insideZonesRef.current.clear();
         setIsAutoNarrationActive(false);
         setAutoNarrationStatus("");
         setCurrentGpsAccuracy(null);
@@ -901,6 +1021,7 @@ tileLayer.addTo(map);
     // 9. Nút đặt lại toàn cảnh sở thú (Reset View to Zoo Bounds)
     const handleResetZooBounds = () => {
         if (mapInstanceRef.current) {
+            mapInstanceRef.current.setMaxBounds(SAIGON_ZOO_BOUNDS);
             mapInstanceRef.current.flyToBounds(SAIGON_ZOO_BOUNDS, {
                 padding: [20, 20],
                 duration: 1.0
@@ -909,6 +1030,7 @@ tileLayer.addTo(map);
         setSelectedMarker(null);
         setActiveRoute(null);
         if (routeLayerRef.current) routeLayerRef.current.clearLayers();
+        if (geofenceLayerRef.current) geofenceLayerRef.current.clearLayers();
     };
 
     // 10. Điều khiển Zoom
@@ -944,9 +1066,9 @@ tileLayer.addTo(map);
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                        {/* Dropdown cổng xuất phát */}
+                        {/* Dropdown điểm xuất phát */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>Cổng xuất phát:</span>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>Điểm xuất phát:</span>
                             <select
                                 style={{
                                     border: 'none',
@@ -959,10 +1081,16 @@ tileLayer.addTo(map);
                                 }}
                                 value={selectedStartPointId}
                                 onChange={(e) => {
-                                    setSelectedStartPointId(e.target.value);
-                                    if (selectedMarker) handleSelectMarker(selectedMarker);
+                                    const nextStart = e.target.value;
+                                    setSelectedStartPointId(nextStart);
+                                    if (selectedMarker) handleSelectMarker(selectedMarker, nextStart);
                                 }}
                             >
+                                {userGpsLocation && (
+                                    <option value="user_gps">
+                                        📍 Vị trí GPS hiện tại ({userGpsLocation.lat.toFixed(4)}, {userGpsLocation.lng.toFixed(4)})
+                                    </option>
+                                )}
                                 {POPULAR_START_POINTS.map(sp => (
                                     <option key={sp.id} value={sp.id}>{sp.name}</option>
                                 ))}
@@ -982,7 +1110,7 @@ tileLayer.addTo(map);
                                     outline: 'none',
                                     background: '#F8FAFC'
                                 }}
-                                placeholder="Tìm chuồng, thú, cổng..."
+                                placeholder="Tìm chuồng, thú, khu vực, cổng..."
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                             />
@@ -1035,6 +1163,7 @@ tileLayer.addTo(map);
                 }}>
                     {[
                         { key: 'all', label: 'Tất cả địa điểm', count: mergedMarkers.length },
+                        { key: 'area', label: 'Phân khu bảo tồn', count: mergedMarkers.filter(m => m.category === 'area').length },
                         { key: 'carnivore', label: 'Động vật ăn thịt', count: mergedMarkers.filter(m => m.category === 'carnivore').length },
                         { key: 'herbivore', label: 'Động vật ăn cỏ', count: mergedMarkers.filter(m => m.category === 'herbivore').length },
                         { key: 'bird', label: 'Vườn chim', count: mergedMarkers.filter(m => m.category === 'bird').length },
@@ -1369,13 +1498,18 @@ tileLayer.addTo(map);
                                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
                                     ➔ {activeRoute.destinationName}
                                 </div>
-                                <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px', display: 'flex', gap: '8px' }}>
+                                <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                                     <span>Từ: <strong>{activeRoute.startNode?.name?.split('(')[0]?.trim()}</strong></span>
                                     <span>•</span>
                                     <span>Cự ly: <strong style={{ color: '#38BDF8' }}>{activeRoute.totalDistanceM}m</strong></span>
                                     <span>•</span>
                                     <span>~<strong style={{ color: '#FCD34D' }}>{activeRoute.timeMin} phút</strong></span>
                                 </div>
+                                {activeRoute.compassDirection && (
+                                    <div style={{ fontSize: '0.75rem', color: '#86EFAC', marginTop: '4px', fontWeight: 600 }}>
+                                        🧭 Hướng di chuyển: <strong>{activeRoute.compassDirection} ({activeRoute.bearingDegrees}°)</strong>
+                                    </div>
+                                )}
                             </div>
                             <button
                                 onClick={() => {
@@ -1481,7 +1615,10 @@ tileLayer.addTo(map);
                             </div>
 
                             <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, marginBottom: '8px' }}>
-                                Mã địa điểm: {selectedMarker.code} • Tọa độ GPS: {selectedMarker.lat.toFixed(6)}, {selectedMarker.lng.toFixed(6)}
+                                Mã địa điểm: {selectedMarker.code} • Tọa độ GPS: {selectedMarker.lat.toFixed(6)}, {selectedMarker.lng.toFixed(6)} • Bán kính Geofence: {selectedMarker.radiusMeters || 30}m
+                                {userGpsLocation && (
+                                    <span> • Cách vị trí của bạn: <strong>{Math.round(calculateHaversineDistance(userGpsLocation.lat, userGpsLocation.lng, selectedMarker.lat, selectedMarker.lng))}m</strong></span>
+                                )}
                             </div>
 
                             <p style={{ margin: '0 0 12px 0', fontSize: '0.88rem', color: '#334155', lineHeight: '1.5' }}>
@@ -1714,6 +1851,25 @@ tileLayer.addTo(map);
                                 </button>
                             )}
 
+                            {userGpsLocation && (
+                                <button
+                                    className="btn btn-outline"
+                                    style={{
+                                        borderRadius: '6px',
+                                        fontWeight: 600,
+                                        fontSize: '0.84rem',
+                                        borderColor: '#2563EB',
+                                        color: '#1D4ED8'
+                                    }}
+                                    onClick={() => {
+                                        setSelectedStartPointId('user_gps');
+                                        handleSelectMarker(selectedMarker, 'user_gps');
+                                    }}
+                                >
+                                    📍 Chỉ đường từ GPS của tôi
+                                </button>
+                            )}
+
                             <button
                                 className="btn btn-outline"
                                 style={{
@@ -1723,7 +1879,7 @@ tileLayer.addTo(map);
                                 }}
                                 onClick={() => handleSelectMarker(selectedMarker)}
                             >
-                                ➔ Chỉ đường từ cổng
+                                ➔ Chỉ đường từ điểm xuất phát
                             </button>
 
                             <button
@@ -1733,7 +1889,10 @@ tileLayer.addTo(map);
                                     fontWeight: 500,
                                     fontSize: '0.82rem'
                                 }}
-                                onClick={() => setSelectedMarker(null)}
+                                onClick={() => {
+                                    setSelectedMarker(null);
+                                    if (geofenceLayerRef.current) geofenceLayerRef.current.clearLayers();
+                                }}
                             >
                                 Đóng thông tin
                             </button>
