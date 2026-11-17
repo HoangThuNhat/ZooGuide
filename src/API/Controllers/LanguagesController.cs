@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ZooGuide.Application.DTOs;
 using ZooGuide.Application.DTOs.Common;
@@ -61,6 +62,7 @@ public class LanguagesController : ControllerBase
     /// Tạo mới hoặc cập nhật bản dịch trong Supabase
     /// </summary>
     [HttpPost("translations")]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<ContentTranslationDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UpsertTranslation([FromBody] UpsertContentTranslationDto dto)
     {

@@ -75,7 +75,7 @@ public class TicketSessionService : ITicketSessionService
             return (false, $"Vé {ticket.TicketCode} chưa đến thời gian có hiệu lực ({ticket.ValidFrom:yyyy-MM-dd}).", null, 400, "TICKET_NOT_YET_VALID");
         }
 
-        // 4. Kiểm tra vé không bị hủy hoặc không bị cấm sử dụng
+        // 4. Kiểm tra vé không bị hủy, không bị cấm sử dụng và chưa được sử dụng
         if (ticket.Status == TicketStatus.Cancelled)
         {
             return (false, $"Vé {ticket.TicketCode} đã bị hủy trên hệ thống.", null, 400, "TICKET_CANCELLED");
@@ -84,6 +84,11 @@ public class TicketSessionService : ITicketSessionService
         if (ticket.Status == TicketStatus.Locked)
         {
             return (false, $"Vé {ticket.TicketCode} hiện đang bị tạm khóa. Vui lòng liên hệ ban quản lý ZooGuide.", null, 400, "TICKET_LOCKED");
+        }
+
+        if (ticket.Status == TicketStatus.Used || (ticket.TicketSessions != null && ticket.TicketSessions.Any(s => s.Status == SessionStatus.Active && s.ExpiredAt > now)))
+        {
+            return (false, $"Vé {ticket.TicketCode} đã được kích hoạt sử dụng trước đó.", null, 400, "TICKET_ALREADY_USED");
         }
 
         // 5. Tính thời gian hiệu lực phiên (ExpiresAt) theo cấu hình DurationMinutes của TicketType (mặc định 480 phút = 8 giờ)
@@ -178,6 +183,20 @@ public class TicketSessionService : ITicketSessionService
     {
         var session = await _sessionRepository.GetByIdWithDetailsAsync(sessionId);
         if (session == null) return false;
+
+        // Nếu phiên đã kết thúc, thu hồi hoặc hết hạn trước đó thì không thực hiện lặp lại
+        if (session.Status != SessionStatus.Active || session.EndedAt.HasValue)
+        {
+            return false;
+        }
+
+        if (session.ExpiredAt <= DateTime.UtcNow)
+        {
+            session.Status = SessionStatus.Expired;
+            session.EndedAt = DateTime.UtcNow;
+            await _sessionRepository.UpdateAsync(session);
+            return false;
+        }
 
         session.Status = SessionStatus.Revoked;
         session.EndedAt = DateTime.UtcNow;

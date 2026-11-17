@@ -48,11 +48,13 @@ export default function TicketsTab() {
         let isMounted = true;
         ZooApi.getTicketTypes().then(res => {
             if (isMounted && res && res.success && Array.isArray(res.data)) {
-                const validTypes = res.data.filter(tt => tt.price > 0 && tt.price < 500000);
-                setTicketTypes(validTypes.length > 0 ? validTypes : res.data);
+                const activeTypes = res.data.filter(tt => tt.isActive !== false);
+                const validTypes = activeTypes.filter(tt => tt.price > 0 && tt.price < 500000);
+                const listToUse = validTypes.length > 0 ? validTypes : activeTypes;
+                setTicketTypes(listToUse);
                 
                 const initialCart = {};
-                (validTypes.length > 0 ? validTypes : res.data).forEach((tt, idx) => {
+                listToUse.forEach((tt, idx) => {
                     const id = tt.ticketTypeId || tt.id;
                     initialCart[id] = idx === 0 ? 1 : 0;
                 });
@@ -77,6 +79,10 @@ export default function TicketsTab() {
                     ZooApi.getOrderByCode(parsed.orderCode).then(res => {
                         if (res && res.success && res.data) {
                             setCurrentOrder(res.data);
+                            if (res.data.expiresAt) {
+                                const rem = Math.max(0, Math.floor((new Date(res.data.expiresAt).getTime() - Date.now()) / 1000));
+                                setPaymentTimeRemaining(rem);
+                            }
                             if (res.data.paymentStatus === 'Paid' || res.data.paymentStatus === 2) {
                                 setOrderSuccessModal(true);
                                 setBuyerIdentity({
@@ -573,6 +579,9 @@ export default function TicketsTab() {
                                                                 </div>
                                                                 <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#15803D' }}>
                                                                     {formatCurrency(tt.price)}
+                                                                    <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#64748B', marginLeft: '6px' }}>
+                                                                        • Thời hạn: {Math.max(1, Math.round((tt.durationMinutes || 480) / 60))} giờ
+                                                                    </span>
                                                                 </div>
                                                             </div>
 
@@ -767,9 +776,13 @@ export default function TicketsTab() {
                                             </div>
                                         </div>
 
-                                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#15803D', fontSize: '0.8rem', fontWeight: 700 }}>
-                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16A34A', display: 'inline-block' }}></span>
-                                            <span>Hệ thống đang tự động lắng nghe giao dịch chuyển khoản...</span>
+                                        <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: (currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0) ? '#DC2626' : '#15803D', fontSize: '0.8rem', fontWeight: 700 }}>
+                                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: (currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0) ? '#DC2626' : '#16A34A', display: 'inline-block' }}></span>
+                                            <span>
+                                                {(currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0)
+                                                    ? 'Đơn hàng đã hết thời hạn thanh toán (15 phút). Vui lòng đặt lại đơn hàng mới.'
+                                                    : 'Hệ thống đang tự động lắng nghe giao dịch chuyển khoản...'}
+                                            </span>
                                         </div>
                                     </div>
 
@@ -778,7 +791,7 @@ export default function TicketsTab() {
                                         <button
                                             type="button"
                                             onClick={handleCheckPaymentStatusManually}
-                                            disabled={isCheckingPayment}
+                                            disabled={isCheckingPayment || currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0}
                                             style={{
                                                 flex: 1,
                                                 minWidth: '140px',
@@ -789,7 +802,8 @@ export default function TicketsTab() {
                                                 border: 'none',
                                                 fontWeight: 700,
                                                 fontSize: '0.88rem',
-                                                cursor: isCheckingPayment ? 'wait' : 'pointer',
+                                                cursor: (isCheckingPayment || currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 'not-allowed' : 'pointer',
+                                                opacity: (currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 0.5 : 1,
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 justifyContent: 'center',
@@ -802,7 +816,7 @@ export default function TicketsTab() {
                                         <button
                                             type="button"
                                             onClick={() => handleSimulatePayment(false)}
-                                            disabled={isSimulatingPayment}
+                                            disabled={isSimulatingPayment || currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0}
                                             style={{
                                                 flex: 1,
                                                 minWidth: '140px',
@@ -813,7 +827,8 @@ export default function TicketsTab() {
                                                 border: 'none',
                                                 fontWeight: 700,
                                                 fontSize: '0.88rem',
-                                                cursor: isSimulatingPayment ? 'wait' : 'pointer'
+                                                cursor: (isSimulatingPayment || currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 'not-allowed' : 'pointer',
+                                                opacity: (currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 0.5 : 1
                                             }}
                                         >
                                             {isSimulatingPayment ? 'Đang xử lý...' : 'Giả lập Sandbox'}

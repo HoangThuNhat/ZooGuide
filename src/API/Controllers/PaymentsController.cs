@@ -28,18 +28,25 @@ public class PaymentsController : ControllerBase
     [HttpPost("webhook")]
     public async Task<IActionResult> HandleWebhook([FromBody] PaymentWebhookPayload payload)
     {
-        // Lấy token xác thực từ Header Authorization hoặc X-Webhook-Secret nếu có
+        // Lấy token xác thực từ Header Authorization hoặc X-Webhook-Secret
         string? signature = Request.Headers["Authorization"].FirstOrDefault() ?? Request.Headers["X-Webhook-Secret"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(signature))
+        if (string.IsNullOrWhiteSpace(signature))
         {
-            if (signature.StartsWith("Apikey ", StringComparison.OrdinalIgnoreCase))
-            {
-                signature = signature.Substring("Apikey ".Length).Trim();
-            }
-            else if (signature.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-            {
-                signature = signature.Substring("Bearer ".Length).Trim();
-            }
+            return BadRequest(new { success = false, message = "Thiếu chữ ký xác thực webhook (Authorization / X-Webhook-Secret)." });
+        }
+
+        if (signature.StartsWith("Apikey ", StringComparison.OrdinalIgnoreCase))
+        {
+            signature = signature.Substring("Apikey ".Length).Trim();
+        }
+        else if (signature.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        {
+            signature = signature.Substring("Bearer ".Length).Trim();
+        }
+
+        if (string.IsNullOrWhiteSpace(signature))
+        {
+            return BadRequest(new { success = false, message = "Chữ ký xác thực webhook không hợp lệ." });
         }
 
         var success = await _orderService.ProcessPaymentWebhookAsync(payload, signature);

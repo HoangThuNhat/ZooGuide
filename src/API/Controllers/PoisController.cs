@@ -154,10 +154,10 @@ public class PoisController : ControllerBase
     // --- NARRATION & AUDIO MANAGEMENT ---
 
     /// <summary>
-    /// Danh sách bài thuyết minh đa ngôn ngữ của điểm tham quan
+    /// Danh sách bài thuyết minh đa ngôn ngữ của điểm tham quan (Dành cho Quản trị viên / Nhân viên biên tập)
     /// </summary>
     [HttpGet("{id:int}/narrations")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<PoiNarrationDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetNarrations(int id)
     {

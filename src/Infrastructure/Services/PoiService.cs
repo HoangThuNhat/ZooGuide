@@ -381,9 +381,9 @@ public class PoiService : IPoiService
 
         var targetCode = (languageCode ?? "vi").Trim().ToLowerInvariant();
 
-        // 1. Exact language match
+        // 1. Exact language match (ưu tiên bản đã Published có file âm thanh)
         var narration = poi.Narrations
-            .FirstOrDefault(n => n.Language.Code.ToLowerInvariant() == targetCode && n.Status == NarrationStatus.Published);
+            .FirstOrDefault(n => n.Language.Code.ToLowerInvariant() == targetCode && n.Status == NarrationStatus.Published && !string.IsNullOrWhiteSpace(n.AudioUrl));
 
         bool isFallback = false;
         string? fallbackMessage = null;
@@ -392,6 +392,7 @@ public class PoiService : IPoiService
         if (narration == null && targetCode != "vi")
         {
             narration = poi.Narrations
+                .OrderByDescending(n => !string.IsNullOrWhiteSpace(n.AudioUrl))
                 .FirstOrDefault(n => n.Language.Code.ToLowerInvariant() == "vi" && n.Status == NarrationStatus.Published);
             if (narration != null)
             {
@@ -404,6 +405,7 @@ public class PoiService : IPoiService
         if (narration == null && targetCode != "en")
         {
             narration = poi.Narrations
+                .OrderByDescending(n => !string.IsNullOrWhiteSpace(n.AudioUrl))
                 .FirstOrDefault(n => n.Language.Code.ToLowerInvariant() == "en" && n.Status == NarrationStatus.Published);
             if (narration != null)
             {
@@ -412,10 +414,18 @@ public class PoiService : IPoiService
             }
         }
 
-        // 4. Any published narration
+        // 4. Exact language match without audio (text-only published narration)
         if (narration == null)
         {
             narration = poi.Narrations
+                .FirstOrDefault(n => n.Language.Code.ToLowerInvariant() == targetCode && n.Status == NarrationStatus.Published);
+        }
+
+        // 5. Any published narration
+        if (narration == null)
+        {
+            narration = poi.Narrations
+                .OrderByDescending(n => !string.IsNullOrWhiteSpace(n.AudioUrl))
                 .FirstOrDefault(n => n.Status == NarrationStatus.Published);
             if (narration != null)
             {
@@ -489,7 +499,7 @@ public class PoiService : IPoiService
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
             NarrationCount = narrations.Count,
-            HasAudio = narrations.Any(n => !string.IsNullOrWhiteSpace(n.AudioUrl)),
+            HasAudio = narrations.Any(n => string.Equals(n.Status, "Published", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(n.AudioUrl)),
             Narrations = narrations
         };
     }

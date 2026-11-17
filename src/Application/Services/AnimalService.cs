@@ -131,6 +131,8 @@ public class AnimalService : IAnimalService
                 Status = animal.Enclosure.Status,
                 MapX = animal.Enclosure.MapX,
                 MapY = animal.Enclosure.MapY,
+                Latitude = animal.Enclosure.Latitude,
+                Longitude = animal.Enclosure.Longitude,
                 CreatedAt = animal.Enclosure.CreatedAt,
                 UpdatedAt = animal.Enclosure.UpdatedAt
             }

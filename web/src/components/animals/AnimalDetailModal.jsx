@@ -25,6 +25,9 @@ export default function AnimalDetailModal({ onPlayAudio, onNavigate }) {
     if (!selectedAnimalForDetail) return null;
     const animal = localizedAnimal || selectedAnimalForDetail;
     const displayName = animal.name || animal.nameVi;
+    const enclosureDisplay = animal.enclosureName || animal.enclosure?.name || (animal.enclosureCode ? `Chuồng ${animal.enclosureCode}` : null);
+    const lat = animal.enclosure?.latitude ?? animal.area?.latitude ?? null;
+    const lng = animal.enclosure?.longitude ?? animal.area?.longitude ?? null;
 
     return (
         <div id="animal-detail-modal" className="modal-overlay" role="dialog" aria-modal="true">
@@ -90,6 +93,18 @@ export default function AnimalDetailModal({ onPlayAudio, onNavigate }) {
                         <div>
                             <span className="ticket-meta-label text-muted">IUCN</span>
                             <p id="detail-modal-breeding" className="font-semibold text-sm">{animal.iucnStatus || '—'}</p>
+                        </div>
+                        <div>
+                            <span className="ticket-meta-label text-muted">{t?.mapEnclosuresLabel || 'Chuồng nuôi'}</span>
+                            <p id="detail-modal-enclosure" className="font-semibold text-sm">
+                                {enclosureDisplay ? `${enclosureDisplay}${animal.enclosureCode ? ` (${animal.enclosureCode})` : ''}` : (animal.zoneName || '—')}
+                            </p>
+                        </div>
+                        <div>
+                            <span className="ticket-meta-label text-muted">Tọa độ vị trí (WGS84)</span>
+                            <p id="detail-modal-coords" className="font-semibold text-sm">
+                                {lat != null && lng != null ? `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}` : '10.78760, 106.70530'}
+                            </p>
                         </div>
                     </div>
 

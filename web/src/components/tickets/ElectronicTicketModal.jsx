@@ -45,7 +45,7 @@ export default function ElectronicTicketModal() {
     } else {
         // Thử tìm vé vừa mua trong sessionStorage
         try {
-            const rawOrder = sessionStorage.getItem('zooguide_pending_order');
+            const rawOrder = sessionStorage.getItem('zooguide_pending_ticket_order') || sessionStorage.getItem('zooguide_pending_order');
             if (rawOrder) {
                 const parsedOrder = JSON.parse(rawOrder);
                 const tks = parsedOrder.issuedTickets || parsedOrder.tickets || [];

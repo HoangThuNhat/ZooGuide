@@ -33,8 +33,10 @@ export default function SpeciesNarrationModal({
         if (currentLang) setSelectedLang(currentLang);
     }, [currentLang]);
 
+    const targetSpeciesId = species?.speciesId || species?.id;
+
     useEffect(() => {
-        if (!isOpen || !species) return;
+        if (!isOpen || !species || !targetSpeciesId) return;
 
         let isMounted = true;
         async function fetchSpeciesDetailsAndNarration() {
@@ -44,12 +46,12 @@ export default function SpeciesNarrationModal({
                 // Fetch localized species & resident animals from Supabase
                 const [spRes, animRes] = await Promise.all([
                     ZooApi.getSpecies({ lang: selectedLang }),
-                    ZooApi.getAnimals({ speciesId: species.id, lang: selectedLang })
+                    ZooApi.getAnimals({ speciesId: targetSpeciesId, lang: selectedLang })
                 ]);
 
                 if (isMounted) {
                     if (spRes.success && Array.isArray(spRes.data)) {
-                        const foundSp = spRes.data.find(s => Number(s.id) === Number(species.id));
+                        const foundSp = spRes.data.find(s => Number(s.id) === Number(targetSpeciesId));
                         if (foundSp) setLocalizedSpecies(foundSp);
                         else setLocalizedSpecies(species);
                     } else {
@@ -68,21 +70,11 @@ export default function SpeciesNarrationModal({
                     return;
                 }
 
-                const res = await ZooApi.getSpeciesNarration(species.id, selectedLang, currentSession.sessionId);
+                const res = await ZooApi.getSpeciesNarration(targetSpeciesId, selectedLang, currentSession.sessionId);
                 if (isMounted) {
                     if (res.success && res.data) {
-                        const actualLang = (res.data.languageCode || '').toLowerCase();
-                        const reqLang = (selectedLang || '').toLowerCase();
-                        if (res.data.isFallbackLanguage || (actualLang && reqLang && actualLang !== reqLang)) {
-                            setNarration(null);
-                            setNarrationError(
-                                t?.narrationMissingDesc ||
-                                `Chưa có bản thu âm và nội dung thuyết minh cho ngôn ngữ "${selectedLang.toUpperCase()}".`
-                            );
-                        } else {
-                            setNarration(res.data);
-                            setNarrationError('');
-                        }
+                        setNarration(res.data);
+                        setNarrationError('');
                     } else {
                         setNarration(null);
                         setNarrationError(res.message || t?.narrationMissingDesc || 'Chưa có bài thuyết minh cho ngôn ngữ này.');
@@ -101,7 +93,7 @@ export default function SpeciesNarrationModal({
 
         fetchSpeciesDetailsAndNarration();
         return () => { isMounted = false; };
-    }, [isOpen, species, selectedLang, hasActiveSession, currentSession, t]);
+    }, [isOpen, species, targetSpeciesId, selectedLang, hasActiveSession, currentSession, t]);
 
     if (!isOpen || !species) return null;
 
@@ -110,8 +102,8 @@ export default function SpeciesNarrationModal({
         audioState.isVisible &&
         audioState.isPlaying &&
         audioState.narration &&
-        Number(audioState.narration.speciesId) === Number(species.id) &&
-        audioState.narration.languageCode === selectedLang;
+        Number(audioState.narration.speciesId) === Number(targetSpeciesId) &&
+        (audioState.narration.languageCode === selectedLang || audioState.narration.languageCode === narration?.languageCode);
 
     const getIucnColor = (status) => {
         if (!status) return '#64748B';
@@ -142,7 +134,7 @@ export default function SpeciesNarrationModal({
             return;
         }
         if (onPlayAudio) {
-            onPlayAudio(species.id, true, narration?.languageCode || selectedLang);
+            onPlayAudio(targetSpeciesId, true, selectedLang);
         }
     };
 

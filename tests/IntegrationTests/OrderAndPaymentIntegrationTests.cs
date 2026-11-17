@@ -289,6 +289,11 @@ public class OrderAndPaymentIntegrationTests : IDisposable
             ReferenceCode = "REF-CTRL-SEPAY"
         };
 
+        // 0. Không gửi header chữ ký (Webhook thiếu chữ ký) -> BadRequest (400)
+        var missingSigResult = await controller.HandleWebhook(payload);
+        var missingSigResponse = Assert.IsType<BadRequestObjectResult>(missingSigResult);
+        Assert.Equal(StatusCodes.Status400BadRequest, missingSigResponse.StatusCode);
+
         // 1. Gửi header sai -> BadRequest (400)
         httpContext.Request.Headers["Authorization"] = "Bearer WrongSecret";
         var badResult = await controller.HandleWebhook(payload);
@@ -300,6 +305,126 @@ public class OrderAndPaymentIntegrationTests : IDisposable
         var okResult = await controller.HandleWebhook(payload);
         var okResponse = Assert.IsType<OkObjectResult>(okResult);
         Assert.Equal(StatusCodes.Status200OK, okResponse.StatusCode);
+    }
+
+    [Fact]
+    public async Task PaymentWebhook_And_Sandbox_WhenOrderExpired_ShouldRejectAndNotIssueTickets()
+    {
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 1,
+            Quantity = 2,
+            CustomerName = "Khách Quá Hạn",
+            CustomerEmail = "expired@zooguide.vn",
+            CustomerPhone = "0905556666"
+        });
+
+        // Giả lập đơn hàng đã quá thời hạn 15 phút
+        var dbOrder = await _context.TicketOrders.FindAsync(order.OrderId);
+        dbOrder!.ExpiresAt = DateTime.UtcNow.AddMinutes(-2);
+        await _context.SaveChangesAsync();
+
+        // 1. Webhook đến khi đơn đã quá hạn -> Phải từ chối và chuyển trạng thái sang Expired
+        var webhookResult = await _orderService.ProcessPaymentWebhookAsync(new PaymentWebhookPayload
+        {
+            TransferAmount = order.TotalAmount,
+            Content = $"THANH TOAN {order.PaymentDescription}",
+            ReferenceCode = "REF-EXPIRED-01"
+        });
+        Assert.False(webhookResult);
+
+        var orderAfterWebhook = await _orderService.GetByOrderCodeAsync(order.OrderCode);
+        Assert.Equal(PaymentStatus.Expired, orderAfterWebhook!.PaymentStatus);
+        Assert.Empty(orderAfterWebhook.IssuedTickets);
+
+        // 2. Sandbox thanh toán đơn quá hạn -> Phải ném ngoại lệ
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _orderService.SimulateSandboxPaymentAsync(new SimulatePaymentRequest
+            {
+                OrderCode = order.OrderCode,
+                Amount = order.TotalAmount
+            }));
+    }
+
+    [Fact]
+    public async Task PaymentWebhook_ConcurrentSimultaneousCalls_ShouldIssueTicketsExactlyOnce()
+    {
+        var order = await _orderService.CreateOrderAsync(new CreateOrderRequest
+        {
+            TicketTypeId = 1,
+            Quantity = 2,
+            CustomerName = "Khách Đồng Thời",
+            CustomerEmail = "concurrent@zooguide.vn",
+            CustomerPhone = "0907778888"
+        });
+
+        var payload = new PaymentWebhookPayload
+        {
+            TransferAmount = order.TotalAmount,
+            Content = $"THANH TOAN {order.PaymentDescription}",
+            ReferenceCode = "REF-CONCURRENT-01"
+        };
+
+        // Gửi 2 webhook đồng thời
+        var results = await Task.WhenAll(
+            _orderService.ProcessPaymentWebhookAsync(payload),
+            _orderService.ProcessPaymentWebhookAsync(payload)
+        );
+
+        Assert.All(results, Assert.True);
+        var ticketsInDb = await _context.Tickets.Where(t => t.OrderId == order.OrderId).ToListAsync();
+        Assert.Equal(2, ticketsInDb.Count);
+    }
+
+    [Fact]
+    public async Task TicketValidation_ConcurrentTwoDevices_ShouldAllowOnlyOneSession()
+    {
+        var ticket = await _ticketService.CreateAsync(new TicketCreateRequest
+        {
+            TicketTypeId = 1,
+            CustomerName = "Khách Hai Thiết Bị"
+        });
+
+        // Hai thiết bị gửi yêu cầu kích hoạt cùng một vé tại cùng thời điểm
+        var results = await Task.WhenAll(
+            _ticketService.ValidateAsync(new ValidateTicketRequest { TicketCode = ticket.TicketCode }),
+            _ticketService.ValidateAsync(new ValidateTicketRequest { TicketCode = ticket.TicketCode })
+        );
+
+        Assert.Single(results, r => r.Valid);
+        Assert.Single(results, r => !r.Valid && r.ErrorCode == "TICKET_ALREADY_USED");
+
+        var sessionsInDb = await _context.TicketSessions.Where(s => s.TicketId == ticket.TicketId).ToListAsync();
+        Assert.Single(sessionsInDb);
+    }
+
+    [Fact]
+    public async Task TicketsController_ExitSession_RepeatedCalls_SecondCallShouldReturnNotFound()
+    {
+        var ticket = await _ticketService.CreateAsync(new TicketCreateRequest
+        {
+            TicketTypeId = 1,
+            CustomerName = "Khách Thoát Nhiều Lần"
+        });
+        var validate = await _ticketService.ValidateAsync(new ValidateTicketRequest { TicketCode = ticket.TicketCode });
+        Assert.True(validate.Valid);
+
+        var controller = new TicketsController(_ticketService, _ticketSessionService);
+
+        // Lần 1: Thoát phiên thành công (200 OK)
+        var exit1 = await controller.ExitSession(new ExitSessionRequest { SessionId = validate.SessionId.ToString() });
+        Assert.IsType<OkObjectResult>(exit1);
+
+        var sessionAfterFirstExit = await _context.TicketSessions.FirstAsync(s => s.SessionId == validate.SessionId);
+        var firstEndedAt = sessionAfterFirstExit.EndedAt;
+        Assert.NotNull(firstEndedAt);
+
+        // Lần 2: Gửi lặp yêu cầu kết thúc -> Phải trả về 404 NotFound và giữ nguyên EndedAt ban đầu
+        var exit2 = await controller.ExitSession(new ExitSessionRequest { SessionId = validate.SessionId.ToString() });
+        Assert.IsType<NotFoundObjectResult>(exit2);
+
+        var sessionAfterSecondExit = await _context.TicketSessions.FirstAsync(s => s.SessionId == validate.SessionId);
+        Assert.Equal(firstEndedAt, sessionAfterSecondExit.EndedAt);
     }
 
     [Fact]

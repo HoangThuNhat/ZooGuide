@@ -6,15 +6,24 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
     const { setSelectedAnimalForDetail, filterZone, setFilterZone, currentLang, t } = useApp();
     const [animals, setAnimals] = useState([]);
     const [areas, setAreas] = useState([]);
+    const [speciesList, setSpeciesList] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedSpecies, setSelectedSpecies] = useState('all');
     const [selectedIucn, setSelectedIucn] = useState('all');
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
+    const [reloadCounter, setReloadCounter] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
         ZooApi.getAreas(currentLang).then(res => {
             if (isMounted && res.success) {
                 setAreas((res.data || []).filter(a => a.status !== 'Closed' && a.status !== '3'));
+            }
+        });
+        ZooApi.getSpecies({ lang: currentLang }).then(res => {
+            if (isMounted && res.success) {
+                setSpeciesList(res.data || []);
             }
         });
         return () => { isMounted = false; };
@@ -24,9 +33,11 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
         let isMounted = true;
         const fetchAnimals = async () => {
             setLoading(true);
+            setLoadError('');
             const res = await ZooApi.getAnimals({
                 search: searchTerm,
                 zoneId: filterZone,
+                speciesId: selectedSpecies !== 'all' ? selectedSpecies : undefined,
                 iucnStatus: selectedIucn,
                 lang: currentLang
             });
@@ -35,6 +46,7 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                     setAnimals(res.data || []);
                 } else {
                     setAnimals([]);
+                    setLoadError(res.message || 'Không thể tải danh sách động vật từ máy chủ.');
                 }
                 setLoading(false);
             }
@@ -45,7 +57,7 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
             isMounted = false;
             clearTimeout(timer);
         };
-    }, [searchTerm, filterZone, selectedIucn, currentLang]);
+    }, [searchTerm, filterZone, selectedSpecies, selectedIucn, currentLang, reloadCounter]);
 
     const getIucnBadgeClass = (status) => {
         if (!status) return 'badge-success';
@@ -59,6 +71,7 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
     const handleResetFilters = () => {
         setSearchTerm('');
         setFilterZone('all');
+        setSelectedSpecies('all');
         setSelectedIucn('all');
     };
 
@@ -81,6 +94,21 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+
+                    <select
+                        id="filter-species-select"
+                        className="filter-select"
+                        aria-label="Filter by species"
+                        value={selectedSpecies}
+                        onChange={(e) => setSelectedSpecies(e.target.value)}
+                    >
+                        <option value="all">{t?.animalFamilyLabel || 'Loài'}: {t?.filterAll || 'Tất cả'}</option>
+                        {speciesList.map(sp => (
+                            <option key={sp.id || sp.speciesId} value={sp.id || sp.speciesId}>
+                                {sp.name || sp.nameVi}
+                            </option>
+                        ))}
+                    </select>
 
                     <select
                         id="filter-iucn-select"
@@ -146,6 +174,18 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                             </div>
                         </div>
                     ))}
+                </div>
+            ) : loadError ? (
+                <div id="animals-error-state" className="empty-state" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#B91C1C' }}>
+                    <h4 className="font-bold text-base mb-2">⚠️ Không thể tải danh sách động vật</h4>
+                    <p className="text-sm mb-4">{loadError}</p>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-primary"
+                        onClick={() => setReloadCounter(c => c + 1)}
+                    >
+                        Thử lại
+                    </button>
                 </div>
             ) : animals.length === 0 ? (
                 <div id="animals-empty-state" className="empty-state">

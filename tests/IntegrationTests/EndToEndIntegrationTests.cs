@@ -866,4 +866,58 @@ public class EndToEndIntegrationTests : IDisposable
         // KPI 7: Kiểm tra bản nháp thuyết minh
         Assert.Equal(1, stats.OverviewKpis.DraftNarrationsCount);
     }
+
+    // ==========================================
+    // K. TEST AREA NAVIGATION (HAVERSINE & GEOFENCE) & ENCLOSURE WGS84 MAPPING (UC01, UC02, UC04)
+    // ==========================================
+    [Fact]
+    public async Task AreaAndAnimalServices_ShouldMapEnclosureLatitudeLongitude_AndComputeHaversineNavigation()
+    {
+        var enc = new Enclosure
+        {
+            EnclosureId = 10,
+            AreaId = 1,
+            Code = "ENC-LIO-01",
+            Name = "Chuồng Sư Tử Hoàng Gia",
+            Latitude = 10.788200m,
+            Longitude = 106.705100m,
+            Status = "Active"
+        };
+        _context.Enclosures.Add(enc);
+
+        var simba = await _context.Animals.FindAsync(1);
+        simba!.EnclosureId = 10;
+        await _context.SaveChangesAsync();
+
+        var areaRepo = new AreaRepository(_context);
+        var animalRepo = new AnimalRepository(_context);
+        var areaService = new ZooGuide.Application.Services.AreaService(areaRepo);
+        var animalService = new ZooGuide.Application.Services.AnimalService(animalRepo);
+
+        // 1. Kiểm tra AreaService trả về đúng tọa độ WGS84 của Enclosure
+        var areaDto = await areaService.GetAreaByIdAsync(1);
+        Assert.NotNull(areaDto);
+        Assert.Single(areaDto.Enclosures);
+        Assert.Equal(10.788200m, areaDto.Enclosures[0].Latitude);
+        Assert.Equal(106.705100m, areaDto.Enclosures[0].Longitude);
+
+        // 2. Kiểm tra AnimalService trả về đúng tọa độ WGS84 của Enclosure
+        var animalDetail = await animalService.GetAnimalByIdAsync(1);
+        Assert.NotNull(animalDetail);
+        Assert.NotNull(animalDetail.Enclosure);
+        Assert.Equal(10.788200m, animalDetail.Enclosure.Latitude);
+        Assert.Equal(106.705100m, animalDetail.Enclosure.Longitude);
+
+        // 3. Kiểm tra Haversine & Geofence khi đứng trong bán kính 60m của Area 1 (10.7875, 106.7052)
+        var navInside = await areaService.GetNavigationToAreaAsync(1, 10.7876m, 106.7052m);
+        Assert.NotNull(navInside);
+        Assert.True(navInside.IsInsideArea);
+        Assert.True(navInside.DistanceMeters < 60);
+
+        // 4. Kiểm tra Haversine khi đứng ngoài bán kính 60m (cách ~300m)
+        var navOutside = await areaService.GetNavigationToAreaAsync(1, 10.7850m, 106.7040m);
+        Assert.NotNull(navOutside);
+        Assert.False(navOutside.IsInsideArea);
+        Assert.True(navOutside.DistanceMeters > 60);
+    }
 }

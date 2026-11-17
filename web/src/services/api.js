@@ -778,7 +778,7 @@ export const ZooApi = {
                     zonesAllowed: ['ALL'],
                     hasAudioGuide: true,
                     activatedAt: new Date().toISOString(),
-                    expiresAt: data.validUntil || new Date(Date.now() + 8 * 3600 * 1000).toISOString()
+                    expiresAt: data.expiresAt || data.validUntil || new Date(Date.now() + 8 * 3600 * 1000).toISOString()
                 };
                 return {
                     success: true,
@@ -847,6 +847,8 @@ export const ZooApi = {
                         hasTranslation: e.hasTranslation !== false,
                         mapX: e.mapX != null ? Number(e.mapX) : null,
                         mapY: e.mapY != null ? Number(e.mapY) : null,
+                        latitude: e.latitude != null ? Number(e.latitude) : null,
+                        longitude: e.longitude != null ? Number(e.longitude) : null,
                         animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
                         animals: (e.animals || []).map(mapAnimalDto)
                     }))
@@ -870,6 +872,33 @@ export const ZooApi = {
                 };
             }
             return { success: false, data: [], message: 'Không thể tải danh sách khu vực từ cơ sở dữ liệu.' };
+        }
+    },
+
+    async getAreaNavigation(areaId, lat, lng, sessionId = null) {
+        if (!areaId || !Number.isFinite(Number(lat)) || !Number.isFinite(Number(lng))) {
+            return { success: false, message: 'Tọa độ điều hướng không hợp lệ.' };
+        }
+        try {
+            const headers = {};
+            if (sessionId) headers['X-Session-Id'] = String(sessionId);
+            const qs = new URLSearchParams({
+                lat: String(lat),
+                lng: String(lng),
+                ...(sessionId ? { sessionId: String(sessionId) } : {})
+            }).toString();
+            const res = await fetch(`${API_CONFIG.BASE_URL}/areas/${encodeURIComponent(areaId)}/navigation?${qs}`, { headers });
+            const json = await res.json().catch(() => null);
+            if (!res.ok) {
+                return {
+                    success: false,
+                    unauthorized: res.status === 401,
+                    message: json?.message || `HTTP ${res.status}`
+                };
+            }
+            return { success: true, data: json?.data || json };
+        } catch (err) {
+            return { success: false, message: err.message };
         }
     },
 
@@ -907,6 +936,8 @@ export const ZooApi = {
                 hasTranslation: e.hasTranslation !== false,
                 mapX: e.mapX != null ? Number(e.mapX) : null,
                 mapY: e.mapY != null ? Number(e.mapY) : null,
+                latitude: e.latitude != null ? Number(e.latitude) : null,
+                longitude: e.longitude != null ? Number(e.longitude) : null,
                 animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
                 animals: (e.animals || []).map(mapAnimalDto)
             }));
@@ -975,7 +1006,9 @@ export const ZooApi = {
                 imageUrl: data.imageUrl?.trim() || '',
                 status: data.status || 'Active',
                 mapX: data.mapX ? parseFloat(data.mapX) : null,
-                mapY: data.mapY ? parseFloat(data.mapY) : null
+                mapY: data.mapY ? parseFloat(data.mapY) : null,
+                latitude: data.latitude != null && data.latitude !== '' ? parseFloat(data.latitude) : null,
+                longitude: data.longitude != null && data.longitude !== '' ? parseFloat(data.longitude) : null
             };
             const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures`, {
                 method: 'POST',
@@ -1004,7 +1037,9 @@ export const ZooApi = {
                 imageUrl: data.imageUrl?.trim() || '',
                 status: data.status || 'Active',
                 mapX: data.mapX ? parseFloat(data.mapX) : null,
-                mapY: data.mapY ? parseFloat(data.mapY) : null
+                mapY: data.mapY ? parseFloat(data.mapY) : null,
+                latitude: data.latitude != null && data.latitude !== '' ? parseFloat(data.latitude) : null,
+                longitude: data.longitude != null && data.longitude !== '' ? parseFloat(data.longitude) : null
             };
             const res = await authFetch(`${API_CONFIG.BASE_URL}/enclosures/${id}`, {
                 method: 'PUT',
@@ -1239,7 +1274,8 @@ export const ZooApi = {
                         ? `${Math.floor(durationSec / 60).toString().padStart(2, '0')}:${(durationSec % 60).toString().padStart(2, '0')}`
                         : '--:--',
                     hasAudio: hasRealAudio,
-                    audioSrc: publicAudioUrl || streamUrl,
+                    audioSrc: streamUrl || publicAudioUrl,
+                    streamUrl,
                     audioUrl: publicAudioUrl || n.audioUrl || null,
                     publicUrl: publicAudioUrl || n.publicUrl || null,
                     storageBucket: n.storageBucket || null,
@@ -1340,7 +1376,8 @@ export const ZooApi = {
                         ? `${Math.floor(durationSec / 60).toString().padStart(2, '0')}:${(durationSec % 60).toString().padStart(2, '0')}`
                         : '--:--',
                     hasAudio: hasRealAudio,
-                    audioSrc: publicAudioUrl || streamUrl,
+                    audioSrc: streamUrl || publicAudioUrl,
+                    streamUrl,
                     audioUrl: publicAudioUrl || n.audioUrl || null,
                     publicUrl: publicAudioUrl || n.publicUrl || null,
                     storageBucket: n.storageBucket || null,
@@ -1928,7 +1965,7 @@ export const ZooApi = {
         try {
             let ticketId = typeof idOrCode === 'number' ? idOrCode : null;
             if (!ticketId) {
-                const allRes = await fetch(`${API_CONFIG.BASE_URL}/tickets`);
+                const allRes = await authFetch(`${API_CONFIG.BASE_URL}/tickets`);
                 const allData = await allRes.json();
                 const ticket = allData.find(t => t.ticketCode === idOrCode || t.ticketId === Number(idOrCode));
                 if (!ticket) throw new Error('Không tìm thấy vé cần cập nhật');
@@ -2114,11 +2151,7 @@ export const ZooApi = {
             if (res.ok) {
                 return { success: true, message: data?.message || 'Đã thoát phiên tham quan thành công.' };
             }
-            if (res.status === 404) {
-                const fallbackRes = await this.revokeTicketSession(sessionId);
-                if (fallbackRes.success) return fallbackRes;
-            }
-            return { success: false, message: data?.message || 'Không thể kết thúc phiên tham quan từ máy chủ.' };
+            return { success: false, status: res.status, message: data?.message || 'Không thể kết thúc phiên tham quan từ máy chủ.' };
         } catch (err) {
             console.error('exitTicketSession error:', err);
             return { success: false, message: 'Lỗi kết nối đến máy chủ khi thoát phiên tham quan.' };
@@ -2267,7 +2300,7 @@ export const ZooApi = {
             if (filter.status) params.append('status', filter.status);
             if (filter.search) params.append('search', filter.search);
 
-            const res = await fetch(`${API_CONFIG.BASE_URL}/narrations?${params.toString()}`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/narrations?${params.toString()}`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             const list = Array.isArray(data) ? data : (data.data || []);
@@ -2656,7 +2689,7 @@ export const ZooApi = {
 
     async getPoiNarrations(poiId) {
         try {
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`);
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/pois/${poiId}/narrations`);
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const data = await res.json();
             return { success: true, data: data.data || data || [] };
