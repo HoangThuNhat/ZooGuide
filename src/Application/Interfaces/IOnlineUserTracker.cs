@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ZooGuide.Application.Interfaces;
 
@@ -80,4 +81,10 @@ public interface IOnlineUserTracker
     event Action<int, int>? OnCountsChanged;
 
     int GetActiveTicketBuyerDevicesCount();
+
+    /// <summary>
+    /// Lấy danh sách mã thiết bị đang hoạt động trong khoảng thời gian gần nhất.
+    /// Khi requireActivityProof = true, chỉ trả về thiết bị đã gửi heartbeat/tương tác thực sự (không chỉ mở socket).
+    /// </summary>
+    IReadOnlyCollection<string> GetActiveDeviceIds(int withinMinutes = 5, bool requireActivityProof = false);
 }

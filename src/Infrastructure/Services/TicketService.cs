@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using System.Threading;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs.Ticket;
 using ZooGuide.Application.Interfaces;
@@ -10,6 +11,7 @@ namespace ZooGuide.Infrastructure.Services;
 
 public class TicketService : ITicketService
 {
+    private static readonly SemaphoreSlim _validationLock = new(1, 1);
     private readonly ZooGuideDbContext _context;
     private readonly ITicketSessionService _ticketSessionService;
     private readonly IEmailService? _emailService;
@@ -327,102 +329,122 @@ public class TicketService : ITicketService
             };
         }
 
-        var normalizedCode = request.TicketCode.Trim().ToUpper();
-        var ticket = await _context.Tickets
-            .Include(t => t.TicketType)
-            .FirstOrDefaultAsync(t => t.TicketCode.ToUpper() == normalizedCode);
-
-        // 1. Kiểm tra tồn tại
-        if (ticket == null)
+        await _validationLock.WaitAsync();
+        try
         {
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_NOT_FOUND",
-                Message = "Không tìm thấy vé trong hệ thống! Vui lòng kiểm tra lại mã vé hoặc liên hệ quầy vé ZooGuide." 
-            };
-        }
+            var normalizedCode = request.TicketCode.Trim().ToUpper();
+            var ticket = await _context.Tickets
+                .Include(t => t.TicketType)
+                .Include(t => t.Order)
+                .Include(t => t.TicketSessions)
+                .FirstOrDefaultAsync(t => t.TicketCode.ToUpper() == normalizedCode);
 
-        var now = DateTime.UtcNow;
+            // 1. Kiểm tra tồn tại
+            if (ticket == null)
+            {
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_NOT_FOUND",
+                    Message = "Không tìm thấy vé trong hệ thống! Vui lòng kiểm tra lại mã vé hoặc liên hệ quầy vé ZooGuide." 
+                };
+            }
 
-        // 2. Kiểm tra trạng thái bị hủy
-        if (ticket.Status == TicketStatus.Cancelled)
-        {
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_CANCELLED",
-                Message = $"Vé {ticket.TicketCode} đã bị hủy trên hệ thống." 
-            };
-        }
+            var now = DateTime.UtcNow;
 
-        // 3. Kiểm tra trạng thái bị khóa
-        if (ticket.Status == TicketStatus.Locked)
-        {
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_LOCKED",
-                Message = $"Vé {ticket.TicketCode} hiện đang bị tạm khóa. Vui lòng liên hệ ban quản lý ZooGuide." 
-            };
-        }
+            // 2. Kiểm tra trạng thái bị hủy
+            if (ticket.Status == TicketStatus.Cancelled)
+            {
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_CANCELLED",
+                    Message = $"Vé {ticket.TicketCode} đã bị hủy trên hệ thống." 
+                };
+            }
 
-        // 4. Kiểm tra vé đã sử dụng
-        if (ticket.Status == TicketStatus.Used)
-        {
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_ALREADY_USED",
-                Message = $"Vé {ticket.TicketCode} đã được kích hoạt sử dụng trước đó (lúc {ticket.UsedAt:yyyy-MM-dd HH:mm:ss})." 
-            };
-        }
+            // 3. Kiểm tra trạng thái bị khóa
+            if (ticket.Status == TicketStatus.Locked)
+            {
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_LOCKED",
+                    Message = $"Vé {ticket.TicketCode} hiện đang bị tạm khóa. Vui lòng liên hệ ban quản lý ZooGuide." 
+                };
+            }
 
-        // 5. Kiểm tra thời gian hiệu lực
-        if (now < ticket.ValidFrom)
-        {
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_NOT_YET_VALID",
-                Message = $"Vé {ticket.TicketCode} chưa đến thời gian có hiệu lực ({ticket.ValidFrom:yyyy-MM-dd})." 
-            };
-        }
+            // 3b. Kiểm tra điều kiện đơn hàng thanh toán (nếu vé gắn với đơn hàng chưa Paid)
+            if (ticket.Order != null && ticket.Order.PaymentStatus != PaymentStatus.Paid)
+            {
+                return new ValidateTicketResponse
+                {
+                    Valid = false,
+                    ErrorCode = "TICKET_NOT_ELIGIBLE",
+                    Message = $"Vé {ticket.TicketCode} chưa đủ điều kiện kích hoạt do đơn hàng chưa xác nhận thanh toán."
+                };
+            }
 
-        if (ticket.Status == TicketStatus.Expired || now > ticket.ValidUntil)
-        {
-            ticket.Status = TicketStatus.Expired;
+            // 4. Kiểm tra vé đã sử dụng hoặc đã có phiên tham quan hoạt động (chống kích hoạt trùng từ 2 thiết bị)
+            if (ticket.Status == TicketStatus.Used || (ticket.TicketSessions != null && ticket.TicketSessions.Any(s => s.Status == SessionStatus.Active && s.ExpiredAt > now)))
+            {
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_ALREADY_USED",
+                    Message = $"Vé {ticket.TicketCode} đã được kích hoạt sử dụng trước đó (lúc {ticket.UsedAt:yyyy-MM-dd HH:mm:ss})." 
+                };
+            }
+
+            // 5. Kiểm tra thời gian hiệu lực
+            if (now < ticket.ValidFrom)
+            {
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_NOT_YET_VALID",
+                    Message = $"Vé {ticket.TicketCode} chưa đến thời gian có hiệu lực ({ticket.ValidFrom:yyyy-MM-dd})." 
+                };
+            }
+
+            if (ticket.Status == TicketStatus.Expired || now > ticket.ValidUntil)
+            {
+                ticket.Status = TicketStatus.Expired;
+                ticket.UpdatedAt = now;
+                await _context.SaveChangesAsync();
+                return new ValidateTicketResponse 
+                { 
+                    Valid = false, 
+                    ErrorCode = "TICKET_EXPIRED",
+                    Message = $"Vé {ticket.TicketCode} đã hết hạn sử dụng vào ngày {ticket.ValidUntil:yyyy-MM-dd}." 
+                };
+            }
+
+            // 6. Vé hợp lệ: Đánh dấu vé đã sử dụng và khởi tạo phiên tham quan (Ticket Session)
+            ticket.Status = TicketStatus.Used;
+            ticket.UsedAt = now;
             ticket.UpdatedAt = now;
             await _context.SaveChangesAsync();
-            return new ValidateTicketResponse 
-            { 
-                Valid = false, 
-                ErrorCode = "TICKET_EXPIRED",
-                Message = $"Vé {ticket.TicketCode} đã hết hạn sử dụng vào ngày {ticket.ValidUntil:yyyy-MM-dd}." 
+
+            var session = await _ticketSessionService.CreateSessionAsync(ticket.TicketId);
+
+            return new ValidateTicketResponse
+            {
+                Valid = true,
+                TicketId = ticket.TicketId,
+                TicketCode = ticket.TicketCode,
+                TicketTypeId = ticket.TicketTypeId,
+                TicketTypeName = ticket.TicketType?.Name ?? "Vé tham quan tiêu chuẩn",
+                Message = "Xác thực vé thành công! Phiên tham quan đã được mở khóa.",
+                SessionId = session.SessionId,
+                ValidUntil = ticket.ValidUntil,
+                ExpiresAt = session.ExpiredAt
             };
         }
-
-        // 6. Vé hợp lệ: Khởi tạo phiên tham quan (Ticket Session)
-        var session = await _ticketSessionService.CreateSessionAsync(ticket.TicketId);
-
-        // Đánh dấu vé đã sử dụng
-        ticket.Status = TicketStatus.Used;
-        ticket.UsedAt = now;
-        ticket.UpdatedAt = now;
-        await _context.SaveChangesAsync();
-
-        return new ValidateTicketResponse
+        finally
         {
-            Valid = true,
-            TicketId = ticket.TicketId,
-            TicketCode = ticket.TicketCode,
-            TicketTypeId = ticket.TicketTypeId,
-            TicketTypeName = ticket.TicketType?.Name ?? "Vé tham quan tiêu chuẩn",
-            Message = "Xác thực vé thành công! Phiên tham quan đã được mở khóa.",
-            SessionId = session.SessionId,
-            ValidUntil = ticket.ValidUntil,
-            ExpiresAt = session.ExpiredAt
-        };
+            _validationLock.Release();
+        }
     }
 
     /// <summary>

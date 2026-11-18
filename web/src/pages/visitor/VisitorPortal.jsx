@@ -400,10 +400,14 @@ export default function VisitorPortal() {
             return;
         }
 
-        // KIỂM TRA ĐA NGÔN NGỮ NGHIÊM NGẶT (TASK 4.4):
-        // Không phát nhầm file âm thanh của ngôn ngữ khác & không hiển thị nội dung không khớp ngôn ngữ đã chọn
+        // Hỗ trợ cơ chế ngôn ngữ dự phòng (Graceful Language Fallback - PRD 6.2 & UC03 A1):
+        // Nếu ngôn ngữ yêu cầu chưa có bản ghi âm xuất bản nhưng hệ thống có bản dự phòng hợp lệ (VI/EN),
+        // hiển thị thông báo minh bạch cho du khách và phát bản dự phòng.
         const returnedLang = (res.data.languageCode || '').trim().toLowerCase();
-        if (res.data.isFallbackLanguage || (returnedLang && returnedLang !== targetLang)) {
+        if (res.data.isFallbackLanguage) {
+            const fallbackNotice = res.data.fallbackMessage || `Chưa có bản ghi âm tiếng ${targetLang.toUpperCase()}. Hệ thống đang phát bản dự phòng (${returnedLang.toUpperCase()}).`;
+            showToast(fallbackNotice, 'info');
+        } else if (returnedLang && returnedLang !== targetLang && !res.data.hasAudio) {
             const missingLangMsg = `Loài "${res.data.speciesName || res.data.animalName || `#${speciesId}`}" hiện chưa có bản ghi âm và nội dung thuyết minh cho ngôn ngữ ${targetLang.toUpperCase()}.`;
             ZooApi.recordDashboardTelemetry({
                 category: 'AUDIO',
@@ -502,21 +506,26 @@ export default function VisitorPortal() {
         t
     ]);
 
-    const playAnimalAudio = useCallback(async (animalOrId, startAutoplay = true) => {
+    const playAnimalAudio = useCallback(async (animalOrId, startAutoplay = true, triggerSource = 'MANUAL_LIST') => {
         if (animalOrId && typeof animalOrId === 'object') {
             if (animalOrId.speciesId) {
-                return playSpeciesAudio(animalOrId.speciesId, startAutoplay, currentLang);
+                return playSpeciesAudio(animalOrId.speciesId, startAutoplay, currentLang, triggerSource);
             }
             if (animalOrId.id || animalOrId.animalId) {
-                return playSpeciesAudio(animalOrId.id || animalOrId.animalId, startAutoplay, currentLang);
+                const animalId = animalOrId.id || animalOrId.animalId;
+                const animalRes = await ZooApi.getAnimalById(animalId, currentLang);
+                if (animalRes.success && animalRes.data?.speciesId) {
+                    return playSpeciesAudio(animalRes.data.speciesId, startAutoplay, currentLang, triggerSource);
+                }
+                return playSpeciesAudio(animalId, startAutoplay, currentLang, triggerSource);
             }
         }
         const id = parseInt(animalOrId);
         const animalRes = await ZooApi.getAnimalById(id, currentLang);
         if (animalRes.success && animalRes.data?.speciesId) {
-            return playSpeciesAudio(animalRes.data.speciesId, startAutoplay, currentLang);
+            return playSpeciesAudio(animalRes.data.speciesId, startAutoplay, currentLang, triggerSource);
         }
-        return playSpeciesAudio(id, startAutoplay, currentLang);
+        return playSpeciesAudio(id, startAutoplay, currentLang, triggerSource);
     }, [currentLang, playSpeciesAudio]);
 
     const handleStopAudio = useCallback(() => {
@@ -818,11 +827,13 @@ export default function VisitorPortal() {
                 scientificName: 'Điểm tham quan (' + (data.category || 'POI') + ')'
             };
 
-            // KIỂM TRA ĐA NGÔN NGỮ NGHIÊM NGẶT (TASK 4.4):
-            // Không phát nhầm file âm thanh của ngôn ngữ khác & không hiển thị nội dung không khớp ngôn ngữ đã chọn
+            // Hỗ trợ cơ chế ngôn ngữ dự phòng (Graceful Language Fallback - PRD 6.2 & UC03 A1):
             const returnedLang = (data.languageCode || '').trim().toLowerCase();
-            if (data.isFallbackLanguage || (returnedLang && returnedLang !== targetLang)) {
-                const missingLangMsg = `Điểm tham quan "${data.poiName}" hiện chưa có bản ghi âm và nội dung thuyết minh cho ngôn ngữ ${targetLang.toUpperCase()} (hiện hỗ trợ: Tiếng Việt, English).`;
+            if (data.isFallbackLanguage) {
+                const fallbackNotice = data.fallbackMessage || `Điểm tham quan "${data.poiName}" chưa có bản thu âm tiếng ${targetLang.toUpperCase()}. Đang phát bản dự phòng (${returnedLang.toUpperCase()}).`;
+                showToast(fallbackNotice, 'info');
+            } else if (returnedLang && returnedLang !== targetLang && !data.hasAudio) {
+                const missingLangMsg = `Điểm tham quan "${data.poiName}" hiện chưa có bản ghi âm và nội dung thuyết minh cho ngôn ngữ ${targetLang.toUpperCase()}.`;
                 ZooApi.recordDashboardTelemetry({
                     category: 'AUDIO',
                     eventType: 'ERROR_LOAD_FILE',
@@ -867,7 +878,7 @@ export default function VisitorPortal() {
             }
 
             const duration = data.durationSeconds || 60;
-            const audioSource = data.audioUrl || data.streamUrl;
+            const audioSource = (data.hasAudio ? data.streamUrl : null) || data.audioUrl;
             const mins = Math.floor(duration / 60).toString().padStart(2, '0');
             const secs = (duration % 60).toString().padStart(2, '0');
             const paragraphs = (data.content || '')
@@ -895,7 +906,9 @@ export default function VisitorPortal() {
                 transcript: structuredTranscript,
                 durationFormatted: mins + ':' + secs,
                 durationSec: duration,
-                hasAudio: Boolean(audioSource)
+                hasAudio: Boolean(audioSource),
+                isFallbackLanguage: Boolean(data.isFallbackLanguage),
+                fallbackMessage: data.fallbackMessage || null
             };
             setAudioState(prev => ({
                 ...prev,

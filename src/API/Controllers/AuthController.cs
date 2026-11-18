@@ -86,7 +86,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Đăng xuất khỏi hệ thống quản trị và kết thúc phiên làm việc
+    /// Đăng xuất khỏi hệ thống quản trị và kết thúc phiên làm việc hiện tại
     /// </summary>
     [HttpPost("logout")]
     [Authorize]
@@ -96,7 +96,24 @@ public class AuthController : ControllerBase
         var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!string.IsNullOrEmpty(userIdClaim) && int.TryParse(userIdClaim, out var userId))
         {
-            await _authService.LogoutAsync(userId);
+            var jti = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Jti)?.Value
+                      ?? User.FindFirst("jti")?.Value;
+
+            DateTime? expiresAtUtc = null;
+            var absExpTicksClaim = User.FindFirst("abs_exp_ticks")?.Value;
+            var expClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Exp)?.Value
+                           ?? User.FindFirst("exp")?.Value;
+
+            if (!string.IsNullOrWhiteSpace(absExpTicksClaim) && long.TryParse(absExpTicksClaim, out var absExpTicks))
+            {
+                expiresAtUtc = new DateTime(absExpTicks, DateTimeKind.Utc);
+            }
+            else if (!string.IsNullOrWhiteSpace(expClaim) && long.TryParse(expClaim, out var expUnix))
+            {
+                expiresAtUtc = DateTimeOffset.FromUnixTimeSeconds(expUnix).UtcDateTime;
+            }
+
+            await _authService.LogoutAsync(userId, jti, expiresAtUtc);
         }
 
         return Ok(ApiResponse<object>.Ok(new { message = "Đăng xuất thành công. Phiên làm việc đã kết thúc." }));

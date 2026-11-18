@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using ZooGuide.Application.Interfaces;
@@ -13,6 +14,7 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
         public string DeviceId { get; }
         public ConcurrentDictionary<string, DateTime> Connections { get; } = new();
         public DateTime LastSeenUtc { get; set; }
+        public DateTime? LastHeartbeatUtc { get; set; }
         public bool IsTicketBuyer { get; set; }
         public string? BuyerKey { get; set; }
         public string? OrderCode { get; set; }
@@ -115,6 +117,7 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
         if (_devices.TryGetValue(normalizedDeviceId, out var session))
         {
             session.LastSeenUtc = now;
+            session.LastHeartbeatUtc = now;
             session.Connections[connKey] = now;
             if (isTicketBuyer.HasValue && isTicketBuyer.Value)
             {
@@ -133,7 +136,8 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
         {
             var newSession = new DeviceSession(normalizedDeviceId, isTicketBuyer ?? false, normalizedBuyerKey, orderCode)
             {
-                LastSeenUtc = now
+                LastSeenUtc = now,
+                LastHeartbeatUtc = now
             };
             newSession.Connections[connKey] = now;
             _devices.TryAdd(normalizedDeviceId, newSession);
@@ -194,6 +198,20 @@ public int GetActiveTicketBuyerDevicesCount()
     {
         CleanupExpiredSessions();
         return _devices.Count;
+    }
+
+    public IReadOnlyCollection<string> GetActiveDeviceIds(int withinMinutes = 5, bool requireActivityProof = false)
+    {
+        CleanupExpiredSessions();
+        var cutoff = DateTime.UtcNow.AddMinutes(-Math.Max(1, withinMinutes));
+
+        return _devices.Values
+            .Where(d => !d.DeviceId.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase))
+            .Where(d => d.LastSeenUtc >= cutoff)
+            .Where(d => !requireActivityProof || (d.LastHeartbeatUtc.HasValue && d.LastHeartbeatUtc.Value >= cutoff))
+            .Select(d => d.DeviceId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     /// <summary>

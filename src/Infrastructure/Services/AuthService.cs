@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -20,9 +21,14 @@ public class AuthService : IAuthService
     private readonly ZooGuideDbContext _context;
     private readonly IConfiguration _configuration;
 
+    // Lưu trạng thái thu hồi JWT theo jti cho môi trường triển khai 1 Backend instance hiện tại
+    private static readonly ConcurrentDictionary<string, DateTime> _revokedTokens = new(StringComparer.Ordinal);
+
     public const string DefaultSecretKey = "ZooGuide_Secret_Key_For_JWT_Authentication_Token_2026_Secure!";
     public const string DefaultIssuer = "ZooGuideAPI";
     public const string DefaultAudience = "ZooGuideClients";
+    public const int AdminAbsoluteSessionHours = 8;
+    public const int AdminInactivityTimeoutMinutes = 15;
 
     public AuthService(ZooGuideDbContext context, IConfiguration configuration)
     {
@@ -64,9 +70,11 @@ public class AuthService : IAuthService
         }
 
         // Tự động nâng cấp hash legacy raw SHA-256 sang salted hash bảo mật
+        bool passwordHashUpgraded = false;
         if (string.Equals(user.PasswordHash, rawHash, StringComparison.OrdinalIgnoreCase))
         {
             user.PasswordHash = saltedHash;
+            passwordHashUpgraded = true;
         }
 
         // Kiểm tra trạng thái tài khoản
@@ -81,14 +89,18 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Tài khoản không có quyền truy cập vào phân hệ quản trị viên.");
         }
 
-        // Cập nhật thời điểm đăng nhập gần nhất
-        user.LastLoginAt = DateTime.UtcNow;
-        user.UpdatedAt = DateTime.UtcNow;
+        // Cập nhật thời điểm đăng nhập gần nhất (không dùng User.UpdatedAt làm trạng thái của JWT session)
+        var loginTime = TruncateToMillisecond(DateTime.UtcNow);
+        user.LastLoginAt = loginTime;
+        if (passwordHashUpgraded)
+        {
+            user.UpdatedAt = loginTime;
+        }
         await _context.SaveChangesAsync();
 
-        // Tạo JWT Token
-        var tokenExpiry = DateTime.UtcNow.AddHours(24);
-        var token = GenerateJwtToken(user, tokenExpiry);
+        // Tạo JWT Token với giới hạn phiên tuyệt đối tối đa 8 giờ kể từ lúc đăng nhập
+        var tokenExpiry = loginTime.AddHours(AdminAbsoluteSessionHours);
+        var token = GenerateJwtToken(user, loginTime, tokenExpiry);
 
         var profile = new UserProfileDto
         {
@@ -127,17 +139,59 @@ public class AuthService : IAuthService
         };
     }
 
-    public async Task<bool> LogoutAsync(int userId)
+    public async Task<bool> LogoutAsync(int userId, string? jti = null, DateTime? tokenExpiresAtUtc = null)
     {
-        var user = await _context.Users.FindAsync(userId);
+        var user = await _context.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserId == userId);
         if (user == null) return false;
 
-        user.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
+        var nowUtc = DateTime.UtcNow;
+        PruneExpiredRevokedTokens(nowUtc);
+
+        if (!string.IsNullOrWhiteSpace(jti))
+        {
+            var expiryUtc = tokenExpiresAtUtc.HasValue && tokenExpiresAtUtc.Value.ToUniversalTime() > nowUtc
+                ? tokenExpiresAtUtc.Value.ToUniversalTime()
+                : nowUtc.AddHours(AdminAbsoluteSessionHours);
+
+            _revokedTokens[jti.Trim()] = expiryUtc;
+        }
+
         return true;
     }
 
-    private string GenerateJwtToken(User user, DateTime expiresAt)
+    public bool IsTokenRevoked(string? jti)
+    {
+        if (string.IsNullOrWhiteSpace(jti))
+        {
+            return false;
+        }
+
+        var normalizedJti = jti.Trim();
+        if (_revokedTokens.TryGetValue(normalizedJti, out var expiresAtUtc))
+        {
+            if (expiresAtUtc > DateTime.UtcNow)
+            {
+                return true;
+            }
+
+            _revokedTokens.TryRemove(normalizedJti, out _);
+        }
+
+        return false;
+    }
+
+    private static void PruneExpiredRevokedTokens(DateTime nowUtc)
+    {
+        foreach (var entry in _revokedTokens)
+        {
+            if (entry.Value <= nowUtc)
+            {
+                _revokedTokens.TryRemove(entry.Key, out _);
+            }
+        }
+    }
+
+    private string GenerateJwtToken(User user, DateTime issuedAt, DateTime expiresAt)
     {
         var secretKey = _configuration["Jwt:SecretKey"] 
             ?? Environment.GetEnvironmentVariable("JWT_SECRET_KEY") 
@@ -148,6 +202,9 @@ public class AuthService : IAuthService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
         var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
+        var iatUnix = new DateTimeOffset(issuedAt).ToUnixTimeSeconds();
+        var absExpUnix = new DateTimeOffset(expiresAt).ToUnixTimeSeconds();
+
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.UserId.ToString()),
@@ -156,12 +213,18 @@ public class AuthService : IAuthService
             new Claim(ClaimTypes.Email, user.Email),
             new Claim("FullName", user.FullName ?? string.Empty),
             new Claim("Status", user.Status.ToString()),
-            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
+            new Claim(JwtRegisteredClaimNames.Iat, iatUnix.ToString(), ClaimValueTypes.Integer64),
+            new Claim("abs_exp", absExpUnix.ToString(), ClaimValueTypes.Integer64),
+            new Claim("login_ticks", issuedAt.Ticks.ToString()),
+            new Claim("abs_exp_ticks", expiresAt.Ticks.ToString())
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject = new ClaimsIdentity(claims),
+            NotBefore = issuedAt,
+            IssuedAt = issuedAt,
             Expires = expiresAt,
             Issuer = issuer,
             Audience = audience,
@@ -171,6 +234,12 @@ public class AuthService : IAuthService
         var tokenHandler = new JwtSecurityTokenHandler();
         var token = tokenHandler.CreateToken(tokenDescriptor);
         return tokenHandler.WriteToken(token);
+    }
+
+    private static DateTime TruncateToMillisecond(DateTime dt)
+    {
+        var utc = dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+        return new DateTime(utc.Ticks - (utc.Ticks % TimeSpan.TicksPerMillisecond), DateTimeKind.Utc);
     }
 
     private static string HashRaw(string password)

@@ -148,7 +148,7 @@ export default function AudioPlayerBar({
                                 background: 'rgba(255, 255, 255, 0.14)',
                                 color: '#E2E8F0'
                             }}>
-                                🌐 {langCode}
+                                🌐 {langCode}{narration.isFallbackLanguage ? ' (Dự phòng)' : ''}
                             </span>
                             <span style={{
                                 fontSize: '0.66rem',
@@ -289,6 +289,7 @@ export default function AudioPlayerBar({
                         <option value="1.0">1.0x</option>
                         <option value="1.25">1.25x</option>
                         <option value="1.5">1.5x</option>
+                        <option value="1.75">1.75x</option>
                     </select>
 
                     <button 

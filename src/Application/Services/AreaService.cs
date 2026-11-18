@@ -203,6 +203,8 @@ public class AreaService : IAreaService
                 Status = e.Status,
                 MapX = e.MapX,
                 MapY = e.MapY,
+                Latitude = e.Latitude,
+                Longitude = e.Longitude,
                 AnimalCount = activeAnimals.Count,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt,

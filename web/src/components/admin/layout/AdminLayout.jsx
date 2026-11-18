@@ -1,11 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { NavLink, Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import ZooApi, { getStoredUser } from '../../../services/api';
+import ZooApi, {
+    getStoredUser,
+    checkAdminSessionValidity,
+    recordAdminActivity,
+    expireAdminSession,
+    clearAuthSession,
+    AUTH_STORAGE_KEY,
+    AUTH_SESSION_META_KEY,
+    AUTH_BROADCAST_CHANNEL
+} from '../../../services/api';
+
+// Chỉ ghi nhận các tương tác thực sự của người dùng (loại trừ mousemove, mouseover, mouseenter, scroll)
+const VALID_ADMIN_ACTIVITY_EVENTS = [
+    'mousedown',
+    'keydown',
+    'input',
+    'change',
+    'submit',
+    'click',
+    'touchstart'
+];
 
 export default function AdminLayout() {
     const location = useLocation();
     const navigate = useNavigate();
     const [currentUser, setCurrentUser] = useState(() => getStoredUser());
+    const locationPathRef = useRef(`${location.pathname}${location.search || ''}`);
+
+    useEffect(() => {
+        locationPathRef.current = `${location.pathname}${location.search || ''}`;
+    }, [location.pathname, location.search]);
 
     // Persistent desktop sidebar state (default: open on desktop)
     const [isDesktopSidebarOpen, setIsDesktopSidebarOpen] = useState(() => {
@@ -24,6 +49,16 @@ export default function AdminLayout() {
         typeof window !== 'undefined' ? window.innerWidth > 1024 : true
     );
 
+    const redirectToLoginExpired = useCallback((reason = 'session_expired') => {
+        setCurrentUser(null);
+        const redirectParam = encodeURIComponent(locationPathRef.current || '/admin');
+        if (reason === 'manual_logout') {
+            navigate('/admin/login', { replace: true });
+        } else {
+            navigate(`/admin/login?redirect=${redirectParam}&reason=session_expired`, { replace: true });
+        }
+    }, [navigate]);
+
     useEffect(() => {
         const handleResize = () => {
             const isDesktop = window.innerWidth > 1024;
@@ -38,14 +73,134 @@ export default function AdminLayout() {
     }, []);
 
     useEffect(() => {
+        const validity = checkAdminSessionValidity();
+        if (!validity.valid) {
+            expireAdminSession(validity.reason || 'session_expired', { notifyBackend: true });
+            redirectToLoginExpired('session_expired');
+            return;
+        }
         const u = getStoredUser();
         if (u) setCurrentUser(u);
-    }, [location.pathname]);
+    }, [location.pathname, redirectToLoginExpired]);
+
+    // Bộ giám sát Inactivity Timeout (15 phút), Absolute Session Timeout (8 giờ) và đồng bộ đa tab
+    // Giữ tham chiếu ổn định để không bị reset timer khi chuyển qua lại giữa các trang Admin
+    useEffect(() => {
+        let isDisposed = false;
+
+        const verifyActiveSession = () => {
+            if (isDisposed) return false;
+            const validity = checkAdminSessionValidity();
+            if (!validity.valid) {
+                expireAdminSession(validity.reason || 'session_expired', { notifyBackend: true });
+                redirectToLoginExpired('session_expired');
+                return false;
+            }
+            return true;
+        };
+
+        const handleValidUserActivity = (event) => {
+            if (isDisposed) return;
+            // Bỏ qua các sự kiện tự động của trình duyệt không xuất phát từ thao tác người dùng
+            if (event && event.isTrusted === false) return;
+            const updated = recordAdminActivity();
+            if (!updated) {
+                const validity = checkAdminSessionValidity();
+                if (!validity.valid) {
+                    redirectToLoginExpired('session_expired');
+                }
+            }
+        };
+
+        const handleVisibilityOrFocus = () => {
+            if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+            verifyActiveSession();
+        };
+
+        const handleUnauthorizedEvent = (event) => {
+            if (isDisposed) return;
+            const reason = event?.detail?.reason || 'session_expired';
+            clearAuthSession({ broadcast: false, reason });
+            redirectToLoginExpired(reason);
+        };
+
+        const handleStorageChange = (event) => {
+            if (isDisposed) return;
+            if (
+                event.key === null ||
+                event.key === AUTH_STORAGE_KEY ||
+                event.key === AUTH_SESSION_META_KEY
+            ) {
+                const validity = checkAdminSessionValidity();
+                if (!validity.valid) {
+                    clearAuthSession({ broadcast: false });
+                    redirectToLoginExpired('session_expired');
+                }
+            }
+        };
+
+        let channel = null;
+        if (typeof window !== 'undefined' && typeof window.BroadcastChannel === 'function') {
+            try {
+                channel = new window.BroadcastChannel(AUTH_BROADCAST_CHANNEL);
+                channel.onmessage = (event) => {
+                    if (isDisposed) return;
+                    const msg = event?.data;
+                    if (msg?.type === 'ADMIN_SESSION_ENDED') {
+                        // Chỉ đồng bộ trạng thái và chuyển về trang đăng nhập, không gửi lại POST /api/auth/logout
+                        clearAuthSession({ broadcast: false, reason: msg.reason || 'session_expired' });
+                        redirectToLoginExpired(msg.reason || 'session_expired');
+                    } else if (msg?.type === 'ADMIN_LOGIN') {
+                        const u = getStoredUser();
+                        if (u) setCurrentUser(u);
+                    }
+                };
+            } catch {
+                channel = null;
+            }
+        }
+
+        // Kiểm tra ngay khi khởi tạo Layout
+        if (!verifyActiveSession()) {
+            return () => {
+                isDisposed = true;
+                if (channel) {
+                    try { channel.close(); } catch {}
+                }
+            };
+        }
+
+        VALID_ADMIN_ACTIVITY_EVENTS.forEach((evtName) => {
+            window.addEventListener(evtName, handleValidUserActivity, { capture: true, passive: true });
+        });
+        window.addEventListener('focus', handleVisibilityOrFocus);
+        document.addEventListener('visibilitychange', handleVisibilityOrFocus);
+        window.addEventListener('zooguide:unauthorized', handleUnauthorizedEvent);
+        window.addEventListener('storage', handleStorageChange);
+
+        const intervalId = window.setInterval(verifyActiveSession, 1000);
+
+        return () => {
+            isDisposed = true;
+            window.clearInterval(intervalId);
+            VALID_ADMIN_ACTIVITY_EVENTS.forEach((evtName) => {
+                window.removeEventListener(evtName, handleValidUserActivity, { capture: true });
+            });
+            window.removeEventListener('focus', handleVisibilityOrFocus);
+            document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
+            window.removeEventListener('zooguide:unauthorized', handleUnauthorizedEvent);
+            window.removeEventListener('storage', handleStorageChange);
+            if (channel) {
+                try { channel.close(); } catch {}
+            }
+        };
+    }, [redirectToLoginExpired]);
 
     const handleLogout = async () => {
         try {
-            await ZooApi.logout();
+            await ZooApi.logout({ reason: 'manual_logout' });
         } finally {
+            setCurrentUser(null);
             navigate('/admin/login', { replace: true });
         }
     };

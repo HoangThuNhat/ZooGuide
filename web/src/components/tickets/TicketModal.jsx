@@ -1,25 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ZooApi } from '../../services/api';
 
 export default function TicketModal() {
     const { isTicketModalOpen, setIsTicketModalOpen, validateTicketCode, switchTab, t } = useApp();
     const [inputCode, setInputCode] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [activeDbTickets, setActiveDbTickets] = useState([]);
-
-    useEffect(() => {
-        if (!isTicketModalOpen) return;
-        let isMounted = true;
-        ZooApi.getTickets().then(res => {
-            if (isMounted && res.success && Array.isArray(res.data)) {
-                const activeOnes = res.data.filter(tk => tk.status === 'Active').slice(0, 3);
-                setActiveDbTickets(activeOnes);
-            }
-        });
-        return () => { isMounted = false; };
-    }, [isTicketModalOpen]);
 
     if (!isTicketModalOpen) return null;
 

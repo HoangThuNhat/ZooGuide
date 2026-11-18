@@ -22,7 +22,11 @@ export default function AdminLoginPage() {
         if (ZooApi.isAuthenticated()) {
             navigate(redirectPath, { replace: true });
         }
-        if (reason === 'session_expired') {
+        if (
+            reason === 'session_expired' ||
+            reason === 'inactivity_timeout' ||
+            reason === 'absolute_timeout'
+        ) {
             setErrorMessage('Phiên làm việc đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
         } else if (reason === 'unauthorized') {
             setErrorMessage('Bạn cần đăng nhập bằng tài khoản quản trị để tiếp tục.');

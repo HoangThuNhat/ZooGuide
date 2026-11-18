@@ -76,16 +76,22 @@ public class DashboardService : IDashboardService
             utcTo = utcTo.Value.Date.AddDays(1).AddTicks(-1);
         }
 
-        // 1. Thiết bị đang hoạt động từ bảng DEVICE_ACTIVITIES
+        // 1. Thiết bị đang hoạt động từ bảng DEVICE_ACTIVITIES & SignalR Hub
         var cutoff60Sec = now.AddSeconds(-60);
         var cutoff5Min = now.AddMinutes(-5);
         var cutoff15Min = now.AddMinutes(-15);
 
         var totalTrackedDevices = await _context.DeviceActivities.AsNoTracking().CountAsync();
         var activeDevices60Sec = await _context.DeviceActivities.AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoff60Sec);
-        var activeDevices5Min = await _context.DeviceActivities.AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoff5Min);
+            .CountAsync(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff60Sec);
+        var dbActiveDeviceIds5Min = (await _context.DeviceActivities.AsNoTracking()
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff5Min && !string.IsNullOrEmpty(d.InstallationId))
+            .Select(d => d.InstallationId)
+            .ToListAsync())
+            .Select(id => id.Trim().ToLowerInvariant())
+            .Distinct()
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var activeDevices5Min = dbActiveDeviceIds5Min.Count;
 
         dbSw.Stop();
         var dbLatencyMs = Math.Max(1, dbSw.ElapsedMilliseconds);
@@ -94,7 +100,7 @@ public class DashboardService : IDashboardService
             _lastDbRecoveredUtc = now;
         }
 
-        // 2. Dữ liệu vé và đơn hàng (giữ tương thích ngược cho bộ kiểm thử hiện có)
+        // 2. Dữ liệu vé, đơn hàng và phân loại tài khoản (USERS)
         var allOrdersQuery = _context.TicketOrders.AsNoTracking().AsQueryable();
         var paidOrdersQuery = _context.TicketOrders
             .AsNoTracking()
@@ -115,32 +121,73 @@ public class DashboardService : IDashboardService
         }
 
         var filteredOrdersList = await allOrdersQuery.OrderByDescending(o => o.CreatedAt).ToListAsync();
+        var paidOrdersList = filteredOrdersList.Where(o => o.PaymentStatus == PaymentStatus.Paid).ToList();
+        var refundedOrdersList = filteredOrdersList.Where(o => o.PaymentStatus == PaymentStatus.Refunded).ToList();
+
         var totalOrders = filteredOrdersList.Count;
-        var paidOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Paid);
+        var paidOrders = paidOrdersList.Count;
         var pendingOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Pending);
         var failedOrExpiredOrders = filteredOrdersList.Count(o => o.PaymentStatus == PaymentStatus.Failed || o.PaymentStatus == PaymentStatus.Expired);
-        var totalRevenue = filteredOrdersList.Where(o => o.PaymentStatus == PaymentStatus.Paid).Sum(o => o.TotalAmount);
+        var refundedOrders = refundedOrdersList.Count;
 
-        var totalTicketBuyers = await paidOrdersQuery
+        var netRevenue = paidOrdersList.Sum(o => o.TotalAmount);
+        var refundedAmount = refundedOrdersList.Sum(o => o.TotalAmount);
+        var grossPaidRevenue = netRevenue + refundedAmount;
+        var totalRevenue = netRevenue;
+        double? orderCompletionRatePercent = totalOrders > 0
+            ? Math.Round(paidOrders * 100.0 / totalOrders, 1)
+            : (double?)null;
+
+        var totalTicketBuyers = paidOrdersList
             .Where(o => !string.IsNullOrEmpty(o.CustomerEmail))
             .Select(o => o.CustomerEmail.ToLower().Trim())
             .Distinct()
-            .CountAsync();
+            .Count();
 
-        var totalTicketsSold = await paidOrdersQuery.SumAsync(o => (int?)o.Quantity) ?? 0;
+        var totalTicketsSold = paidOrdersList.Sum(o => o.Quantity);
 
         var activeTicketBuyers = _onlineTracker?.GetActiveTicketBuyersCount() ?? 0;
-        var trackerActiveDevices = _onlineTracker?.GetActiveDevicesCount() ?? 0;
-        var activeDevices = Math.Max(trackerActiveDevices, activeDevices60Sec);
         var activeBuyerConnections = _onlineTracker?.GetActiveBuyerConnectionsCount() ?? 0;
+        var signalRConnectedIds = (_onlineTracker?.GetActiveDeviceIds(5, requireActivityProof: false) ?? Array.Empty<string>())
+            .Select(id => id.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var signalRVerifiedIds = (_onlineTracker?.GetActiveDeviceIds(5, requireActivityProof: true) ?? Array.Empty<string>())
+            .Select(id => id.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var totalTickets = await ticketQuery.CountAsync();
-        var validTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid && t.ValidUntil >= now);
-        var usedTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Used);
-        var cancelledTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Cancelled);
-        var activeTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
-        var expiredTickets = await ticketQuery.CountAsync(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
-        var totalUsers = await _context.Users.AsNoTracking().CountAsync();
+        var filteredTicketList = await ticketQuery.ToListAsync();
+        var totalTickets = filteredTicketList.Count;
+        var validTickets = filteredTicketList.Count(t => t.Status == TicketStatus.Valid && t.ValidUntil >= now);
+        var usedTickets = filteredTicketList.Count(t => t.Status == TicketStatus.Used);
+        var cancelledTickets = filteredTicketList.Count(t => t.Status == TicketStatus.Cancelled);
+        var activeTickets = filteredTicketList.Count(t => t.Status == TicketStatus.Valid || t.Status == TicketStatus.Used);
+        var expiredTickets = filteredTicketList.Count(t => t.Status == TicketStatus.Expired || (t.ValidUntil < now && t.Status != TicketStatus.Cancelled));
+
+        var paidOrderIds = paidOrdersList.Select(o => o.OrderId).ToHashSet();
+        var paidOrderTickets = paidOrderIds.Count > 0
+            ? await _context.Tickets.AsNoTracking()
+                .Where(t => t.OrderId.HasValue && paidOrderIds.Contains(t.OrderId.Value))
+                .ToListAsync()
+            : new List<ZooGuide.Domain.Entities.Ticket>();
+
+        var paidTicketsIssuedCount = paidOrderTickets.Count;
+        var paidTicketsUsedCount = paidOrderTickets.Count(t => t.Status == TicketStatus.Used);
+        var paidTicketsValidCount = paidOrderTickets.Count(t => t.Status == TicketStatus.Valid && t.ValidUntil >= now);
+        var paidTicketsCancelledCount = paidOrderTickets.Count(t => t.Status == TicketStatus.Cancelled);
+        var paidTicketsExpiredCount = paidOrderTickets.Count(t => t.Status == TicketStatus.Expired || (t.Status == TicketStatus.Valid && t.ValidUntil < now));
+
+        var allUsers = await _context.Users.AsNoTracking()
+            .Select(u => new { u.UserId, u.Role, u.CreatedAt })
+            .ToListAsync();
+        var totalUsers = allUsers.Count;
+        var visitorAccountsCount = allUsers.Count(u => u.Role == UserRole.Visitor);
+        var internalAccountsCount = allUsers.Count(u => u.Role == UserRole.Staff || u.Role == UserRole.Admin);
+        var internalUserIds = allUsers
+            .Where(u => u.Role == UserRole.Staff || u.Role == UserRole.Admin)
+            .Select(u => u.UserId)
+            .ToHashSet();
 
         // 3. Dữ liệu danh mục gốc (Inventory)
         var allAnimals = await _context.Animals
@@ -202,6 +249,22 @@ public class DashboardService : IDashboardService
             .Where(e => (!utcFrom.HasValue || e.CreatedAt >= utcFrom.Value) && (!utcTo.HasValue || e.CreatedAt <= utcTo.Value))
             .ToList();
 
+        // Kết hợp thiết bị trực tuyến trong 5 phút gần nhất:
+        // Chỉ tính thiết bị có hoạt động thực tế (DEVICE_ACTIVITIES, Telemetry 5p, hoặc SignalR đã gửi heartbeat),
+        // không lấy kết nối SignalR tồn tại đơn thuần làm bằng chứng duy nhất.
+        var telemetryActiveDeviceIds5Min = allTelemetryEvents
+            .Where(e => e.Category != "ALERT_STATE" && e.CreatedAt >= cutoff5Min && !string.IsNullOrWhiteSpace(e.InstallationId))
+            .Select(e => e.InstallationId!.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var onlineDevicesCombined5MinSet = new HashSet<string>(dbActiveDeviceIds5Min, StringComparer.OrdinalIgnoreCase);
+        onlineDevicesCombined5MinSet.UnionWith(telemetryActiveDeviceIds5Min);
+        onlineDevicesCombined5MinSet.UnionWith(signalRVerifiedIds);
+
+        var onlineDevicesCombined5MinCount = onlineDevicesCombined5MinSet.Count;
+        var activeDevices = onlineDevicesCombined5MinCount;
+
         // Lịch sử tham quan (VISIT_HISTORY) và Nhật ký vị trí (LOCATION_LOGS)
         var visitQuery = _context.VisitHistories.AsNoTracking().AsQueryable();
         var locationLogQuery = _context.LocationLogs.AsNoTracking().AsQueryable();
@@ -229,11 +292,16 @@ public class DashboardService : IDashboardService
             sessionQuery = sessionQuery.Where(s => s.StartedAt <= utcTo.Value);
         }
 
-        var filteredSessions = await sessionQuery.ToListAsync();
+        var allPeriodSessions = await sessionQuery.ToListAsync();
+        var internalExcludedSessionsCount = allPeriodSessions.Count(s => s.UserId.HasValue && internalUserIds.Contains(s.UserId.Value));
+        var filteredSessions = allPeriodSessions
+            .Where(s => !s.UserId.HasValue || !internalUserIds.Contains(s.UserId.Value))
+            .ToList();
         var activeSessionsList = filteredSessions
             .Where(s => s.Status == SessionStatus.Active && s.EndedAt == null && s.ExpiredAt > now)
             .ToList();
         var activeSessions = activeSessionsList.Count;
+        var endedOrExpiredSessionsCount = filteredSessions.Count - activeSessions;
 
         // Các phiên được đánh giá GPS trong kỳ (ưu tiên phiên Active nếu không lọc, hoặc toàn bộ phiên trong kỳ lọc)
         var evaluatedSessions = (utcFrom.HasValue || utcTo.HasValue) ? filteredSessions : activeSessionsList;
@@ -369,7 +437,11 @@ public class DashboardService : IDashboardService
 
         var publishedAnimalNarrs = allAnimalNarrations.Where(n => n.Status == NarrationStatus.Published).ToList();
         var publishedPoiNarrs = allPoiNarrations.Where(n => n.Status == NarrationStatus.Published).ToList();
-        var unpublishedNarrsCount = (allAnimalNarrations.Count - publishedAnimalNarrs.Count) + (allPoiNarrations.Count - publishedPoiNarrs.Count);
+        var draftNarrationsCount = allAnimalNarrations.Count(n => n.Status == NarrationStatus.Draft)
+                                 + allPoiNarrations.Count(n => n.Status == NarrationStatus.Draft);
+        var archivedNarrationsCount = allAnimalNarrations.Count(n => n.Status == NarrationStatus.Archived)
+                                    + allPoiNarrations.Count(n => n.Status == NarrationStatus.Archived);
+        var unpublishedNarrsCount = draftNarrationsCount + archivedNarrationsCount;
 
         var expectedAnimalsCount = activeAnimals.Count; // 22 loài/cá thể đang hoạt động
         var expectedPoisCount = activePois; // 14 POI đang hoạt động
@@ -785,10 +857,17 @@ public class DashboardService : IDashboardService
         }
 
         // ====================================================================
-        // TASK 2: TỔNG HỢP 8 THẺ THỐNG KÊ TỔNG QUAN (OVERVIEW KPIS)
+        // TASK 2: TỔNG HỢP KPI TỔNG QUAN (KHÔNG SUY DIỄN SỐ LIỆU)
         // ====================================================================
-        // Khách đang sử dụng thuyết minh: tính các phiên/thiết bị có tương tác thuyết minh/GPS/ngôn ngữ trong 15 phút gần nhất,
-        // hoặc thiết bị đang có heartbeat trực tiếp trong 5 phút qua
+        // Khách đang sử dụng thuyết minh: chỉ tính khi có sự kiện thuyết minh AUDIO thực tế trong 15 phút gần nhất.
+        // Không suy diễn từ activeDevices5Min (vì thiết bị chỉ mở trang mua vé chưa nghe thuyết minh).
+        var activeAudioTelemetryIdentities = allTelemetryEvents
+            .Where(e => e.Category == "AUDIO" && e.CreatedAt >= cutoff15Min)
+            .Select(e => e.SessionId.HasValue ? $"sess:{e.SessionId.Value}" : (!string.IsNullOrEmpty(e.InstallationId) ? $"dev:{e.InstallationId}" : null))
+            .Where(id => id != null)
+            .Distinct()
+            .Count();
+
         var activeTelemetryIdentities = allTelemetryEvents
             .Where(e => e.Category != "ALERT_STATE" && e.CreatedAt >= cutoff15Min)
             .Select(e => e.SessionId.HasValue ? $"sess:{e.SessionId.Value}" : (!string.IsNullOrEmpty(e.InstallationId) ? $"dev:{e.InstallationId}" : null))
@@ -796,16 +875,24 @@ public class DashboardService : IDashboardService
             .Distinct()
             .Count();
 
-        var activeNarrationUsers = Math.Max(activeTelemetryIdentities, activeDevices5Min);
+        var hasActiveNarrationUsersData = activeAudioTelemetryIdentities > 0;
+        var activeNarrationUsers = activeAudioTelemetryIdentities;
+
+        var expectedTotalAllNarrs = expectedTotalAnimalNarrs + expectedTotalPoiNarrs;
+        var publishedTotalAllNarrs = publishedAnimalNarrs.Count + publishedPoiNarrs.Count;
+        var multilingualCompletionRate = expectedTotalAllNarrs > 0
+            ? Math.Round(publishedTotalAllNarrs * 100.0 / expectedTotalAllNarrs, 1)
+            : 0.0;
 
         var overviewKpis = new DashboardOverviewKpisDto
         {
             // 1. Khách đang sử dụng thuyết minh
             ActiveNarrationUsersCount = activeNarrationUsers,
+            HasActiveNarrationUsersData = hasActiveNarrationUsersData,
             ActiveTelemetryUsers15Min = activeTelemetryIdentities,
             ActiveDevices5Min = activeDevices5Min,
             ActiveTicketSessionsCount = activeSessions,
-            ActiveUsersFormulaNote = "Đếm định danh thiết bị/phiên duy nhất có hoạt động thuyết minh/GPS trong 15 phút hoặc heartbeat trong 5 phút (tách biệt với người mua vé).",
+            ActiveUsersFormulaNote = "Đếm định danh phiên/thiết bị duy nhất có sự kiện phát âm thanh (AUDIO) trong 15 phút gần nhất; không suy diễn từ thiết bị chỉ mở trang web.",
 
             // 2. Tổng lượt phát âm thanh
             TotalAudioPlayRequests = effectivePlayRequests,
@@ -839,12 +926,18 @@ public class DashboardService : IDashboardService
             ApiErrorCount = errApi,
             PlaybackErrorCount = errPlayback,
 
-            // 7. Số bài thuyết minh đã xuất bản
-            PublishedNarrationsCount = publishedAnimalNarrs.Count + publishedPoiNarrs.Count,
+            // 7. Số bài thuyết minh đã xuất bản & tình trạng nội dung
+            TotalAllNarrationsCount = allAnimalNarrations.Count + allPoiNarrations.Count,
+            PublishedNarrationsCount = publishedTotalAllNarrs,
             PublishedAnimalNarrationsCount = publishedAnimalNarrs.Count,
             PublishedPoiNarrationsCount = publishedPoiNarrs.Count,
+            TotalAnimalNarrationsCount = allAnimalNarrations.Count,
+            TotalPoiNarrationsCount = allPoiNarrations.Count,
+            DraftNarrationsCount = draftNarrationsCount,
+            ArchivedNarrationsCount = archivedNarrationsCount,
             UnpublishedNarrationsCount = unpublishedNarrsCount,
-            ExpectedTotalNarrationsCount = expectedTotalAnimalNarrs + expectedTotalPoiNarrs,
+            ExpectedTotalNarrationsCount = expectedTotalAllNarrs,
+            MultilingualCompletionRatePercent = multilingualCompletionRate,
 
             // 8. Tỷ lệ phiên tham quan có GPS khả dụng
             GpsAvailableSessionRatePercent = gpsSessionRate,
@@ -904,7 +997,69 @@ public class DashboardService : IDashboardService
             });
         }
 
-        var totalVisitorsCount = Math.Max(totalTicketsSold, Math.Max(activeTickets, filteredSessions.Count));
+        // Tổng số khách tham quan duy nhất đã ghi nhận (khử trùng giữa Đơn vé, Vé, Phiên tham quan và Tài khoản Visitor; loại trừ Admin/Staff; không cộng trùng thiết bị)
+        var uniqueVisitorKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var cancelledTicketIds = filteredTicketList
+            .Where(t => t.Status == TicketStatus.Cancelled)
+            .Select(t => t.TicketId)
+            .ToHashSet();
+
+        foreach (var order in paidOrdersList)
+        {
+            var orderTickets = paidOrderTickets.Where(t => t.OrderId == order.OrderId).ToList();
+            var nonCancelledOrderTickets = orderTickets.Where(t => t.Status != TicketStatus.Cancelled).ToList();
+            foreach (var t in nonCancelledOrderTickets)
+            {
+                uniqueVisitorKeys.Add($"ticket:{t.TicketId}");
+            }
+
+            // Nếu đơn đã thanh toán chưa sinh đủ dòng TICKETS tương ứng Quantity (ví dụ dữ liệu tối giản), chỉ bù đúng phần chênh lệch theo OrderId
+            int accountedSlots = orderTickets.Count;
+            if (order.Quantity > accountedSlots)
+            {
+                for (int slot = 0; slot < order.Quantity - accountedSlots; slot++)
+                {
+                    uniqueVisitorKeys.Add($"order:{order.OrderId}:slot:{slot}");
+                }
+            }
+        }
+
+        var sessionVisitorUserIds = new HashSet<int>();
+        foreach (var sess in filteredSessions)
+        {
+            if (sess.UserId.HasValue)
+            {
+                sessionVisitorUserIds.Add(sess.UserId.Value);
+            }
+
+            if (sess.TicketId > 0)
+            {
+                if (!cancelledTicketIds.Contains(sess.TicketId))
+                {
+                    uniqueVisitorKeys.Add($"ticket:{sess.TicketId}");
+                }
+            }
+            else if (sess.UserId.HasValue)
+            {
+                uniqueVisitorKeys.Add($"user:{sess.UserId.Value}");
+            }
+            else
+            {
+                uniqueVisitorKeys.Add($"session:{sess.SessionId}");
+            }
+        }
+
+        foreach (var user in allUsers.Where(u => u.Role == UserRole.Visitor))
+        {
+            if ((!utcFrom.HasValue || user.CreatedAt >= utcFrom.Value) &&
+                (!utcTo.HasValue || user.CreatedAt <= utcTo.Value) &&
+                !sessionVisitorUserIds.Contains(user.UserId))
+            {
+                uniqueVisitorKeys.Add($"user:{user.UserId}");
+            }
+        }
+
+        var totalVisitorsCount = uniqueVisitorKeys.Count;
 
         // ====================================================================
         // GIỮ TƯƠNG THÍCH NGƯỢC CHO CÁC TEST HIỆN CÓ (RecentHealthLogs & RecentActivities)
@@ -958,21 +1113,40 @@ public class DashboardService : IDashboardService
             OnlineUsers = activeTicketBuyers,
             ActiveDevices5Min = activeDevices5Min,
             TotalTrackedDevices = totalTrackedDevices,
+            SignalRConnectedDevicesCount = signalRConnectedIds.Count,
+            SignalRVerifiedDevicesCount = signalRVerifiedIds.Count,
+            DbActiveDevices5MinCount = dbActiveDeviceIds5Min.Count,
+            TelemetryActiveDevices5MinCount = telemetryActiveDeviceIds5Min.Count,
+            OnlineDevicesCombined5MinCount = onlineDevicesCombined5MinCount,
             ActiveSessions = activeSessions,
             TotalSessions = filteredSessions.Count,
+            EndedOrExpiredSessionsCount = endedOrExpiredSessionsCount,
+            InternalExcludedSessionsCount = internalExcludedSessionsCount,
             TotalUsers = totalUsers,
+            VisitorAccountsCount = visitorAccountsCount,
+            InternalAccountsCount = internalAccountsCount,
             TotalVisitorsCount = totalVisitorsCount,
             TotalOrders = totalOrders,
             PaidOrders = paidOrders,
             PendingOrders = pendingOrders,
             FailedOrExpiredOrders = failedOrExpiredOrders,
+            RefundedOrders = refundedOrders,
             TotalRevenue = totalRevenue,
+            GrossPaidRevenue = grossPaidRevenue,
+            RefundedAmount = refundedAmount,
+            NetRevenue = netRevenue,
+            OrderCompletionRatePercent = orderCompletionRatePercent,
             TotalTickets = totalTickets,
             ActiveTickets = activeTickets,
             ValidTickets = validTickets,
             UsedTickets = usedTickets,
             CancelledTickets = cancelledTickets,
             ExpiredTickets = expiredTickets,
+            PaidTicketsIssuedCount = paidTicketsIssuedCount,
+            PaidTicketsUsedCount = paidTicketsUsedCount,
+            PaidTicketsValidCount = paidTicketsValidCount,
+            PaidTicketsCancelledCount = paidTicketsCancelledCount,
+            PaidTicketsExpiredCount = paidTicketsExpiredCount,
             DailyTicketStats = dailyTicketStats,
             TotalAnimals = totalAnimals,
             TotalSpecies = totalSpecies,

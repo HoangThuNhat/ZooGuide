@@ -421,6 +421,280 @@ public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal(UserRole.Admin, body.Data?.User?.Role);
     }
 
+    // 16. Kiểm thử JWT của Admin có thời hạn tối đa 8 giờ và chứa đầy đủ claims bắt buộc (UserId, Role, iat, exp, abs_exp, jti)
+    [Fact]
+    public async Task AdminLogin_JwtToken_HasMaximum8HoursExpirationAndRequiredClaims()
+    {
+        var client = _factory.CreateClient();
+        var beforeLogin = DateTime.UtcNow.AddSeconds(-2);
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var afterLogin = DateTime.UtcNow.AddSeconds(2);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.NotNull(body?.Data);
+
+        var expiresAt = body!.Data!.ExpiresAt;
+        var expectedMinExpiry = beforeLogin.AddHours(8);
+        var expectedMaxExpiry = afterLogin.AddHours(8);
+        Assert.True(expiresAt >= expectedMinExpiry && expiresAt <= expectedMaxExpiry,
+            $"Expected ExpiresAt to be ~8 hours from login, but got {expiresAt:O}");
+
+        var handler = new JwtSecurityTokenHandler();
+        var jwt = handler.ReadJwtToken(body.Data.Token);
+
+        Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Jti));
+        Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == JwtRegisteredClaimNames.Iat));
+        Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == "abs_exp"));
+        Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == "login_ticks"));
+        Assert.NotNull(jwt.Claims.FirstOrDefault(c => c.Type == "abs_exp_ticks"));
+        Assert.True((jwt.ValidTo - jwt.ValidFrom).TotalHours <= 8.01);
+    }
+
+    // 17. Kiểm thử Manual Logout: Sau khi đăng xuất, JWT cũ bị thu hồi và không thể gọi lại API Admin (401 Unauthorized)
+    [Fact]
+    public async Task AdminLogout_RevokesSession_SubsequentApiCallsWithOldTokenReturn401Unauthorized()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        var loginBody = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        var token = loginBody!.Data!.Token;
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Trước khi logout: truy cập bình thường (200 OK)
+        var meBefore = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meBefore.StatusCode);
+
+        // Thực hiện Logout
+        var logoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logoutRes.StatusCode);
+
+        // Sau khi logout: dùng lại JWT cũ phải bị từ chối với 401 Unauthorized
+        var meAfter = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, meAfter.StatusCode);
+
+        var logsAfter = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.Unauthorized, logsAfter.StatusCode);
+    }
+
+    // 18. Kiểm thử Login Again: Sau khi hết hạn/đăng xuất, đăng nhập lại tạo phiên mới hợp lệ và JWT cũ vẫn bị từ chối
+    [Fact]
+    public async Task AdminLoginAgain_AfterLogout_CreatesNewValidSessionAndOldTokenRemainsRevoked()
+    {
+        var client = _factory.CreateClient();
+
+        // Lần đăng nhập 1
+        var login1 = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var body1 = await login1.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        var oldToken = body1!.Data!.Token;
+
+        // Đăng xuất phiên 1
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", oldToken);
+        var logoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logoutRes.StatusCode);
+
+        // Đăng nhập lại (Phiên 2)
+        client.DefaultRequestHeaders.Authorization = null;
+        var login2 = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login2.StatusCode);
+        var body2 = await login2.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        var newToken = body2!.Data!.Token;
+
+        // Token cũ vẫn bị từ chối 401
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", oldToken);
+        var oldTokenRes = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.Unauthorized, oldTokenRes.StatusCode);
+
+        // Token mới hoạt động bình thường 200 OK
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var newTokenMeRes = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, newTokenMeRes.StatusCode);
+
+        var newTokenLogsRes = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.OK, newTokenLogsRes.StatusCode);
+    }
+
+    // 19. Kiểm thử Absolute Session Timeout trên Backend: Token vượt quá 8 giờ kể từ lúc phát hành bị từ chối 401
+    [Fact]
+    public async Task TokenExceeding8HoursAbsoluteLimit_IsRejectedWith401Unauthorized()
+    {
+        var client = _factory.CreateClient();
+        // Token được phát hành cách đây 8 giờ 5 phút (dù exp vẫn còn ở tương lai)
+        var over8HoursToken = CreateJwtToken(
+            101,
+            "admin_test",
+            UserRole.Admin,
+            expiresAt: DateTime.UtcNow.AddMinutes(30),
+            notBefore: DateTime.UtcNow.AddHours(-8).AddMinutes(-5));
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", over8HoursToken);
+        var response = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // 20. Kiểm thử Role Authorization: Staff nhận 403 trên API chỉ dành cho Admin nhưng không bị mất phiên đăng nhập
+    [Fact]
+    public async Task StaffUser_Receives403OnAdminOnlyEndpoint_SessionRemainsActiveOnStaffAllowedEndpoints()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "staff_test",
+            Password = "Staff@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var loginBody = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        var staffToken = loginBody!.Data!.Token;
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", staffToken);
+
+        // Gọi endpoint chỉ dành cho Admin -> 403 Forbidden
+        var adminOnlyRes = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.Forbidden, adminOnlyRes.StatusCode);
+
+        // Phiên của Staff vẫn còn hiệu lực trên /api/auth/me -> 200 OK
+        var meRes = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
+    }
+
+    // 21. Hai trình duyệt đăng nhập cùng tài khoản: logout một trình duyệt không làm logout trình duyệt còn lại
+    [Fact]
+    public async Task TwoBrowsersSameAdminAccount_LogoutFirstBrowser_DoesNotLogoutSecondBrowser()
+    {
+        var browser1 = _factory.CreateClient();
+        var browser2 = _factory.CreateClient();
+
+        var login1 = await browser1.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login1.StatusCode);
+        var token1 = (await login1.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        var login2 = await browser2.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login2.StatusCode);
+        var token2 = (await login2.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        browser1.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token1);
+        browser2.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token2);
+
+        // Cả 2 trình duyệt đều hoạt động bình thường
+        Assert.Equal(HttpStatusCode.OK, (await browser1.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/auth/me")).StatusCode);
+
+        // Trình duyệt 1 thực hiện Logout
+        var logout1 = await browser1.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logout1.StatusCode);
+
+        // Trình duyệt 1 bị từ chối (401 Unauthorized)
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser1.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, (await browser1.GetAsync("/api/admin/logs")).StatusCode);
+
+        // Trình duyệt 2 vẫn hoạt động bình thường (200 OK), không bị đăng xuất theo
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/auth/me")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/admin/logs")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await browser2.GetAsync("/api/dashboard/stats")).StatusCode);
+    }
+
+    // 22. Token cũ gọi logout SAU KHI token mới đã đăng nhập: token mới vẫn hoạt động bình thường
+    [Fact]
+    public async Task OldTokenLogoutAfterNewTokenLogin_NewTokenRemainsActiveAndOldTokenIsRevoked()
+    {
+        var client = _factory.CreateClient();
+
+        // Phiên cũ đăng nhập trước
+        var oldLogin = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var oldToken = (await oldLogin.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Phiên mới đăng nhập sau
+        var newLogin = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var newToken = (await newLogin.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Một tab/phiên cũ gửi POST /api/auth/logout bằng oldToken SAU KHI newToken đã được cấp
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", oldToken);
+        var oldLogoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, oldLogoutRes.StatusCode);
+
+        // oldToken bị thu hồi (401)
+        var oldCheck = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.Unauthorized, oldCheck.StatusCode);
+
+        // newToken vẫn hoàn toàn hợp lệ (200 OK), không bị ảnh hưởng bởi lệnh logout của oldToken
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", newToken);
+        var newMeCheck = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, newMeCheck.StatusCode);
+
+        var newLogsCheck = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.OK, newLogsCheck.StatusCode);
+    }
+
+    // 23. Polling Dashboard (/api/dashboard/stats) và thay đổi User.UpdatedAt không làm mất hiệu lực JWT đang hoạt động
+    [Fact]
+    public async Task DashboardPollingAndUserUpdatedAtChanges_DoNotInvalidateActiveAdminJwt()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+
+        // Giả lập User.UpdatedAt trong DB bị thay đổi sau khi đăng nhập
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.UpdatedAt = DateTime.UtcNow.AddMinutes(10);
+            await db.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Nhiều lần gọi polling /api/dashboard/stats liên tiếp đều trả về 200 OK
+        for (int i = 0; i < 3; i++)
+        {
+            var statsRes = await client.GetAsync("/api/dashboard/stats");
+            Assert.Equal(HttpStatusCode.OK, statsRes.StatusCode);
+        }
+
+        var meRes = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
+    }
+
     private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,

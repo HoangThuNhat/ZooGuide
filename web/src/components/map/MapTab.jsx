@@ -142,6 +142,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         currentLang,
         currentSession,
         hasActiveSession,
+        clearSession,
         setIsTicketModalOpen,
         audioState,
         t
@@ -212,6 +213,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             if (resEnclosures && resEnclosures.success) setEnclosures(resEnclosures.data || []);
             if (resAnimals && resAnimals.success) setAnimals(resAnimals.data || []);
             if (resPois && resPois.success) setDbPois(resPois.data || []);
+
+            const allFailed = !resAreas?.success && !resEnclosures?.success && !resAnimals?.success && !resPois?.success;
+            if (allFailed) {
+                setLoadError(resAreas?.message || resEnclosures?.message || "Không thể tải dữ liệu bản đồ từ máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
+            }
         } catch (err) {
             console.error("MapTab loadMapData error:", err);
             setLoadError(err.message || "Không thể kết nối đến máy chủ cơ sở dữ liệu.");
@@ -275,7 +281,15 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             }
 
             const resident = animals.filter(a => a.enclosureId === dbEnc.enclosureId);
-            const hasLatLong = Boolean(dbEnc.latitude && dbEnc.longitude);
+            const fallbackGraphNode = WALKWAY_NODES[`enc_node_${dbEnc.enclosureId}`];
+            const hasDbLatLong = Boolean(dbEnc.latitude && dbEnc.longitude);
+            const resolvedLat = hasDbLatLong
+                ? Number(dbEnc.latitude)
+                : (fallbackGraphNode?.lat ? Number(fallbackGraphNode.lat) : 10.7876);
+            const resolvedLng = hasDbLatLong
+                ? Number(dbEnc.longitude)
+                : (fallbackGraphNode?.lng ? Number(fallbackGraphNode.lng) : 106.7053);
+            const hasLatLong = hasDbLatLong || Boolean(fallbackGraphNode?.lat && fallbackGraphNode?.lng);
 
             markerList.push({
                 id: `enc_${dbEnc.enclosureId}`,
@@ -285,8 +299,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 code: dbEnc.code || `ENC-${dbEnc.enclosureId}`,
                 name: dbEnc.name,
                 description: dbEnc.description || '',
-                lat: hasLatLong ? Number(dbEnc.latitude) : 10.7876,
-                lng: hasLatLong ? Number(dbEnc.longitude) : 106.7053,
+                lat: resolvedLat,
+                lng: resolvedLng,
                 radiusMeters: Number(dbEnc.radiusMeters) || 30,
                 category,
                 isVerified: hasLatLong,
@@ -417,6 +431,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         });
 
         tileLayer.addTo(map);
+
+    
 
         // Lớp chứa Marker, Tuyến đường, Geofence và Vị trí GPS
         const geofenceLayer = L.layerGroup().addTo(map);
@@ -779,31 +795,64 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         if (!mergedMarkers || mergedMarkers.length === 0) return;
         if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) return;
 
+        // Kiểm tra nếu phiên tham quan hết hạn giữa quá trình sử dụng GPS
+        if (hasActiveSession && currentSession?.expiresAt && new Date(currentSession.expiresAt) <= new Date()) {
+            if (clearSession) clearSession();
+            showToast(t?.ticketExpiredNarration || 'Phiên tham quan của bạn đã hết hạn. Vui lòng kích hoạt vé mới để tiếp tục nghe thuyết minh tự động.', 'error');
+            return;
+        }
+
         const EXIT_HYSTERESIS_METERS = 8; // Ngưỡng đệm 8m khi đi ra khỏi khu vực để xử lý trường hợp rời đi rồi quay lại
+        const REENTRY_MIN_COOLDOWN_MS = 15000; // Chống nhiễu khi di chuyển liên tục qua ranh giới geofence
+        const COOLDOWN_MS = 120000; // Cooldown 120 giây cho cùng một vùng
+        const now = Date.now();
         const nearbyTargets = [];
 
         mergedMarkers.forEach(m => {
             if (!m.lat || !m.lng) return;
             const dist = calculateHaversineDistance(userLat, userLng, m.lat, m.lng);
-            const triggerRadius = Number(m.radiusMeters) > 0 ? Math.min(Number(m.radiusMeters), 60) : 30;
+            // Sử dụng nhất quán RadiusMeters từ Database (fallback 30m nếu không cấu hình)
+            const triggerRadius = Number(m.radiusMeters) > 0 ? Number(m.radiusMeters) : 30;
 
             if (dist <= triggerRadius) {
                 nearbyTargets.push({ ...m, dist, triggerRadius });
             } else if (dist > triggerRadius + EXIT_HYSTERESIS_METERS) {
-                // Khách tham quan đã đi ra khỏi khu vực -> xóa trạng thái đứng trong vùng để khi quay lại sẽ kích hoạt lại
+                // Khách tham quan đã đi ra ngoài vùng geofence -> xóa trạng thái đứng trong vùng để khi quay lại sẽ kích hoạt lại,
+                // nhưng giữ ngưỡng chống nhiễu ngắn (15s) tránh trường hợp tín hiệu GPS nhảy qua lại mép biên liên tục
                 if (insideZonesRef.current.has(m.id)) {
                     insideZonesRef.current.delete(m.id);
-                    audioCooldownMapRef.current.delete(m.id);
+                    const prevTriggerTime = audioCooldownMapRef.current.get(m.id) || 0;
+                    if (now - prevTriggerTime > REENTRY_MIN_COOLDOWN_MS) {
+                        audioCooldownMapRef.current.delete(m.id);
+                    } else {
+                        audioCooldownMapRef.current.set(m.id, now - (COOLDOWN_MS - REENTRY_MIN_COOLDOWN_MS));
+                    }
                 }
             }
         });
 
         if (nearbyTargets.length === 0) return;
 
-        // Ưu tiên điểm gần du khách nhất
-        nearbyTargets.sort((a, b) => a.dist - b.dist);
+        // Ưu tiên điểm cụ thể (POI / Chuồng nuôi) hơn Phân khu rộng (Area) khi cùng thỏa mãn điều kiện, sau đó ưu tiên khoảng cách gần nhất
+        nearbyTargets.sort((a, b) => {
+            const aIsMacroArea = a.category === 'area' ? 1 : 0;
+            const bIsMacroArea = b.category === 'area' ? 1 : 0;
+            if (aIsMacroArea !== bIsMacroArea && Math.abs(a.dist - b.dist) <= 25) {
+                return aIsMacroArea - bIsMacroArea;
+            }
+            return a.dist - b.dist;
+        });
         const nearest = nearbyTargets[0];
-        const now = Date.now();
+
+        // Nếu điểm gần nhất thuộc một Area và khách có phiên hợp lệ, đồng bộ điều hướng Haversine/Bearing với Backend
+        if (hasActiveSession && currentSession?.sessionId && (nearest.areaId || nearest.category === 'area')) {
+            const navKey = `nav_area_${nearest.areaId}`;
+            const lastNavTime = audioCooldownMapRef.current.get(navKey) || 0;
+            if (now - lastNavTime > 60000) {
+                audioCooldownMapRef.current.set(navKey, now);
+                ZooApi.getAreaNavigation(nearest.areaId, userLat, userLng, currentSession.sessionId).catch(() => {});
+            }
+        }
 
         // Ghi nhận sự kiện phát hiện vào vùng POI (throttled mỗi 90s cho cùng 1 điểm để tránh spam)
         const proxKey = `prox_${nearest.id}`;
@@ -828,24 +877,26 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
         // Lọc các điểm đủ điều kiện có audio hoặc bài thuyết minh
         const eligibleTargets = nearbyTargets.filter(m => {
-            const isPoiWithAudio = m.poiId && m.hasAudio;
-            const isEnclosureWithAnimals = m.residentAnimals && m.residentAnimals.length > 0;
-            return isPoiWithAudio || isEnclosureWithAnimals;
+            const isPoiWithAudio = Boolean(m.poiId && m.hasAudio);
+            const isEnclosureOrAreaWithAnimals = Boolean(m.residentAnimals && m.residentAnimals.length > 0);
+            return isPoiWithAudio || isEnclosureOrAreaWithAnimals;
         });
 
         if (eligibleTargets.length === 0) return;
 
-        // Chỉ kích hoạt cho điểm mà du khách MỚI bước vào (chưa có trong insideZonesRef) và hết thời gian cooldown
-        const candidate = eligibleTargets.find(t => {
-            if (insideZonesRef.current.has(t.id)) {
-                return false; // Đang đứng liên tục trong cùng một khu vực -> không thông báo lặp lại
-            }
-            const lastTime = audioCooldownMapRef.current.get(t.id) || 0;
-            return (now - lastTime) > 120000;
-        });
+        // Xét điểm ưu tiên nhất (eligibleTargets[0]) trước:
+        // Nếu người dùng đang đứng yên trong vùng của điểm gần nhất (đã nằm trong insideZonesRef) hoặc đang phát audio của điểm đó,
+        // KHÔNG tự động nhảy sang các vùng giao thoa (overlapping geofences) đứng sau nó.
+        const primaryTarget = eligibleTargets[0];
+        if (insideZonesRef.current.has(primaryTarget.id)) {
+            return;
+        }
+
+        const lastTime = audioCooldownMapRef.current.get(primaryTarget.id) || 0;
+        const candidate = (now - lastTime) > COOLDOWN_MS ? primaryTarget : null;
 
         if (!candidate) {
-            const skipKey = `skip_${eligibleTargets[0].id}`;
+            const skipKey = `skip_${primaryTarget.id}`;
             const lastSkipTime = audioCooldownMapRef.current.get(skipKey) || 0;
             if (now - lastSkipTime > 90000) {
                 audioCooldownMapRef.current.set(skipKey, now);
@@ -854,23 +905,23 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     eventType: 'SKIPPED_COOLDOWN',
                     sessionId: currentSession?.sessionId || null,
                     languageCode: currentLang,
-                    targetType: eligibleTargets[0].poiId ? 'POI' : 'Enclosure',
-                    targetId: eligibleTargets[0].poiId || eligibleTargets[0].enclosureId || null,
-                    targetCode: eligibleTargets[0].code || String(eligibleTargets[0].id),
-                    targetName: eligibleTargets[0].name,
+                    targetType: primaryTarget.poiId ? 'POI' : 'Enclosure',
+                    targetId: primaryTarget.poiId || primaryTarget.enclosureId || null,
+                    targetCode: primaryTarget.code || String(primaryTarget.id),
+                    targetName: primaryTarget.name,
                     triggerSource: 'GPS_AUTO',
-                    distanceMeters: Math.round(eligibleTargets[0].dist * 10) / 10,
+                    distanceMeters: Math.round(primaryTarget.dist * 10) / 10,
                     isSuccess: true
                 });
             }
             return;
         }
 
-        // Đánh dấu du khách đã bước vào khu vực này để không thông báo lặp lại khi đứng yên
+        // Đánh dấu du khách đã bước vào khu vực này để không phát lặp khi đứng lâu trong khu vực
         insideZonesRef.current.add(candidate.id);
 
         // Kiểm tra quyền nghe thuyết minh (yêu cầu phiên vé)
-        if (!hasActiveSession) {
+        if (!hasActiveSession || !currentSession?.sessionId) {
             audioCooldownMapRef.current.set(candidate.id, now);
             showToast(`Bạn đã vào khu vực "${candidate.name}" (${Math.round(candidate.dist)}m). Vui lòng kích hoạt vé tham quan để nghe thuyết minh tự động.`, 'info');
             return;
@@ -914,14 +965,14 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             onPlayPoiAudio(candidate.poiId, true, 'GPS_AUTO');
             showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
         } else if (candidate.residentAnimals && candidate.residentAnimals.length > 0) {
-            if (onOpenSpeciesNarration) {
+            if (onPlayAudio) {
+                onPlayAudio(candidate.residentAnimals[0], true, 'GPS_AUTO');
+            } else if (onOpenSpeciesNarration) {
                 onOpenSpeciesNarration(candidate.residentAnimals[0]);
-            } else if (onPlayAudio) {
-                onPlayAudio(candidate.residentAnimals[0]);
             }
             showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
         }
-    }, [mergedMarkers, hasActiveSession, currentSession?.sessionId, currentLang, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast]);
+    }, [mergedMarkers, hasActiveSession, currentSession, clearSession, currentLang, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast, t]);
 
     const startAutoNarrationTracking = useCallback(() => {
         if (!navigator.geolocation) {
@@ -1197,8 +1248,16 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
             {/* Báo lỗi nếu có */}
             {loadError && (
-                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 16px', borderRadius: '12px', marginBottom: '12px', fontSize: '0.88rem' }}>
-                    Lỗi tải dữ liệu: {loadError}
+                <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 16px', borderRadius: '12px', marginBottom: '12px', fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+                    <span>⚠️ Lỗi tải dữ liệu: {loadError}</span>
+                    <button
+                        type="button"
+                        className="btn btn-sm"
+                        style={{ background: '#DC2626', color: '#FFF', borderRadius: '6px', padding: '4px 12px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                        onClick={() => loadMapData(currentLang)}
+                    >
+                        Thử lại
+                    </button>
                 </div>
             )}
 
@@ -1230,7 +1289,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
                             {isAutoNarrationActive 
                                 ? (autoNarrationStatus || 'Đang theo dõi vị trí thực tế của bạn tại Thảo Cầm Viên...') 
-                                : 'Tự động phát audio khi đến gần chuồng thú hoặc điểm tham quan (< 25m)'}
+                                : 'Tự động phát audio khi tiến vào bán kính Geofence (RadiusMeters) của chuồng thú hoặc điểm tham quan'}
                         </div>
                     </div>
                 </div>
@@ -1791,8 +1850,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                                                     cursor: 'pointer'
                                                                 }}
                                                                 onClick={() => {
-                                                                    if (onOpenSpeciesNarration) onOpenSpeciesNarration(animal);
-                                                                    else if (onPlayAudio) onPlayAudio(animal);
+                                                                    if (onPlayAudio) onPlayAudio(animal);
+                                                                    else if (onOpenSpeciesNarration) onOpenSpeciesNarration(animal);
                                                                 }}
                                                             >
                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">

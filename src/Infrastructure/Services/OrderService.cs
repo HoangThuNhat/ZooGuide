@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Cryptography;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using ZooGuide.Application.DTOs.Order;
@@ -14,6 +15,7 @@ namespace ZooGuide.Infrastructure.Services;
 
 public class OrderService : IOrderService
 {
+    private static readonly SemaphoreSlim _webhookLock = new(1, 1);
     private readonly ZooGuideDbContext _context;
     private readonly ITicketService _ticketService;
     private readonly IEmailService? _emailService;
@@ -158,8 +160,8 @@ public class OrderService : IOrderService
     {
         if (payload == null) return false;
 
-        // 1. Kiểm tra Webhook Secret/Signature nếu có truyền
-        if (!string.IsNullOrEmpty(signature) && signature != WebhookSecret)
+        // 1. Kiểm tra Webhook Secret/Signature (từ chối nếu truyền chuỗi rỗng hoặc sai chữ ký)
+        if (signature != null && (string.IsNullOrWhiteSpace(signature) || signature != WebhookSecret))
         {
             Console.WriteLine("Warning: Invalid payment webhook secret signature.");
             return false;
@@ -169,44 +171,80 @@ public class OrderService : IOrderService
         var content = (payload.Content ?? payload.Description ?? "").ToUpper();
         if (string.IsNullOrWhiteSpace(content)) return false;
 
-        var order = await _context.TicketOrders
-            .Include(o => o.TicketType)
-            .Include(o => o.Tickets)
-            .FirstOrDefaultAsync(o => content.Contains(o.PaymentDescription.ToUpper()) || content.Contains(o.OrderCode.ToUpper()));
-
-        if (order == null)
+        await _webhookLock.WaitAsync();
+        try
         {
-            Console.WriteLine($"Webhook note: No matching pending order for content: {content}");
-            return false;
-        }
+            var order = await _context.TicketOrders
+                .Include(o => o.TicketType)
+                .Include(o => o.Tickets)
+                .FirstOrDefaultAsync(o => content.Contains(o.PaymentDescription.ToUpper()) || content.Contains(o.OrderCode.ToUpper()));
 
-        // 3. Idempotency: Nếu đơn hàng đã hoàn tất, xác nhận 200 OK ngay để tránh webhook gửi lại sinh thừa vé
-        if (order.PaymentStatus == PaymentStatus.Paid)
-        {
-            return true;
-        }
+            if (order == null)
+            {
+                Console.WriteLine("Webhook note: No matching order found for incoming transfer notification.");
+                return false;
+            }
 
-        // 4. Đối soát số tiền giao dịch: Số tiền thanh toán phải lớn hơn hoặc bằng tổng tiền đơn
-        if (payload.TransferAmount < order.TotalAmount)
-        {
-            Console.WriteLine($"Webhook error: Transfer amount {payload.TransferAmount} is less than order amount {order.TotalAmount}.");
-            order.PaymentStatus = PaymentStatus.Failed;
+            // 3. Idempotency: Nếu đơn hàng đã hoàn tất, xác nhận 200 OK ngay để tránh webhook gửi lại sinh thừa vé
+            if (order.PaymentStatus == PaymentStatus.Paid)
+            {
+                return true;
+            }
+
+            // 3b. Kiểm tra đơn hàng đã quá thời hạn thanh toán (15 phút) hoặc đã bị hủy/hoàn tiền
+            if (order.PaymentStatus == PaymentStatus.Expired ||
+                order.PaymentStatus == PaymentStatus.Refunded ||
+                (order.PaymentStatus == PaymentStatus.Pending && DateTime.UtcNow > order.ExpiresAt))
+            {
+                if (order.PaymentStatus == PaymentStatus.Pending)
+                {
+                    order.PaymentStatus = PaymentStatus.Expired;
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+                Console.WriteLine($"Webhook rejected: Order {order.OrderCode} has expired or is not eligible for payment.");
+                return false;
+            }
+
+            // 4. Đối soát số tiền giao dịch: Số tiền thanh toán phải lớn hơn hoặc bằng tổng tiền đơn
+            if (payload.TransferAmount < order.TotalAmount)
+            {
+                Console.WriteLine($"Webhook error: Insufficient transfer amount for order {order.OrderCode}.");
+                order.PaymentStatus = PaymentStatus.Failed;
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                return false;
+            }
+
+            // 5. Cập nhật trạng thái đơn hàng thành Paid và tự động phát hành vé điện tử an toàn
+            var previousStatus = order.PaymentStatus;
+            order.PaymentStatus = PaymentStatus.Paid;
+            order.PaidAt = DateTime.UtcNow;
+            order.TransactionReference = payload.ReferenceCode ?? payload.Code ?? $"TXN-{Guid.NewGuid():N}";
             order.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            return false;
+
+            try
+            {
+                // 6. Tự động phát hành vé điện tử cho đơn hàng
+                await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
+            }
+            catch
+            {
+                // Rollback trạng thái đơn nếu quá trình phát hành vé gặp sự cố (PRD UC05 Exception E4)
+                order.PaymentStatus = previousStatus;
+                order.PaidAt = null;
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                throw;
+            }
+
+            return true;
         }
-
-        // 5. Cập nhật trạng thái đơn hàng thành Paid
-        order.PaymentStatus = PaymentStatus.Paid;
-        order.PaidAt = DateTime.UtcNow;
-        order.TransactionReference = payload.ReferenceCode ?? payload.Code ?? $"TXN-{Guid.NewGuid():N}";
-        order.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        // 6. Tự động phát hành vé điện tử cho đơn hàng
-        await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
-
-        return true;
+        finally
+        {
+            _webhookLock.Release();
+        }
     }
 
     public async Task<OrderDto> SimulateSandboxPaymentAsync(SimulatePaymentRequest request)
@@ -216,58 +254,91 @@ public class OrderService : IOrderService
             throw new ArgumentException("Mã đơn hàng không hợp lệ.");
         }
 
-        var normalizedCode = request.OrderCode.Trim().ToUpper();
-        var order = await _context.TicketOrders
-            .Include(o => o.TicketType)
-            .Include(o => o.Tickets)
-            .FirstOrDefaultAsync(o => o.OrderCode.ToUpper() == normalizedCode || o.PaymentDescription.ToUpper() == normalizedCode);
-
-        if (order == null)
+        await _webhookLock.WaitAsync();
+        try
         {
-            throw new ArgumentException($"Không tìm thấy đơn hàng {request.OrderCode}.");
-        }
+            var normalizedCode = request.OrderCode.Trim().ToUpper();
+            var order = await _context.TicketOrders
+                .Include(o => o.TicketType)
+                .Include(o => o.Tickets)
+                .FirstOrDefaultAsync(o => o.OrderCode.ToUpper() == normalizedCode || o.PaymentDescription.ToUpper() == normalizedCode);
 
-        // Mô phỏng thất bại phục vụ kiểm thử
-        if (request.FailSimulation == true)
-        {
-            order.PaymentStatus = PaymentStatus.Failed;
+            if (order == null)
+            {
+                throw new ArgumentException($"Không tìm thấy đơn hàng {request.OrderCode}.");
+            }
+
+            if (order.PaymentStatus == PaymentStatus.Paid)
+            {
+                var existingTickets = await _context.Tickets
+                    .Where(t => t.OrderId == order.OrderId)
+                    .ToListAsync();
+                return MapToDto(order, order.TicketType, existingTickets);
+            }
+
+            // Kiểm tra đơn hàng đã quá thời hạn giữ chỗ (15 phút)
+            if (order.PaymentStatus == PaymentStatus.Expired ||
+                (order.PaymentStatus == PaymentStatus.Pending && DateTime.UtcNow > order.ExpiresAt))
+            {
+                if (order.PaymentStatus != PaymentStatus.Expired)
+                {
+                    order.PaymentStatus = PaymentStatus.Expired;
+                    order.UpdatedAt = DateTime.UtcNow;
+                    await _context.SaveChangesAsync();
+                }
+                throw new InvalidOperationException($"Đơn hàng {order.OrderCode} đã quá thời hạn thanh toán (15 phút). Không có vé nào được phát hành.");
+            }
+
+            // Mô phỏng thất bại phục vụ kiểm thử
+            if (request.FailSimulation == true)
+            {
+                order.PaymentStatus = PaymentStatus.Failed;
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                throw new InvalidOperationException("Giao dịch thanh toán sandbox thất bại (mô phỏng lỗi giao dịch). Không có vé nào được phát hành.");
+            }
+
+            var amount = request.Amount ?? order.TotalAmount;
+            if (amount < order.TotalAmount)
+            {
+                throw new InvalidOperationException($"Số tiền giả lập ({amount:N0} đ) không đủ so với giá trị đơn hàng ({order.TotalAmount:N0} đ).");
+            }
+
+            var previousStatus = order.PaymentStatus;
+            order.PaymentStatus = PaymentStatus.Paid;
+            order.PaidAt = DateTime.UtcNow;
+            order.TransactionReference = $"SANDBOX-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
             order.UpdatedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
-            throw new InvalidOperationException("Giao dịch thanh toán sandbox thất bại (mô phỏng lỗi giao dịch). Không có vé nào được phát hành.");
-        }
 
-        if (order.PaymentStatus == PaymentStatus.Paid)
-        {
-            var existingTickets = await _context.Tickets
+            try
+            {
+                // Tự động cấp mã vé
+                await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
+            }
+            catch
+            {
+                order.PaymentStatus = previousStatus;
+                order.PaidAt = null;
+                order.UpdatedAt = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+                throw;
+            }
+
+            var ticketsList = await _context.Tickets
                 .Where(t => t.OrderId == order.OrderId)
                 .ToListAsync();
-            return MapToDto(order, order.TicketType, existingTickets);
-        }
 
-        var amount = request.Amount ?? order.TotalAmount;
-        if (amount < order.TotalAmount)
+            var dto = MapToDto(order, order.TicketType, ticketsList);
+            dto.EmailSent = null;
+            dto.EmailStatusMessage = null;
+
+            return dto;
+        }
+        finally
         {
-            throw new InvalidOperationException($"Số tiền giả lập ({amount:N0} đ) không đủ so với giá trị đơn hàng ({order.TotalAmount:N0} đ).");
+            _webhookLock.Release();
         }
-
-        order.PaymentStatus = PaymentStatus.Paid;
-        order.PaidAt = DateTime.UtcNow;
-        order.TransactionReference = $"SANDBOX-{DateTime.UtcNow:yyyyMMddHHmmss}-{Guid.NewGuid().ToString("N")[..6].ToUpper()}";
-        order.UpdatedAt = DateTime.UtcNow;
-        await _context.SaveChangesAsync();
-
-        // Tự động cấp mã vé
-        var issuedTickets = await _ticketService.IssueTicketsForOrderAsync(order.OrderId);
-
-        var ticketsList = await _context.Tickets
-            .Where(t => t.OrderId == order.OrderId)
-            .ToListAsync();
-
-        var dto = MapToDto(order, order.TicketType, ticketsList);
-        dto.EmailSent = null;
-        dto.EmailStatusMessage = null;
-
-        return dto;
     }
 
     public async Task<OrderDto> ResendTicketEmailAsync(string orderCode, string? recipientEmail = null)
