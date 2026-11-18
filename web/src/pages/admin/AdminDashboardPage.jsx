@@ -673,7 +673,7 @@ export default function AdminDashboardPage() {
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #059669' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">5. Thiết bị trực tuyến (5 phút gần nhất)</span>
+                                        <span className="saas-kpi-title">5. Thiết bị trực tuyến (1 phút gần nhất)</span>
                                         <span className="saas-status-dot-badge" style={{ fontSize: '0.73rem', color: signalRConnected ? '#15803D' : '#64748B' }}>
                                             <span className={`saas-dot ${signalRConnected ? 'success' : 'neutral'}`} />
                                             {signalRConnected ? 'SignalR Live' : 'Polling'}
@@ -681,13 +681,13 @@ export default function AdminDashboardPage() {
                                     </div>
                                     <div className="saas-kpi-value-row">
                                         <span className="saas-kpi-value" style={{ color: '#059669' }}>
-                                            {stats.onlineDevicesCombined5MinCount ?? stats.activeDevices ?? 0}
+                                            {stats.onlineDevicesCombined1MinCount ?? stats.activeDevices ?? 0}
                                         </span>
                                         <span className="saas-kpi-unit">thiết bị đang hoạt động</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Lịch sử tương tác 5p (DB): <strong>{stats.dbActiveDevices5MinCount ?? stats.activeDevices5Min ?? 0}</strong> • SignalR có heartbeat: <strong>{stats.signalRVerifiedDevicesCount ?? 0}</strong>
+                                    Lịch sử tương tác 1p (DB): <strong>{stats.dbActiveDevices1MinCount ?? stats.activeDevices1Min ?? 0}</strong> • SignalR có heartbeat: <strong>{stats.signalRVerifiedDevicesCount ?? 0}</strong>
                                     <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#94A3B8' }}>
                                         Kết hợp SignalR & DEVICE_ACTIVITIES (không tính socket rỗi không có heartbeat; socket mở: {stats.signalRConnectedDevicesCount ?? 0})
                                     </div>
