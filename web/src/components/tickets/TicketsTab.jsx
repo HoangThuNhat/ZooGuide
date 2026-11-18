@@ -779,39 +779,16 @@ export default function TicketsTab() {
                                         <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: (currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0) ? '#DC2626' : '#15803D', fontSize: '0.8rem', fontWeight: 700 }}>
                                             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: (currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0) ? '#DC2626' : '#16A34A', display: 'inline-block' }}></span>
                                             <span>
-                                                {(currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0)
-                                                    ? 'Đơn hàng đã hết thời hạn thanh toán (15 phút). Vui lòng đặt lại đơn hàng mới.'
-                                                    : 'Hệ thống đang tự động lắng nghe giao dịch chuyển khoản...'}
+                                                     Đơn hàng đã hết thời hạn thanh toán (15 phút). Vui lòng đặt lại đơn hàng mới.
+                                                
                                             </span>
                                         </div>
                                     </div>
 
                                     {/* Các nút thao tác kiểm tra & Sandbox */}
                                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                        <button
-                                            type="button"
-                                            onClick={handleCheckPaymentStatusManually}
-                                            disabled={isCheckingPayment || currentOrder.paymentStatus === 'Expired' || currentOrder.paymentStatus === 4 || paymentTimeRemaining <= 0}
-                                            style={{
-                                                flex: 1,
-                                                minWidth: '140px',
-                                                padding: '12px',
-                                                borderRadius: '10px',
-                                                background: '#15803D',
-                                                color: '#FFFFFF',
-                                                border: 'none',
-                                                fontWeight: 700,
-                                                fontSize: '0.88rem',
-                                                cursor: (isCheckingPayment || currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 'not-allowed' : 'pointer',
-                                                opacity: (currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 0.5 : 1,
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '6px'
-                                            }}
-                                        >
-                                            {isCheckingPayment ? 'Đang kiểm tra...' : 'Kiểm tra thanh toán'}
-                                        </button>
+
+
 
                                         <button
                                             type="button"
@@ -831,7 +808,7 @@ export default function TicketsTab() {
                                                 opacity: (currentOrder.paymentStatus === 'Expired' || paymentTimeRemaining <= 0) ? 0.5 : 1
                                             }}
                                         >
-                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Giả lập Sandbox'}
+                                            {isSimulatingPayment ? 'Đang xử lý...' : 'Thanh toán'}
                                         </button>
 
                                         <button
