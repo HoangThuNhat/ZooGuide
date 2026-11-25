@@ -27,7 +27,13 @@ public class TicketSessionDto
     public bool HasAudioGuide { get; set; } = true;
     public string ActivatedAt { get; set; } = string.Empty;
     public string ExpiresAt { get; set; } = string.Empty;
+    public string? EndedAt { get; set; }
+    public DateTime StartedAtUtc { get; set; }
+    public DateTime ExpiredAtUtc { get; set; }
+    public DateTime? EndedAtUtc { get; set; }
     public string Status { get; set; } = "Active";
+    public bool IsActive { get; set; }
+    public bool IsInternalUser { get; set; }
     public string? Device { get; set; }
 }
 

@@ -12,10 +12,14 @@ public class DashboardStatsDto
     public int ActiveBuyerConnections { get; set; }
     public int OnlineUsers { get; set; }
     public int ActiveDevices { get; set; }
+    public int ActiveDevices1Min { get; set; }
     public int ActiveDevices5Min { get; set; }
     public int TotalTrackedDevices { get; set; }
     public int SignalRConnectedDevicesCount { get; set; }
     public int SignalRVerifiedDevicesCount { get; set; }
+    public int DbActiveDevices1MinCount { get; set; }
+    public int TelemetryActiveDevices1MinCount { get; set; }
+    public int OnlineDevicesCombined1MinCount { get; set; }
     public int DbActiveDevices5MinCount { get; set; }
     public int TelemetryActiveDevices5MinCount { get; set; }
     public int OnlineDevicesCombined5MinCount { get; set; }

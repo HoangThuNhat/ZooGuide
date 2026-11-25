@@ -19,6 +19,8 @@ public class TicketSessionRepository : ITicketSessionRepository
         return await _context.TicketSessions
             .Include(ts => ts.Ticket)
                 .ThenInclude(t => t.TicketType)
+            .Include(ts => ts.Ticket)
+                .ThenInclude(t => t.Order)
             .Include(ts => ts.User)
             .FirstOrDefaultAsync(ts => ts.SessionId == sessionId);
     }
@@ -41,6 +43,8 @@ public class TicketSessionRepository : ITicketSessionRepository
         return await _context.TicketSessions
             .Include(ts => ts.Ticket)
                 .ThenInclude(t => t.TicketType)
+            .Include(ts => ts.Ticket)
+                .ThenInclude(t => t.Order)
             .Include(ts => ts.User)
             .OrderByDescending(ts => ts.StartedAt)
             .AsNoTracking()

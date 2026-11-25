@@ -137,13 +137,34 @@ public class TicketSessionService : ITicketSessionService
         return (true, "Xác thực vé thành công! Phiên tham quan đã được mở khóa.", sessionDto, 200, null);
     }
 
+    public static SessionStatus ResolveEffectiveStatus(TicketSession session, DateTime utcNow)
+    {
+        if (session.Status == SessionStatus.Revoked)
+            return SessionStatus.Revoked;
+
+        if (session.Status == SessionStatus.Ended)
+            return SessionStatus.Ended;
+
+        if (session.Status == SessionStatus.Expired)
+            return SessionStatus.Expired;
+
+        // Trạng thái trong DB là Active: kiểm tra điều kiện kết thúc & hết hạn thực tế
+        if (session.EndedAt.HasValue)
+            return SessionStatus.Ended;
+
+        if (session.ExpiredAt <= utcNow)
+            return SessionStatus.Expired;
+
+        return SessionStatus.Active;
+    }
+
     public async Task<TicketSession?> GetValidSessionAsync(Guid sessionId)
     {
         var session = await _sessionRepository.GetByIdWithDetailsAsync(sessionId);
         if (session == null) return null;
 
-        // Nếu trạng thái không phải Active
-        if (session.Status != SessionStatus.Active)
+        // Nếu trạng thái không phải Active hoặc đã có EndedAt
+        if (session.Status != SessionStatus.Active || session.EndedAt.HasValue)
         {
             return null;
         }
@@ -160,23 +181,91 @@ public class TicketSessionService : ITicketSessionService
         return session;
     }
 
-    public async Task<IEnumerable<TicketSessionDto>> GetAllSessionsAsync()
+    public async Task<IEnumerable<TicketSessionDto>> GetAllSessionsAsync(string? status = null, string? search = null)
     {
+        var now = DateTime.UtcNow;
         var sessions = await _sessionRepository.GetAllWithDetailsAsync();
-        return sessions.Select(s => new TicketSessionDto
+
+        var mapped = sessions.Select(s =>
         {
-            SessionId = s.SessionId.ToString(),
-            TicketCode = s.Ticket?.TicketCode ?? string.Empty,
-            CustomerName = s.User?.FullName ?? "Khách tham quan",
-            TicketType = s.Ticket?.TicketType?.Name ?? "Vé tiêu chuẩn",
-            ValidDate = s.Ticket?.ValidUntil.ToString("yyyy-MM-dd") ?? string.Empty,
-            ZonesAllowed = new List<string> { "ALL" },
-            HasAudioGuide = true,
-            ActivatedAt = s.StartedAt.ToString("yyyy-MM-dd HH:mm:ss"),
-            ExpiresAt = s.ExpiredAt.ToString("yyyy-MM-dd HH:mm:ss"),
-            Status = s.Status.ToString(),
-            Device = "Web Browser"
+            var effectiveStatus = ResolveEffectiveStatus(s, now);
+            var isInternalUser = s.User != null && (s.User.Role == UserRole.Admin || s.User.Role == UserRole.Staff);
+            var customerName = !string.IsNullOrWhiteSpace(s.User?.FullName)
+                ? s.User.FullName
+                : (!string.IsNullOrWhiteSpace(s.Ticket?.Order?.CustomerName)
+                    ? s.Ticket.Order.CustomerName
+                    : "Khách tham quan");
+
+            var startedUtc = DateTime.SpecifyKind(s.StartedAt, DateTimeKind.Utc);
+            var expiredUtc = DateTime.SpecifyKind(s.ExpiredAt, DateTimeKind.Utc);
+            DateTime? endedUtc = s.EndedAt.HasValue
+                ? DateTime.SpecifyKind(s.EndedAt.Value, DateTimeKind.Utc)
+                : null;
+
+            return new TicketSessionDto
+            {
+                SessionId = s.SessionId.ToString(),
+                TicketCode = s.Ticket?.TicketCode ?? string.Empty,
+                CustomerName = customerName,
+                TicketType = s.Ticket?.TicketType?.Name ?? "Vé tiêu chuẩn",
+                ValidDate = s.Ticket?.ValidUntil.ToString("yyyy-MM-dd") ?? string.Empty,
+                ZonesAllowed = new List<string> { "ALL" },
+                HasAudioGuide = true,
+                ActivatedAt = startedUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                ExpiresAt = expiredUtc.ToString("yyyy-MM-dd HH:mm:ss"),
+                EndedAt = endedUtc?.ToString("yyyy-MM-dd HH:mm:ss"),
+                StartedAtUtc = startedUtc,
+                ExpiredAtUtc = expiredUtc,
+                EndedAtUtc = endedUtc,
+                Status = effectiveStatus.ToString(),
+                IsActive = effectiveStatus == SessionStatus.Active,
+                IsInternalUser = isInternalUser,
+                Device = "Web Browser"
+            };
         });
+
+        if (!string.IsNullOrWhiteSpace(status) && !string.Equals(status.Trim(), "all", StringComparison.OrdinalIgnoreCase))
+        {
+            var targetStatus = status.Trim();
+            mapped = mapped.Where(s => string.Equals(s.Status, targetStatus, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var q = search.Trim();
+            mapped = mapped.Where(s =>
+                s.SessionId.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.TicketCode.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.CustomerName.Contains(q, StringComparison.OrdinalIgnoreCase) ||
+                s.TicketType.Contains(q, StringComparison.OrdinalIgnoreCase));
+        }
+
+        return mapped.ToList();
+    }
+
+    public async Task<bool> EndSessionAsync(Guid sessionId)
+    {
+        var session = await _sessionRepository.GetByIdWithDetailsAsync(sessionId);
+        if (session == null) return false;
+
+        if (session.Status != SessionStatus.Active || session.EndedAt.HasValue)
+        {
+            return false;
+        }
+
+        var now = DateTime.UtcNow;
+        if (session.ExpiredAt <= now)
+        {
+            session.Status = SessionStatus.Expired;
+            session.EndedAt = now;
+            await _sessionRepository.UpdateAsync(session);
+            return false;
+        }
+
+        session.Status = SessionStatus.Ended;
+        session.EndedAt = now;
+        await _sessionRepository.UpdateAsync(session);
+        return true;
     }
 
     public async Task<bool> RevokeSessionAsync(Guid sessionId)
@@ -190,16 +279,17 @@ public class TicketSessionService : ITicketSessionService
             return false;
         }
 
-        if (session.ExpiredAt <= DateTime.UtcNow)
+        var now = DateTime.UtcNow;
+        if (session.ExpiredAt <= now)
         {
             session.Status = SessionStatus.Expired;
-            session.EndedAt = DateTime.UtcNow;
+            session.EndedAt = now;
             await _sessionRepository.UpdateAsync(session);
             return false;
         }
 
         session.Status = SessionStatus.Revoked;
-        session.EndedAt = DateTime.UtcNow;
+        session.EndedAt = now;
         await _sessionRepository.UpdateAsync(session);
         return true;
     }

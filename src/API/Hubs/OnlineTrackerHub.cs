@@ -40,6 +40,42 @@ public class OnlineTrackerHub : Hub
             ? visitorId.Trim()
             : (!string.IsNullOrWhiteSpace(userId) ? userId.Trim() : Context.ConnectionId);
 
+        bool isAdminMonitor = string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(role, "Staff", StringComparison.OrdinalIgnoreCase)
+            || deviceId.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase);
+
+        Context.Items["DeviceId"] = deviceId;
+        Context.Items["IsAdminMonitor"] = isAdminMonitor;
+
+        // Nếu là kết nối giám sát từ Admin Dashboard, chỉ tham gia nhóm "Admins" để nhận cập nhật,
+        // KHÔNG đăng ký như một thiết bị khách tham quan đang hoạt động.
+        if (isAdminMonitor)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, "Admins");
+            var activeBuyers = _tracker.GetActiveTicketBuyersCount();
+            var activeDevs = _tracker.GetActiveDevicesCount();
+            var activeConn = _tracker.GetActiveBuyerConnectionsCount();
+            var activeBuyerDevices = _tracker.GetActiveTicketBuyerDevicesCount();
+
+            await Clients.Caller.SendAsync("ActiveBuyersUpdated", new
+            {
+                activeTicketBuyers = activeBuyers,
+                activeTicketBuyerDevices = activeBuyerDevices,
+                activeDevices = activeDevs,
+                activeBuyerConnections = activeConn
+            });
+
+            await Clients.Caller.SendAsync("ActiveDevicesUpdated", new
+            {
+                activeDevices = activeDevs,
+                activeTicketBuyerDevices = activeBuyerDevices
+            });
+
+            await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
+            await base.OnConnectedAsync();
+            return;
+        }
+
         bool isTicketBuyer = false;
         string? verifiedEmail = null;
 
@@ -104,36 +140,10 @@ public class OnlineTrackerHub : Hub
             ? (verifiedEmail ?? buyerEmail ?? deviceId).ToLower().Trim()
             : null;
 
-        Context.Items["DeviceId"] = deviceId;
         Context.Items["IsTicketBuyer"] = isTicketBuyer;
         Context.Items["BuyerKey"] = buyerKey;
 
         var isNewDevice = _tracker.RegisterDeviceConnection(deviceId, Context.ConnectionId, isTicketBuyer: isTicketBuyer, buyerKey: buyerKey, orderCode: orderCode);
-
-        // Nếu là Quản trị viên (Admin Dashboard), thêm vào nhóm "Admins"
-        if (string.Equals(role, "Admin", StringComparison.OrdinalIgnoreCase))
-        {
-            await Groups.AddToGroupAsync(Context.ConnectionId, "Admins");
-            var activeBuyers = _tracker.GetActiveTicketBuyersCount();
-            var activeDevs = _tracker.GetActiveDevicesCount();
-            var activeConn = _tracker.GetActiveBuyerConnectionsCount();
-            var activeBuyerDevices = _tracker.GetActiveTicketBuyerDevicesCount();
-            await Clients.Caller.SendAsync("ActiveBuyersUpdated", new
-{
-    activeTicketBuyers = activeBuyers,
-    activeTicketBuyerDevices = activeBuyerDevices,
-    activeDevices = activeDevs,
-    activeBuyerConnections = activeConn
-});
-
-await Clients.Caller.SendAsync("ActiveDevicesUpdated", new
-{
-    activeDevices = activeDevs,
-    activeTicketBuyerDevices = activeBuyerDevices
-});
-
-await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
-        }
 
         // Thông báo cho Dashboard Admin khi có thiết bị/phiên mới hoặc trạng thái thay đổi
         if (isNewDevice)
@@ -146,7 +156,8 @@ await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
 
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        if (Context.Items.TryGetValue("DeviceId", out var idObj) && idObj is string deviceId)
+        bool isAdminMonitor = Context.Items.TryGetValue("IsAdminMonitor", out var admObj) && admObj is bool isAdm && isAdm;
+        if (!isAdminMonitor && Context.Items.TryGetValue("DeviceId", out var idObj) && idObj is string deviceId)
         {
             var deviceWentOffline = _tracker.RemoveDeviceConnection(deviceId, Context.ConnectionId);
             if (deviceWentOffline)
@@ -208,6 +219,12 @@ await Clients.Caller.SendAsync("OnlineUsersUpdated", activeBuyers);
     /// </summary>
     public Task Heartbeat()
     {
+        bool isAdminMonitor = Context.Items.TryGetValue("IsAdminMonitor", out var admObj) && admObj is bool isAdm && isAdm;
+        if (isAdminMonitor)
+        {
+            return Task.CompletedTask;
+        }
+
         var deviceId = Context.Items.TryGetValue("DeviceId", out var devObj) && devObj is string d ? d : Context.ConnectionId;
         bool isBuyer = Context.Items.TryGetValue("IsTicketBuyer", out var bObj) && bObj is bool b && b;
         var buyerKey = Context.Items.TryGetValue("BuyerKey", out var kObj) ? kObj as string : null;

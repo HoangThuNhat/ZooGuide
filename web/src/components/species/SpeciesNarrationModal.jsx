@@ -95,6 +95,17 @@ export default function SpeciesNarrationModal({
         return () => { isMounted = false; };
     }, [isOpen, species, targetSpeciesId, selectedLang, hasActiveSession, currentSession, t]);
 
+    useEffect(() => {
+        if (!isOpen) return undefined;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape' && onClose) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isOpen, onClose]);
+
     if (!isOpen || !species) return null;
 
     const spDisplay = localizedSpecies || species;
@@ -141,7 +152,7 @@ export default function SpeciesNarrationModal({
     const activeLangObj = supportedLanguages.find(l => l.code === selectedLang);
 
     return (
-        <div id="species-narration-modal" className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 1200 }}>
+        <div id="species-narration-modal" className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-backdrop" onClick={onClose}></div>
             <div className="modal-dialog" style={{ maxWidth: '680px', width: '94%', maxHeight: '90vh', overflowY: 'auto' }}>
                 <div className="modal-header" style={{ alignItems: 'flex-start' }}>

@@ -43,9 +43,17 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
         _cleanupTimer = new Timer(_ => CheckAndNotifyExpiredSessions(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
+    private const string AdminDashboardPrefix = "admin_dashboard_";
+
+    private static bool IsAdminMonitorId(string? deviceId)
+    {
+        return !string.IsNullOrWhiteSpace(deviceId) &&
+               deviceId.Trim().StartsWith(AdminDashboardPrefix, StringComparison.OrdinalIgnoreCase);
+    }
+
     public bool RegisterDeviceConnection(string deviceId, string connectionId, bool isTicketBuyer = false, string? buyerKey = null, string? orderCode = null)
     {
-        if (string.IsNullOrWhiteSpace(deviceId)) return false;
+        if (string.IsNullOrWhiteSpace(deviceId) || IsAdminMonitorId(deviceId)) return false;
 
         var normalizedDeviceId = NormalizeKey(deviceId);
         var normalizedConnId = !string.IsNullOrWhiteSpace(connectionId) ? connectionId.Trim() : "conn-default";
@@ -107,7 +115,7 @@ public class OnlineUserTracker : IOnlineUserTracker, IDisposable
 
     public void RefreshHeartbeat(string deviceId, string? connectionId = null, bool? isTicketBuyer = null, string? buyerKey = null, string? orderCode = null)
     {
-        if (string.IsNullOrWhiteSpace(deviceId)) return;
+        if (string.IsNullOrWhiteSpace(deviceId) || IsAdminMonitorId(deviceId)) return;
 
         var normalizedDeviceId = NormalizeKey(deviceId);
         var now = DateTime.UtcNow;
@@ -192,12 +200,12 @@ public int GetActiveTicketBuyerDevicesCount()
 }
 
     /// <summary>
-    /// Số lượng thiết bị đang hoạt động (cả người chưa mua vé và đã mua vé, còn trong timeout 45s).
+    /// Số lượng thiết bị đang hoạt động (cả người chưa mua vé và đã mua vé, còn trong timeout 45s, loại trừ kết nối giám sát Admin).
     /// </summary>
     public int GetActiveDevicesCount()
     {
         CleanupExpiredSessions();
-        return _devices.Count;
+        return _devices.Values.Count(d => !IsAdminMonitorId(d.DeviceId));
     }
 
     public IReadOnlyCollection<string> GetActiveDeviceIds(int withinMinutes = 5, bool requireActivityProof = false)
@@ -206,7 +214,7 @@ public int GetActiveTicketBuyerDevicesCount()
         var cutoff = DateTime.UtcNow.AddMinutes(-Math.Max(1, withinMinutes));
 
         return _devices.Values
-            .Where(d => !d.DeviceId.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase))
+            .Where(d => !IsAdminMonitorId(d.DeviceId))
             .Where(d => d.LastSeenUtc >= cutoff)
             .Where(d => !requireActivityProof || (d.LastHeartbeatUtc.HasValue && d.LastHeartbeatUtc.Value >= cutoff))
             .Select(d => d.DeviceId)
@@ -350,7 +358,7 @@ public int GetActiveTicketBuyerDevicesCount()
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Count();
 
-        var currentDevices = _devices.Count;
+        var currentDevices = _devices.Values.Count(d => !IsAdminMonitorId(d.DeviceId));
 
         if (currentBuyers != _lastActiveBuyers || currentDevices != _lastActiveDevices)
         {

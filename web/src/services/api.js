@@ -16,6 +16,128 @@ export const OFFLINE_CACHE_CONFIG = {
     MAX_ENTRY_CHARS: 400000
 };
 
+function parseVttTimeToSeconds(raw) {
+    const parts = String(raw || '').trim().replace(',', '.').split(':');
+    if (parts.length === 3) {
+        return Math.max(0, Number(parts[0]) * 3600 + Number(parts[1]) * 60 + Number(parts[2]));
+    }
+    if (parts.length === 2) {
+        return Math.max(0, Number(parts[0]) * 60 + Number(parts[1]));
+    }
+    return 0;
+}
+
+/**
+ * Parses real timestamped transcripts (JSON segments or WebVTT) if present;
+ * otherwise builds honest length-weighted estimated segments with hasExactTimestamps: false.
+ */
+export function parseStructuredTranscript(rawInput, durationSec = 0) {
+    if (!rawInput) return { segments: [], hasExactTimestamps: false };
+
+    // 1. Pre-structured array with explicit startTime / time
+    if (Array.isArray(rawInput)) {
+        const valid = rawInput
+            .filter(item => item && typeof item.text === 'string' && item.text.trim())
+            .map(item => ({
+                time: Number.isFinite(Number(item.startTime ?? item.time ?? item.start))
+                    ? Math.max(0, Math.floor(Number(item.startTime ?? item.time ?? item.start)))
+                    : 0,
+                endTime: Number.isFinite(Number(item.endTime ?? item.end))
+                    ? Math.max(0, Math.floor(Number(item.endTime ?? item.end)))
+                    : null,
+                text: item.text.trim()
+            }));
+        if (valid.length > 0) {
+            const hasExplicit = rawInput.some(item => item && (item.startTime !== undefined || item.exact === true));
+            return { segments: valid, hasExactTimestamps: hasExplicit };
+        }
+        return { segments: [], hasExactTimestamps: false };
+    }
+
+    const str = String(rawInput).trim();
+    if (!str) return { segments: [], hasExactTimestamps: false };
+
+    // 2. JSON string with structured timestamps
+    if (str.startsWith('[') || str.startsWith('{')) {
+        try {
+            const parsed = JSON.parse(str);
+            const arr = Array.isArray(parsed) ? parsed : (Array.isArray(parsed.segments) ? parsed.segments : null);
+            if (arr && arr.length > 0) {
+                const segs = arr
+                    .filter(item => item && typeof item.text === 'string' && item.text.trim())
+                    .map(item => ({
+                        time: Math.max(0, Math.floor(Number(item.startTime ?? item.time ?? item.start ?? 0))),
+                        endTime: item.endTime != null ? Math.floor(Number(item.endTime)) : null,
+                        text: item.text.trim()
+                    }));
+                if (segs.length > 0) {
+                    return { segments: segs, hasExactTimestamps: true };
+                }
+            }
+        } catch {
+            // Fall through to WebVTT / plain text
+        }
+    }
+
+    // 3. WebVTT / SRT cues
+    if (/^\s*WEBVTT/i.test(str) || /\d{2}:\d{2}(?::\d{2})?[.,]\d{3}\s*-->\s*\d{2}:\d{2}/.test(str)) {
+        const blocks = str.replace(/\r\n/g, '\n').split(/\n\n+/);
+        const segs = [];
+        for (const block of blocks) {
+            const lines = block.split('\n').map(l => l.trim()).filter(Boolean);
+            const timeLineIdx = lines.findIndex(l => l.includes('-->'));
+            if (timeLineIdx >= 0) {
+                const [startRaw, endRaw] = lines[timeLineIdx].split('-->');
+                const text = lines.slice(timeLineIdx + 1).join(' ').trim();
+                if (text) {
+                    segs.push({
+                        time: Math.floor(parseVttTimeToSeconds(startRaw)),
+                        endTime: Math.floor(parseVttTimeToSeconds(endRaw)),
+                        text
+                    });
+                }
+            }
+        }
+        if (segs.length > 0) {
+            return { segments: segs, hasExactTimestamps: true };
+        }
+    }
+
+    // 4. Plain text: split by paragraphs, and if single long paragraph split by sentences
+    let parts = str.split(/\n+/).map(p => p.trim()).filter(Boolean);
+    if (parts.length <= 1 && str.length > 140) {
+        const sentenceParts = str
+            .split(/(?<=[.!?。！？])\s+/)
+            .map(s => s.trim())
+            .filter(Boolean);
+        if (sentenceParts.length > 1) {
+            parts = sentenceParts;
+        }
+    }
+
+    if (parts.length === 0) return { segments: [], hasExactTimestamps: false };
+
+    // Length-weighted estimated timeline across actual audio duration (clearly marked estimated)
+    const safeDuration = Number(durationSec) > 0 ? Number(durationSec) : Math.max(parts.length * 8, 24);
+    const totalChars = parts.reduce((sum, p) => sum + Math.max(p.length, 10), 0);
+    let cursor = 0;
+
+    const segments = parts.map((text, idx) => {
+        const startSec = idx === 0 ? 0 : Math.min(Math.floor(safeDuration - 1), Math.floor(cursor));
+        const share = (Math.max(text.length, 10) / totalChars) * safeDuration;
+        cursor += share;
+        const endSec = idx === parts.length - 1 ? Math.floor(safeDuration) : Math.min(Math.floor(safeDuration), Math.floor(cursor));
+        return {
+            time: startSec,
+            endTime: endSec,
+            text,
+            isEstimated: true
+        };
+    });
+
+    return { segments, hasExactTimestamps: false };
+}
+
 function notifyApiStatus(reachable, extra = {}) {
     if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
     try {
@@ -849,6 +971,7 @@ export const ZooApi = {
                         mapY: e.mapY != null ? Number(e.mapY) : null,
                         latitude: e.latitude != null ? Number(e.latitude) : null,
                         longitude: e.longitude != null ? Number(e.longitude) : null,
+                        radiusMeters: e.radiusMeters != null ? Number(e.radiusMeters) : 30,
                         animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
                         animals: (e.animals || []).map(mapAnimalDto)
                     }))
@@ -938,6 +1061,7 @@ export const ZooApi = {
                 mapY: e.mapY != null ? Number(e.mapY) : null,
                 latitude: e.latitude != null ? Number(e.latitude) : null,
                 longitude: e.longitude != null ? Number(e.longitude) : null,
+                radiusMeters: e.radiusMeters != null ? Number(e.radiusMeters) : 30,
                 animalCount: e.animalCount || (e.animals ? e.animals.length : 0),
                 animals: (e.animals || []).map(mapAnimalDto)
             }));
@@ -1243,13 +1367,7 @@ export const ZooApi = {
                 ? `${API_CONFIG.BASE_URL}/narrations/${n.narrationId}/stream?sessionId=${encodeURIComponent(sessionId)}`
                 : null;
             const durationSec = n.durationSeconds || 0;
-            const paragraphs = (n.content || '')
-                .split(/\n+/)
-                .map(p => p.trim())
-                .filter(Boolean);
-            const stepSec = paragraphs.length > 0 && durationSec > 0
-                ? Math.max(5, Math.floor(durationSec / paragraphs.length))
-                : 10;
+            const parsedTranscript = parseStructuredTranscript(n.transcript || n.content || n.title || '', durationSec);
 
             return {
                 success: true,
@@ -1282,9 +1400,8 @@ export const ZooApi = {
                     objectPath: n.objectPath || null,
                     referenceSource: n.referenceSource || '',
                     imageUrl: n.animalImageUrl || '',
-                    transcript: paragraphs.length > 0
-                        ? paragraphs.map((text, idx) => ({ time: idx * stepSec, text }))
-                        : [{ time: 0, text: n.content || n.title }],
+                    transcript: parsedTranscript.segments,
+                    hasExactTimestamps: parsedTranscript.hasExactTimestamps,
                     isFallbackLanguage: Boolean(n.isFallbackLanguage),
                     originalRequestedLanguage: n.originalRequestedLanguage || null,
                     fallbackMessage: n.fallbackMessage || null,
@@ -2109,16 +2226,23 @@ export const ZooApi = {
     },
 
     // 13. ADMIN: TICKET SESSIONS
-    async getTicketSessions() {
+    async getTicketSessions(filter = {}) {
         try {
-            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/sessions`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const params = new URLSearchParams();
+            if (filter.status && filter.status !== 'all') params.append('status', filter.status);
+            if (filter.search && filter.search.trim()) params.append('search', filter.search.trim());
+            const qs = params.toString() ? `?${params.toString()}` : '';
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/tickets/sessions${qs}`);
+            if (!res.ok) {
+                const errJson = await res.json().catch(() => null);
+                throw new Error(errJson?.message || `HTTP ${res.status}`);
+            }
             const data = await res.json();
             const list = Array.isArray(data) ? data : (data.data || []);
             return { success: true, data: list };
         } catch (err) {
             console.error('getTicketSessions error:', err);
-            return { success: false, data: [], error: err.message };
+            return { success: false, data: [], error: err.message, message: err.message || 'Không thể tải danh sách phiên tham quan.' };
         }
     },
 
@@ -2543,51 +2667,83 @@ export const ZooApi = {
 
     // 20. POINTS OF INTEREST (POI) & NARRATIONS
     async getPois(filter = {}) {
-        const cacheKey = `pois:${filter.category || 'all'}:${filter.isActive ?? 'all'}:${filter.areaId || 'all'}`;
-        try {
-            const params = new URLSearchParams();
-            if (filter.category && filter.category !== 'all') params.append('category', filter.category);
-            if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') params.append('isActive', filter.isActive);
-            if (filter.isVerified !== undefined && filter.isVerified !== null && filter.isVerified !== '') params.append('isVerified', filter.isVerified);
-            if (filter.search) params.append('search', filter.search);
-            if (filter.areaId) params.append('areaId', filter.areaId);
+        const lang = filter.lang || filter.languageCode || 'vi';
+        const cacheKey = `pois:${filter.category || 'all'}:${filter.isActive ?? 'all'}:${filter.areaId || 'all'}:${lang}`;
+        const params = new URLSearchParams();
+        if (filter.category && filter.category !== 'all') params.append('category', filter.category);
+        if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') params.append('isActive', filter.isActive);
+        if (filter.isVerified !== undefined && filter.isVerified !== null && filter.isVerified !== '') params.append('isVerified', filter.isVerified);
+        if (filter.search) params.append('search', filter.search);
+        if (filter.areaId) params.append('areaId', filter.areaId);
+        if (lang) params.append('lang', lang);
 
-            const qs = params.toString() ? `?${params.toString()}` : '';
-            const res = await fetch(`${API_CONFIG.BASE_URL}/pois${qs}`);
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            const data = await res.json();
-            const list = data.data || data || [];
-            if (!filter.search) {
-                saveOfflineTourCache(cacheKey, list);
+        const qs = params.toString() ? `?${params.toString()}` : '';
+        const url = `${API_CONFIG.BASE_URL}/pois${qs}`;
+
+        const retryDelays = [400, 1000];
+        let lastErr = null;
+
+        for (let attempt = 0; attempt <= retryDelays.length; attempt++) {
+            try {
+                const res = await fetch(url);
+                if (!res.ok) {
+                    const httpErr = new Error(`HTTP ${res.status}`);
+                    httpErr.status = res.status;
+                    // Bounded retry ONLY on transient 5xx server errors, never 4xx
+                    if (res.status >= 500 && attempt < retryDelays.length) {
+                        lastErr = httpErr;
+                        await new Promise(r => setTimeout(r, retryDelays[attempt]));
+                        continue;
+                    }
+                    throw httpErr;
+                }
+                const data = await res.json();
+                const list = data.data || data || [];
+                if (!filter.search) {
+                    saveOfflineTourCache(cacheKey, list);
+                }
+                notifyApiStatus(true);
+                return { success: true, data: list, fromOfflineCache: false };
+            } catch (err) {
+                lastErr = err;
+                const isNetworkErr = !err.status;
+                if (isNetworkErr && attempt < retryDelays.length) {
+                    await new Promise(r => setTimeout(r, retryDelays[attempt]));
+                    continue;
+                }
+                break;
             }
-            notifyApiStatus(true);
-            return { success: true, data: list, fromOfflineCache: false };
-        } catch (err) {
-            console.error('getPois error:', err);
-            notifyApiStatus(false, { error: err.message });
-            const cached = readOfflineTourCache(cacheKey) || readOfflineTourCache('pois:all:true:all') || readOfflineTourCache('pois:all:all:all');
-            if (cached && Array.isArray(cached.data)) {
-                let list = cached.data;
-                if (filter.category && filter.category !== 'all') {
-                    list = list.filter(p => p.category === filter.category);
-                }
-                if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') {
-                    list = list.filter(p => Boolean(p.isActive) === Boolean(filter.isActive));
-                }
-                if (filter.areaId) {
-                    list = list.filter(p => Number(p.areaId) === Number(filter.areaId));
-                }
-                if (filter.search) {
-                    const q = String(filter.search).toLowerCase();
-                    list = list.filter(p =>
-                        (p.name || '').toLowerCase().includes(q) ||
-                        (p.code || '').toLowerCase().includes(q)
-                    );
-                }
-                return { success: true, data: list, fromOfflineCache: true, cachedAt: cached.cachedAt };
-            }
-            return { success: false, data: [], error: err.message };
         }
+
+        console.error('getPois error:', lastErr);
+        notifyApiStatus(false, { error: lastErr?.message });
+        const cached =
+            readOfflineTourCache(cacheKey) ||
+            readOfflineTourCache(`pois:all:true:all:${lang}`) ||
+            readOfflineTourCache('pois:all:true:all:vi') ||
+            readOfflineTourCache('pois:all:true:all') ||
+            readOfflineTourCache('pois:all:all:all');
+        if (cached && Array.isArray(cached.data)) {
+            let list = cached.data;
+            if (filter.category && filter.category !== 'all') {
+                list = list.filter(p => (p.category || '').toLowerCase() === String(filter.category).toLowerCase());
+            }
+            if (filter.isActive !== undefined && filter.isActive !== null && filter.isActive !== '') {
+                list = list.filter(p => Boolean(p.isActive) === Boolean(filter.isActive));
+            }
+            if (filter.areaId) {
+                list = list.filter(p => Number(p.areaId) === Number(filter.areaId));
+            }
+            if (filter.search) {
+                const q = String(filter.search).toLowerCase();
+                list = list.filter(p =>
+                    (p.name || '').toLowerCase().includes(q) ||
+                    (p.code || '').toLowerCase().includes(q)
+                );
+            }
+            return { success: true, data: list, fromOfflineCache: true, cachedAt: cached.cachedAt };
+        }
+        return { success: false, data: [], error: lastErr?.message || 'Không thể tải danh sách điểm tham quan (POI).' };
     },
 
     async getPoiById(id) {

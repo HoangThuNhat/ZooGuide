@@ -182,7 +182,9 @@ public class NarrationService : INarrationService
                 ? fallbackNarration.Language.NativeName
                 : (fallbackNarration.Language?.Name ?? fallbackLang.ToUpper());
 
-            var message = $"Chưa có file âm thanh cho ngôn ngữ '{lang.ToUpper()}'. Hệ thống phát âm thanh dự phòng bằng {langName} ({fallbackLang.ToUpper()}) của cùng loài động vật.";
+            var message = lang == "en"
+                ? $"Audio narration is not yet available in English. Playing fallback audio in {langName} ({fallbackLang.ToUpper()}) for this species."
+                : $"Chưa có file âm thanh cho ngôn ngữ '{lang.ToUpper()}'. Hệ thống phát âm thanh dự phòng bằng {langName} ({fallbackLang.ToUpper()}) của cùng loài động vật.";
 
             return MapToDto(fallbackNarration, animalTranslations, isFallbackLanguage: true, originalRequestedLanguage: lang, fallbackMessage: message);
         }
@@ -446,6 +448,7 @@ public class NarrationService : INarrationService
                 : (n.Language?.Name ?? string.Empty),
             Title = n.Title,
             Content = n.Content,
+            Transcript = LocalizationHelper.TryReadSidecarVtt(primaryAudio?.PublicUrl ?? primaryAudio?.FileUrl ?? n.AudioUrl, primaryAudio?.ObjectPath),
             AudioUrl = primaryAudio?.FileUrl ?? n.AudioUrl,
             DurationSeconds = primaryAudio?.DurationSeconds ?? n.DurationSeconds,
             Status = n.Status.ToString(),

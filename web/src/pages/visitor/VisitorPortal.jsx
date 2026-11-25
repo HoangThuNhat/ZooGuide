@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
-import { ZooApi } from '../../services/api';
+import { ZooApi, parseStructuredTranscript } from '../../services/api';
 
 // Layout & Global Components
 import Header from '../../components/layout/Header';
@@ -49,8 +49,43 @@ export default function VisitorPortal() {
         if (audioElementRef.current) {
             audioElementRef.current.pause();
         }
-        setAudioState(prev => ({ ...prev, isPlaying: false, isLoading: false }));
+        setAudioState(prev => ({ ...prev, isPlaying: false, isLoading: false, autoplayBlocked: false }));
     }, [setAudioState]);
+
+    // Unlock HTMLAudioElement inside a direct user gesture (e.g. "Allow & Start GPS")
+    // so mobile browsers (iOS Safari / Android Chrome) allow subsequent GPS-triggered playback.
+    const unlockAudioForMobile = useCallback(() => {
+        try {
+            if (!audioElementRef.current) {
+                audioElementRef.current = new Audio();
+                audioElementRef.current.preload = 'metadata';
+            }
+            const audio = audioElementRef.current;
+            if (!audio.src || audio.paused) {
+                const prevSrc = audio.src;
+                if (!prevSrc) {
+                    // Minimal valid silent WAV data URI (44 bytes) to unlock media element on user gesture
+                    audio.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+                }
+                const playPromise = audio.play();
+                if (playPromise && typeof playPromise.then === 'function') {
+                    playPromise.then(() => {
+                        audio.pause();
+                        if (!prevSrc) {
+                            audio.removeAttribute('src');
+                            audio.load();
+                        }
+                    }).catch(() => {
+                        if (!prevSrc) {
+                            audio.removeAttribute('src');
+                        }
+                    });
+                }
+            }
+        } catch {
+            // Ignore audio unlock errors on restricted environments
+        }
+    }, []);
 
     // Theo dõi trạng thái kết nối mạng (xử lý mất mạng / mạng yếu khi phát âm thanh)
     useEffect(() => {
@@ -119,6 +154,8 @@ export default function VisitorPortal() {
             setAudioState(prev => ({
                 ...prev,
                 isLoading: true,
+                isCompleted: false,
+                autoplayBlocked: false,
                 error: null
             }));
 
@@ -211,6 +248,8 @@ export default function VisitorPortal() {
                     ...prev,
                     isPlaying: false,
                     isLoading: false,
+                    isCompleted: true,
+                    autoplayBlocked: false,
                     currentTime: prev.duration
                 }));
             };
@@ -268,7 +307,11 @@ export default function VisitorPortal() {
                     isSuccess: true
                 });
             }).catch(err => {
-                console.warn('Audio playback blocked or failed:', err.message);
+                const isNotAllowed = err?.name === 'NotAllowedError' ||
+                    String(err?.message || '').toLowerCase().includes('not allowed') ||
+                    String(err?.message || '').toLowerCase().includes('user gesture') ||
+                    String(err?.message || '').toLowerCase().includes('interact');
+                console.warn('Audio playback blocked or failed:', err?.name, err?.message);
                 ZooApi.recordDashboardTelemetry({
                     category: 'AUDIO',
                     eventType: 'ERROR_PLAYBACK',
@@ -279,14 +322,17 @@ export default function VisitorPortal() {
                     targetName,
                     triggerSource,
                     isSuccess: false,
-                    errorCode: 'PLAYBACK_BLOCKED',
-                    errorMessage: err.message
+                    errorCode: isNotAllowed ? 'AUTOPLAY_BLOCKED' : 'PLAYBACK_BLOCKED',
+                    errorMessage: err?.message || 'Playback blocked'
                 });
                 setAudioState(prev => ({
                     ...prev,
                     isPlaying: false,
                     isLoading: false,
-                    error: 'Trình duyệt tạm chặn tự động phát hoặc luồng âm thanh gặp sự cố. Nhấn Phát để tiếp tục.'
+                    autoplayBlocked: isNotAllowed,
+                    error: isNotAllowed
+                        ? (t?.audioAutoplayBlockedMsg || 'Trình duyệt trên thiết bị đang chặn tự động phát âm thanh.')
+                        : (t?.audioMissingDesc || 'Luồng âm thanh gặp sự cố. Nhấn Phát để tiếp tục.')
                 }));
             });
         } catch (err) {
@@ -330,18 +376,26 @@ export default function VisitorPortal() {
         }
 
         const reqId = ++playRequestIdRef.current;
-        if (audioElementRef.current) {
-            audioElementRef.current.pause();
-        }
+        const isLanguageSwitch = triggerSource === 'LANGUAGE_SWITCH';
+        const wasPlayingBeforeSwitch = Boolean(audioElementRef.current && !audioElementRef.current.paused);
+        const prevNarration = audioState.narration;
 
-        setAudioState(prev => ({
-            ...prev,
-            isLoading: true,
-            isPlaying: false,
-            error: null,
-            entityType: 'ANIMAL',
-            isVisible: true
-        }));
+        // Khi chuyển ngôn ngữ, KHÔNG tạm dừng âm thanh cũ trước khi biết bản mới có khác file thực tế hay không
+        if (!isLanguageSwitch) {
+            if (audioElementRef.current) {
+                audioElementRef.current.pause();
+            }
+            setAudioState(prev => ({
+                ...prev,
+                isLoading: true,
+                isPlaying: false,
+                isCompleted: false,
+                autoplayBlocked: false,
+                error: null,
+                entityType: 'ANIMAL',
+                isVisible: true
+            }));
+        }
 
         ZooApi.recordDashboardTelemetry({
             category: 'AUDIO',
@@ -454,6 +508,31 @@ export default function VisitorPortal() {
             return;
         }
 
+        // Nếu chuyển ngôn ngữ nhưng hai ngôn ngữ cùng fallback về đúng một file/narration thực tế:
+        // KHÔNG dừng, KHÔNG nạp lại src, KHÔNG tua về 00:00 — chỉ cập nhật thông báo fallback minh bạch.
+        const isSameResolvedTrack = Boolean(
+            isLanguageSwitch &&
+            prevNarration &&
+            res.data.hasAudio &&
+            res.data.audioSrc &&
+            prevNarration.audioSrc &&
+            ((res.data.narrationId && prevNarration.narrationId && Number(res.data.narrationId) === Number(prevNarration.narrationId)) ||
+             res.data.audioSrc === prevNarration.audioSrc)
+        );
+
+        if (isSameResolvedTrack) {
+            setAudioState(prev => ({
+                ...prev,
+                narration: {
+                    ...prev.narration,
+                    isFallbackLanguage: Boolean(res.data.isFallbackLanguage),
+                    originalRequestedLanguage: res.data.originalRequestedLanguage || targetLang,
+                    fallbackMessage: res.data.fallbackMessage || prev.narration?.fallbackMessage || null
+                }
+            }));
+            return;
+        }
+
         const animalObj = {
             id: speciesId,
             speciesId: parseInt(speciesId),
@@ -464,7 +543,16 @@ export default function VisitorPortal() {
             imageUrl: res.data.imageUrl || ''
         };
         const duration = res.data.durationSec || 60;
-        const canAutoPlay = Boolean(startAutoplay && res.data.hasAudio && res.data.audioSrc);
+        const shouldPlayAfterSwitch = isLanguageSwitch ? wasPlayingBeforeSwitch : startAutoplay;
+        const canAutoPlay = Boolean(shouldPlayAfterSwitch && res.data.hasAudio && res.data.audioSrc);
+
+        if (isLanguageSwitch && !canAutoPlay && audioElementRef.current) {
+            audioElementRef.current.pause();
+            if (res.data.audioSrc) {
+                audioElementRef.current.src = res.data.audioSrc;
+                try { audioElementRef.current.currentTime = 0; } catch {}
+            }
+        }
 
         setAudioState(prev => ({
             ...prev,
@@ -473,6 +561,8 @@ export default function VisitorPortal() {
             entityType: 'ANIMAL',
             isPlaying: canAutoPlay,
             isLoading: canAutoPlay,
+            isCompleted: false,
+            autoplayBlocked: false,
             error: (!res.data.hasAudio || !res.data.audioSrc) ? (t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.') : null,
             currentTime: 0,
             duration,
@@ -480,7 +570,7 @@ export default function VisitorPortal() {
             isVisible: true
         }));
 
-        if (startAutoplay) {
+        if (shouldPlayAfterSwitch) {
             if (res.data.hasAudio && res.data.audioSrc) {
                 startAudioPlayback(res.data, audioState.playbackRate || 1.0, triggerSource);
             } else {
@@ -631,13 +721,13 @@ export default function VisitorPortal() {
         }
         if (audioElementRef.current && audioElementRef.current.src) {
             audioElementRef.current.play().then(() => {
-                setAudioState(prev => ({ ...prev, isPlaying: true }));
+                setAudioState(prev => ({ ...prev, isPlaying: true, autoplayBlocked: false, error: null, isCompleted: false }));
             }).catch(() => {
                 startAudioPlayback(audioState.narration, audioState.playbackRate);
             });
         } else {
             startAudioPlayback(audioState.narration, audioState.playbackRate);
-            setAudioState(prev => ({ ...prev, isPlaying: true }));
+            setAudioState(prev => ({ ...prev, isPlaying: true, autoplayBlocked: false, error: null, isCompleted: false }));
         }
     };
 
@@ -749,18 +839,26 @@ export default function VisitorPortal() {
         }
 
         const reqId = ++playRequestIdRef.current;
-        if (audioElementRef.current) {
-            audioElementRef.current.pause();
-        }
+        const isLanguageSwitch = triggerSource === 'LANGUAGE_SWITCH';
+        const wasPlayingBeforeSwitch = Boolean(audioElementRef.current && !audioElementRef.current.paused);
+        const prevNarration = audioState.narration;
 
-        setAudioState(prev => ({
-            ...prev,
-            isLoading: true,
-            isPlaying: false,
-            error: null,
-            entityType: 'POI',
-            isVisible: true
-        }));
+        if (!isLanguageSwitch) {
+            if (audioElementRef.current) {
+                audioElementRef.current.pause();
+            }
+
+            setAudioState(prev => ({
+                ...prev,
+                isLoading: true,
+                isPlaying: false,
+                isCompleted: false,
+                autoplayBlocked: false,
+                error: null,
+                entityType: 'POI',
+                isVisible: true
+            }));
+        }
 
         ZooApi.recordDashboardTelemetry({
             category: 'AUDIO',
@@ -879,18 +977,33 @@ export default function VisitorPortal() {
 
             const duration = data.durationSeconds || 60;
             const audioSource = (data.hasAudio ? data.streamUrl : null) || data.audioUrl;
+
+            // Khi đổi ngôn ngữ mà POI fallback về đúng cùng bản âm thanh thực tế -> giữ nguyên phát liên tục
+            const isSameResolvedPoiTrack = Boolean(
+                isLanguageSwitch &&
+                prevNarration &&
+                audioSource &&
+                prevNarration.audioSrc &&
+                Number(prevNarration.poiId) === Number(data.poiId) &&
+                ((data.languageCode || '').toLowerCase() === (prevNarration.languageCode || '').toLowerCase() ||
+                 (data.audioUrl && prevNarration.publicUrl && data.audioUrl === prevNarration.publicUrl))
+            );
+
+            if (isSameResolvedPoiTrack) {
+                setAudioState(prev => ({
+                    ...prev,
+                    narration: {
+                        ...prev.narration,
+                        isFallbackLanguage: Boolean(data.isFallbackLanguage),
+                        fallbackMessage: data.fallbackMessage || prev.narration?.fallbackMessage || null
+                    }
+                }));
+                return;
+            }
+
             const mins = Math.floor(duration / 60).toString().padStart(2, '0');
             const secs = (duration % 60).toString().padStart(2, '0');
-            const paragraphs = (data.content || '')
-                .split(/\n+/)
-                .map(p => p.trim())
-                .filter(Boolean);
-            const stepSec = paragraphs.length > 0 && duration > 0
-                ? Math.max(5, Math.floor(duration / paragraphs.length))
-                : 10;
-            const structuredTranscript = paragraphs.length > 0
-                ? paragraphs.map((text, idx) => ({ time: idx * stepSec, text }))
-                : [{ time: 0, text: data.content || data.title || data.poiName }];
+            const parsedPoiTranscript = parseStructuredTranscript(data.transcript || data.content || data.title || data.poiName, duration);
 
             const narrationData = {
                 poiId: data.poiId,
@@ -903,30 +1016,41 @@ export default function VisitorPortal() {
                 publicUrl: data.audioUrl,
                 streamUrl: data.streamUrl,
                 content: data.content,
-                transcript: structuredTranscript,
+                transcript: parsedPoiTranscript.segments,
+                hasExactTimestamps: parsedPoiTranscript.hasExactTimestamps,
                 durationFormatted: mins + ':' + secs,
                 durationSec: duration,
                 hasAudio: Boolean(audioSource),
                 isFallbackLanguage: Boolean(data.isFallbackLanguage),
                 fallbackMessage: data.fallbackMessage || null
             };
+            const shouldPlayPoi = isLanguageSwitch ? wasPlayingBeforeSwitch : startAutoplay;
+            if (isLanguageSwitch && !shouldPlayPoi && audioElementRef.current) {
+                audioElementRef.current.pause();
+                if (audioSource) {
+                    audioElementRef.current.src = audioSource;
+                    try { audioElementRef.current.currentTime = 0; } catch {}
+                }
+            }
             setAudioState(prev => ({
                 ...prev,
                 animal: poiObj,
                 narration: narrationData,
                 entityType: 'POI',
-                isPlaying: Boolean(audioSource && startAutoplay),
-                isLoading: Boolean(audioSource && startAutoplay),
-                error: !audioSource ? 'Điểm tham quan này hiện chưa có file âm thanh thuyết minh.' : null,
+                isPlaying: Boolean(audioSource && shouldPlayPoi),
+                isLoading: Boolean(audioSource && shouldPlayPoi),
+                isCompleted: false,
+                autoplayBlocked: false,
+                error: !audioSource ? (t?.audioMissingDesc || 'Điểm tham quan này hiện chưa có file âm thanh thuyết minh.') : null,
                 currentTime: 0,
                 duration,
                 playbackRate: prev.playbackRate || 1.0,
                 isVisible: true
             }));
-            if (startAutoplay && audioSource) {
+            if (shouldPlayPoi && audioSource) {
                 startAudioPlayback(narrationData, audioState.playbackRate || 1.0, triggerSource);
             } else if (!audioSource) {
-                showToast('Điểm tham quan này hiện chưa có file âm thanh thuyết minh.', 'info');
+                showToast(t?.audioMissingDesc || 'Điểm tham quan này hiện chưa có file âm thanh thuyết minh.', 'info');
             }
         } catch (err) {
             setAudioState(prev => ({
@@ -1008,6 +1132,7 @@ export default function VisitorPortal() {
                                 onOpenSpeciesNarration={(species) => setSelectedSpeciesForNarration(species)}
                                 onOpenDetail={(animal) => setSelectedAnimalForDetail(animal)}
                                 onPlayPoiAudio={playPoiAudio}
+                                onUnlockAudio={unlockAudioForMobile}
                             />
                         )}
 

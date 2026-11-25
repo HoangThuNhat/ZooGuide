@@ -41,6 +41,17 @@ public class DevicesController : ControllerBase
             return BadRequest(ApiResponse<DeviceHeartbeatResponseDto>.Fail("InstallationId không được để trống."));
         }
 
+        if (request.InstallationId.Trim().StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase))
+        {
+            return Ok(ApiResponse<DeviceHeartbeatResponseDto>.Ok(new DeviceHeartbeatResponseDto
+            {
+                Success = false,
+                InstallationId = request.InstallationId.Trim().ToLowerInvariant(),
+                ServerTimeUtc = DateTime.UtcNow,
+                Message = "Bỏ qua heartbeat từ kết nối giám sát Admin."
+            }));
+        }
+
         var userAgent = Request.Headers["User-Agent"].ToString();
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
 

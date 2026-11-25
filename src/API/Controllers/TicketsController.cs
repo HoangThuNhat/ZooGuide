@@ -185,14 +185,14 @@ public class TicketsController : ControllerBase
     [HttpGet("sessions")]
     [Authorize(Roles = "Admin,Staff")]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<TicketSessionDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetSessions()
+    public async Task<IActionResult> GetSessions([FromQuery] string? status = null, [FromQuery] string? search = null)
     {
-        var sessions = await _ticketSessionService.GetAllSessionsAsync();
+        var sessions = await _ticketSessionService.GetAllSessionsAsync(status, search);
         return Ok(ApiResponse<IEnumerable<TicketSessionDto>>.Ok(sessions));
     }
 
     /// <summary>
-    /// Đóng/thu hồi phiên tham quan theo SessionId (Dành cho Quản trị viên và Khách tham quan)
+    /// Đóng/thu hồi phiên tham quan theo SessionId (Dành cho Quản trị viên)
     /// </summary>
     [HttpPost("sessions/{sessionId:guid}/revoke")]
     [Authorize(Roles = "Admin,Staff")]
@@ -203,10 +203,10 @@ public class TicketsController : ControllerBase
         bool revoked = await _ticketSessionService.RevokeSessionAsync(sessionId);
         if (!revoked)
         {
-            return NotFound(ApiResponse<object>.Fail($"Không tìm thấy phiên tham quan với SessionId = {sessionId}."));
+            return NotFound(ApiResponse<object>.Fail($"Phiên tham quan {sessionId} không tồn tại, đã hết hạn hoặc đã kết thúc trước đó."));
         }
 
-        return Ok(ApiResponse<object>.Ok(new { sessionId }, "Đã kết thúc phiên tham quan thành công."));
+        return Ok(ApiResponse<object>.Ok(new { sessionId, status = SessionStatus.Revoked.ToString() }, "Đã thu hồi phiên tham quan thành công."));
     }
 
     /// <summary>
@@ -231,13 +231,13 @@ public class TicketsController : ControllerBase
             return BadRequest(ApiResponse<object>.Fail("Mã phiên tham quan (SessionId) không hợp lệ."));
         }
 
-        bool revoked = await _ticketSessionService.RevokeSessionAsync(targetSessionId);
-        if (!revoked)
+        bool ended = await _ticketSessionService.EndSessionAsync(targetSessionId);
+        if (!ended)
         {
             return NotFound(ApiResponse<object>.Fail("Phiên tham quan không tồn tại hoặc đã kết thúc trước đó."));
         }
 
-        return Ok(ApiResponse<object>.Ok(new { sessionId = targetSessionId }, "Đã thoát phiên tham quan thành công."));
+        return Ok(ApiResponse<object>.Ok(new { sessionId = targetSessionId, status = SessionStatus.Ended.ToString() }, "Đã thoát phiên tham quan thành công."));
     }
 
     /// <summary>

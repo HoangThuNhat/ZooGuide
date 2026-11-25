@@ -8,6 +8,7 @@ public class PoiDto
     public int PoiId { get; set; }
     public string Code { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
+    public string? OriginalName { get; set; }
     public string? Description { get; set; }
     public string Category { get; set; } = "Landmark";
     public decimal Latitude { get; set; }
@@ -19,6 +20,8 @@ public class PoiDto
     public string? ImageUrl { get; set; }
     public int? AreaId { get; set; }
     public string? AreaName { get; set; }
+    public string LanguageCode { get; set; } = "vi";
+    public bool HasTranslation { get; set; } = true;
     public int? CreatedBy { get; set; }
     public string? CreatorName { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -79,6 +82,7 @@ public class PoiNarrationDto
     public string LanguageName { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string? Transcript { get; set; }
     public string? AudioUrl { get; set; }
     public int? DurationSeconds { get; set; }
     public string Status { get; set; } = "Published";
@@ -94,6 +98,7 @@ public class CreatePoiNarrationDto
     public int LanguageId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string? Transcript { get; set; }
     public string? AudioUrl { get; set; }
     public int? DurationSeconds { get; set; }
     public string Status { get; set; } = "Published";
@@ -122,6 +127,7 @@ public class PoiPublicNarrationDto
     public string LanguageName { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Content { get; set; } = string.Empty;
+    public string? Transcript { get; set; }
     public string? AudioUrl { get; set; }
     public int? DurationSeconds { get; set; }
     public bool HasAudio { get; set; }

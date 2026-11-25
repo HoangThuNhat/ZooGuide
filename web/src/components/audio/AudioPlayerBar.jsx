@@ -18,6 +18,8 @@ export default function AudioPlayerBar({
         narration,
         isPlaying,
         isLoading,
+        isCompleted = false,
+        autoplayBlocked = false,
         error,
         currentTime,
         duration,
@@ -67,7 +69,41 @@ export default function AudioPlayerBar({
                 />
             </div>
 
-            {error && (
+            {autoplayBlocked && (
+                <div id="autoplay-blocked-banner" style={{
+                    background: 'rgba(21, 128, 61, 0.25)',
+                    borderBottom: '1px solid rgba(74, 222, 128, 0.4)',
+                    padding: '8px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: '12px',
+                    fontSize: '0.8rem',
+                    color: '#DCFCE7'
+                }}>
+                    <span>🔊 {t?.audioAutoplayBlockedMsg || 'Trình duyệt trên thiết bị đang chặn tự động phát âm thanh.'}</span>
+                    <button
+                        type="button"
+                        id="btn-resume-autoplay"
+                        onClick={onTogglePlay}
+                        style={{
+                            background: '#22C55E',
+                            color: '#052E16',
+                            border: 'none',
+                            borderRadius: '6px',
+                            padding: '5px 12px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap'
+                        }}
+                    >
+                        {t?.audioTapResumeBtn || '▶ Chạm để phát tiếp'}
+                    </button>
+                </div>
+            )}
+
+            {error && !autoplayBlocked && (
                 <div style={{
                     background: 'rgba(220, 38, 38, 0.18)',
                     borderBottom: '1px solid rgba(248, 113, 113, 0.35)',
@@ -96,7 +132,7 @@ export default function AudioPlayerBar({
                                 whiteSpace: 'nowrap'
                             }}
                         >
-                            Thử lại
+                            {t?.retryBtn || 'Thử lại'}
                         </button>
                     )}
                 </div>
@@ -138,7 +174,7 @@ export default function AudioPlayerBar({
                                 background: isPoi ? 'rgba(14, 165, 233, 0.25)' : 'rgba(34, 197, 94, 0.25)',
                                 color: isPoi ? '#7DD3FC' : '#86EFAC'
                             }}>
-                                {isPoi ? '📍 Điểm tham quan' : '🐾 Động vật'}
+                                {isPoi ? (t?.audioTypePoi || '📍 Điểm tham quan') : (t?.audioTypeAnimal || '🐾 Động vật')}
                             </span>
                             <span style={{
                                 fontSize: '0.65rem',
@@ -148,20 +184,20 @@ export default function AudioPlayerBar({
                                 background: 'rgba(255, 255, 255, 0.14)',
                                 color: '#E2E8F0'
                             }}>
-                                🌐 {langCode}{narration.isFallbackLanguage ? ' (Dự phòng)' : ''}
+                                🌐 {langCode}{narration.isFallbackLanguage ? ` ${t?.audioFallbackTag || '(Dự phòng)'}` : ''}
                             </span>
                             <span style={{
                                 fontSize: '0.66rem',
                                 fontWeight: 700,
-                                color: error ? '#FCA5A5' : (isLoading ? '#FDE047' : (isPlaying ? '#4ADE80' : '#94A3B8'))
+                                color: (error && !autoplayBlocked) ? '#FCA5A5' : (isLoading ? '#FDE047' : (isPlaying ? '#4ADE80' : (isCompleted ? '#86EFAC' : '#94A3B8')))
                             }}>
-                                {error
-                                    ? '• Lỗi âm thanh'
+                                {(error && !autoplayBlocked)
+                                    ? (t?.audioStatusErr || '• Lỗi âm thanh')
                                     : (isLoading
-                                        ? '• ⏳ Đang tải...'
+                                        ? (t?.audioStatusLoading || '• ⏳ Đang tải...')
                                         : (isPlaying
-                                            ? `• ▶️ Đang phát${loadDurationMs ? ` (${loadDurationMs}ms)` : ''}`
-                                            : '• ⏸️ Tạm dừng'))}
+                                            ? `${t?.audioStatusPlaying || '• ▶️ Đang phát'}${loadDurationMs ? ` (${loadDurationMs}ms)` : ''}`
+                                            : (isCompleted ? (t?.audioStatusDone || '• ✅ Đã phát xong') : (t?.audioStatusPaused || '• ⏸️ Tạm dừng'))))}
                             </span>
                         </div>
                         <h5 id="player-track-title">{narration.title}</h5>

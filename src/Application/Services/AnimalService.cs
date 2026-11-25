@@ -85,27 +85,29 @@ public class AnimalService : IAnimalService
             {
                 SpeciesId = animal.Species.SpeciesId,
                 OriginalName = animal.Species.Name,
-                Name = spTr != null && !string.IsNullOrWhiteSpace(spTr.Title) ? spTr.Title : animal.Species.Name,
+                Name = dto.SpeciesName,
                 ScientificName = animal.Species.ScientificName,
-                Description = spTr != null && !string.IsNullOrWhiteSpace(spTr.Description) ? spTr.Description : ((isDefaultVi || spTr != null) ? animal.Species.Description : null),
-                ConservationStatus = animal.Species.ConservationStatus,
+                Description = ResolveSpeciesDescription(animal.Species, normalizedLang, spTr),
+                ConservationStatus = dto.ConservationStatus,
                 ImageUrl = animal.Species.ImageUrl,
                 Habitat = dto.Habitat,
                 Diet = dto.Diet,
                 Lifespan = dto.Lifespan,
                 ReferenceSource = spTr?.SourceReference ?? animal.Species.ReferenceSource,
                 LanguageCode = normalizedLang,
-                HasTranslation = isDefaultVi || (spTr != null && !string.IsNullOrWhiteSpace(spTr.Title))
+                HasTranslation = isDefaultVi || LocalizationHelper.HasValidDbTranslation(spTr?.Title, animal.Species.Name, normalizedLang) || (normalizedLang == "en" && LocalizationHelper.TryGetEnglishSpecies(animal.Species.ScientificName, out _))
             },
             Area = animal.Area == null ? null : new AreaResponseDto
             {
                 AreaId = animal.Area.AreaId,
                 Code = animal.Area.Code ?? "A",
                 OriginalName = animal.Area.Name,
-                Name = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title) ? areaTr.Title : animal.Area.Name,
-                Description = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Description) ? areaTr.Description : ((isDefaultVi || areaTr != null) ? animal.Area.Description : null),
+                Name = dto.AreaName,
+                Description = LocalizationHelper.HasValidDbTranslation(areaTr?.Title, animal.Area.Name, normalizedLang) && !string.IsNullOrWhiteSpace(areaTr?.Description)
+                    ? areaTr.Description
+                    : (isDefaultVi ? animal.Area.Description : null),
                 LanguageCode = normalizedLang,
-                HasTranslation = isDefaultVi || (areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title)),
+                HasTranslation = isDefaultVi || LocalizationHelper.HasValidDbTranslation(areaTr?.Title, animal.Area.Name, normalizedLang),
                 ReferenceSource = areaTr?.SourceReference ?? animal.Area.ReferenceSource,
                 Latitude = animal.Area.Latitude,
                 Longitude = animal.Area.Longitude,
@@ -122,10 +124,10 @@ public class AnimalService : IAnimalService
                 AreaName = dto.AreaName,
                 Code = animal.Enclosure.Code ?? $"ENC-{animal.Enclosure.EnclosureId:D3}",
                 OriginalName = animal.Enclosure.Name,
-                Name = encTr != null && !string.IsNullOrWhiteSpace(encTr.Title) ? encTr.Title : animal.Enclosure.Name,
-                Description = encTr != null && !string.IsNullOrWhiteSpace(encTr.Description) ? encTr.Description : ((isDefaultVi || encTr != null) ? animal.Enclosure.Description : null),
+                Name = dto.EnclosureName ?? animal.Enclosure.Name,
+                Description = ResolveEnclosureDescription(animal.Enclosure, normalizedLang, encTr),
                 LanguageCode = normalizedLang,
-                HasTranslation = isDefaultVi || (encTr != null && !string.IsNullOrWhiteSpace(encTr.Title)),
+                HasTranslation = isDefaultVi || LocalizationHelper.HasValidDbTranslation(encTr?.Title, animal.Enclosure.Name, normalizedLang) || (normalizedLang == "en" && LocalizationHelper.TryGetEnglishEnclosure(animal.Enclosure.Code, out _)),
                 ReferenceSource = encTr?.SourceReference ?? animal.Enclosure.ReferenceSource,
                 ImageUrl = animal.Enclosure.ImageUrl,
                 Status = animal.Enclosure.Status,
@@ -133,6 +135,7 @@ public class AnimalService : IAnimalService
                 MapY = animal.Enclosure.MapY,
                 Latitude = animal.Enclosure.Latitude,
                 Longitude = animal.Enclosure.Longitude,
+                RadiusMeters = LocalizationHelper.GetRecommendedEnclosureRadiusMeters(animal.Enclosure.Code),
                 CreatedAt = animal.Enclosure.CreatedAt,
                 UpdatedAt = animal.Enclosure.UpdatedAt
             }
@@ -316,6 +319,30 @@ public class AnimalService : IAnimalService
         return (c == "zh-cn" || c == "zh_cn" || c == "zh-hans") ? "zh" : c;
     }
 
+    private static string? ResolveSpeciesDescription(Species sp, string lang, ContentTranslation? spTr)
+    {
+        if (lang == "vi") return sp.Description;
+        if (LocalizationHelper.HasValidDbTranslation(spTr?.Title, sp.Name, lang) &&
+            !string.IsNullOrWhiteSpace(spTr?.Description) &&
+            !LocalizationHelper.IsUntranslatedVietnamese(spTr.Description, sp.Description, lang))
+            return spTr.Description;
+        if (lang == "en" && LocalizationHelper.TryGetEnglishSpecies(sp.ScientificName, out var enSp))
+            return enSp.Description;
+        return null;
+    }
+
+    private static string? ResolveEnclosureDescription(Enclosure enc, string lang, ContentTranslation? encTr)
+    {
+        if (lang == "vi") return enc.Description;
+        if (LocalizationHelper.HasValidDbTranslation(encTr?.Title, enc.Name, lang) &&
+            !string.IsNullOrWhiteSpace(encTr?.Description) &&
+            !LocalizationHelper.IsUntranslatedVietnamese(encTr.Description, enc.Description, lang))
+            return encTr.Description;
+        if (lang == "en" && LocalizationHelper.TryGetEnglishEnclosure(enc.Code, out var enEnc))
+            return enEnc.Description;
+        return null;
+    }
+
     private static AnimalResponseDto MapToResponseDto(Animal a, string lang = "vi", List<ContentTranslation>? translations = null)
     {
         bool isDefaultVi = lang == "vi";
@@ -326,14 +353,26 @@ public class AnimalService : IAnimalService
             ? translations?.FirstOrDefault(ct => ct.EntityType == "Enclosure" && ct.EntityId == a.EnclosureId.Value)
             : null;
 
-        bool hasAnTr = isDefaultVi || (anTr != null && !string.IsNullOrWhiteSpace(anTr.Title));
+        bool hasValidDbAn = LocalizationHelper.HasValidDbTranslation(anTr?.Title, a.Name, lang);
+        EnglishAnimalContent? enAn = null;
+        bool hasEnAnimal = lang == "en" && LocalizationHelper.TryGetEnglishAnimal(a.Name, out enAn);
+        bool hasAnTr = isDefaultVi || hasValidDbAn || hasEnAnimal;
 
-        string? origin = isDefaultVi ? a.Origin : null;
-        string? healthStatus = isDefaultVi ? a.HealthStatus : null;
+        bool hasValidDbSp = a.Species != null && LocalizationHelper.HasValidDbTranslation(spTr?.Title, a.Species.Name, lang);
+        EnglishSpeciesContent? enSp = null;
+        bool hasEnSpecies = lang == "en" && a.Species != null && LocalizationHelper.TryGetEnglishSpecies(a.Species.ScientificName, out enSp);
+
+        bool hasValidDbArea = a.Area != null && LocalizationHelper.HasValidDbTranslation(areaTr?.Title, a.Area.Name, lang);
+        bool hasValidDbEnc = a.Enclosure != null && LocalizationHelper.HasValidDbTranslation(encTr?.Title, a.Enclosure.Name, lang);
+        EnglishEnclosureContent? enEnc = null;
+        bool hasEnEnc = lang == "en" && a.Enclosure != null && LocalizationHelper.TryGetEnglishEnclosure(a.Enclosure.Code, out enEnc);
+
+        string? origin = isDefaultVi ? a.Origin : (hasEnAnimal ? enAn!.Origin : null);
+        string? healthStatus = isDefaultVi ? a.HealthStatus : (hasEnAnimal ? enAn!.HealthStatus : null);
         string? conservationNote = isDefaultVi ? a.ConservationNote : null;
-        string? habitat = isDefaultVi ? a.Species?.Habitat : null;
-        string? diet = isDefaultVi ? a.Species?.Diet : null;
-        string? lifespan = isDefaultVi ? a.Species?.Lifespan : null;
+        string? habitat = isDefaultVi ? a.Species?.Habitat : (hasEnSpecies ? enSp!.Habitat : null);
+        string? diet = isDefaultVi ? a.Species?.Diet : (hasEnSpecies ? enSp!.Diet : null);
+        string? lifespan = isDefaultVi ? a.Species?.Lifespan : (hasEnSpecies ? enSp!.Lifespan : null);
 
         if (anTr != null && !string.IsNullOrWhiteSpace(anTr.ExtraJson))
         {
@@ -341,11 +380,11 @@ public class AnimalService : IAnimalService
             {
                 using var doc = JsonDocument.Parse(anTr.ExtraJson);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("origin", out var o) && o.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("origin", out var o) && o.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(o.GetString(), a.Origin, lang))
                     origin = o.GetString();
-                if (root.TryGetProperty("healthStatus", out var hs) && hs.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("healthStatus", out var hs) && hs.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(hs.GetString(), a.HealthStatus, lang))
                     healthStatus = hs.GetString();
-                if (root.TryGetProperty("conservationNote", out var cn) && cn.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("conservationNote", out var cn) && cn.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(cn.GetString(), a.ConservationNote, lang))
                     conservationNote = cn.GetString();
             }
             catch { }
@@ -357,48 +396,74 @@ public class AnimalService : IAnimalService
             {
                 using var doc = JsonDocument.Parse(spTr.ExtraJson);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("habitat", out var h) && h.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("habitat", out var h) && h.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(h.GetString(), a.Species?.Habitat, lang))
                     habitat = h.GetString();
-                if (root.TryGetProperty("diet", out var d) && d.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("diet", out var d) && d.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(d.GetString(), a.Species?.Diet, lang))
                     diet = d.GetString();
-                if (root.TryGetProperty("lifespan", out var l) && l.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("lifespan", out var l) && l.ValueKind == JsonValueKind.String && !LocalizationHelper.IsUntranslatedVietnamese(l.GetString(), a.Species?.Lifespan, lang))
                     lifespan = l.GetString();
             }
             catch { }
         }
 
+        string displayName = isDefaultVi
+            ? a.Name
+            : (hasValidDbAn ? anTr!.Title! : (hasEnAnimal ? enAn!.Name : a.Name));
+
+        string? displayDescription = isDefaultVi
+            ? a.Description
+            : (hasValidDbAn && !string.IsNullOrWhiteSpace(anTr?.Description) && !LocalizationHelper.IsUntranslatedVietnamese(anTr.Description, a.Description, lang)
+                ? anTr.Description
+                : (hasEnAnimal ? enAn!.Description : null));
+
+        string displaySpeciesName = a.Species == null
+            ? string.Empty
+            : (isDefaultVi ? a.Species.Name : (hasValidDbSp ? spTr!.Title! : (hasEnSpecies ? enSp!.Name : a.Species.Name)));
+
+        string displayAreaName = a.Area == null
+            ? string.Empty
+            : (isDefaultVi ? a.Area.Name : (hasValidDbArea ? areaTr!.Title! : a.Area.Name));
+
+        string? displayEncName = a.Enclosure == null
+            ? null
+            : (isDefaultVi ? a.Enclosure.Name : (hasValidDbEnc ? encTr!.Title! : (hasEnEnc ? enEnc!.Name : a.Enclosure.Name)));
+
+        string? conservationStatus = hasEnSpecies
+            ? enSp!.ConservationStatus
+            : LocalizationHelper.LocalizeConservationStatus(a.Species?.ConservationStatus, lang);
+
         return new AnimalResponseDto
         {
             AnimalId = a.AnimalId,
             SpeciesId = a.SpeciesId,
-            SpeciesName = spTr != null && !string.IsNullOrWhiteSpace(spTr.Title) ? spTr.Title : (a.Species?.Name ?? string.Empty),
+            SpeciesName = displaySpeciesName,
             ScientificName = a.Species?.ScientificName,
-            ConservationStatus = a.Species?.ConservationStatus,
+            ConservationStatus = conservationStatus,
             AreaId = a.AreaId,
-            AreaName = areaTr != null && !string.IsNullOrWhiteSpace(areaTr.Title) ? areaTr.Title : (a.Area?.Name ?? string.Empty),
+            AreaName = displayAreaName,
             EnclosureId = a.EnclosureId,
-            EnclosureName = encTr != null && !string.IsNullOrWhiteSpace(encTr.Title) ? encTr.Title : a.Enclosure?.Name,
+            EnclosureName = displayEncName,
             EnclosureCode = a.Enclosure?.Code,
             OriginalName = a.Name,
-            Name = anTr != null && !string.IsNullOrWhiteSpace(anTr.Title) ? anTr.Title : a.Name,
-            Description = anTr != null && !string.IsNullOrWhiteSpace(anTr.Description) ? anTr.Description : (hasAnTr ? a.Description : null),
+            Name = displayName,
+            Description = displayDescription,
             LanguageCode = lang,
             HasTranslation = hasAnTr,
             ReferenceSource = anTr?.SourceReference ?? a.ReferenceSource ?? a.Species?.ReferenceSource,
             Gender = a.Gender.ToString(),
             DateOfBirth = a.DateOfBirth,
-            Origin = origin ?? (hasAnTr ? a.Origin : null),
-            HealthStatus = healthStatus ?? (hasAnTr ? a.HealthStatus : null),
-            ConservationNote = conservationNote ?? (hasAnTr ? a.ConservationNote : null),
+            Origin = origin,
+            HealthStatus = healthStatus,
+            ConservationNote = conservationNote,
             ImageUrl = a.ImageUrl,
             WeightKg = a.WeightKg,
             TemperatureC = a.TemperatureC,
             VeterinarianName = a.VeterinarianName,
             HealthActionRequired = a.HealthActionRequired,
             LastHealthCheckAt = a.LastHealthCheckAt,
-            Habitat = habitat ?? (hasAnTr ? a.Species?.Habitat : null),
-            Diet = diet ?? (hasAnTr ? a.Species?.Diet : null),
-            Lifespan = lifespan ?? (hasAnTr ? a.Species?.Lifespan : null),
+            Habitat = habitat,
+            Diet = diet,
+            Lifespan = lifespan,
             Status = a.Status.ToString(),
             CreatedAt = a.CreatedAt,
             UpdatedAt = a.UpdatedAt

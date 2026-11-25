@@ -25,11 +25,14 @@ public class PoiService : IPoiService
 
     public async Task<IEnumerable<PoiDto>> GetAllAsync(PoiFilterDto? filter = null)
     {
+        var normalizedLang = LocalizationHelper.NormalizeLanguageCode(filter?.LanguageCode);
+
         var query = _context.PointsOfInterest
             .Include(p => p.Area)
             .Include(p => p.Creator)
             .Include(p => p.Narrations)
                 .ThenInclude(n => n.Language)
+            .AsSplitQuery()
             .AsNoTracking()
             .AsQueryable();
 
@@ -37,8 +40,15 @@ public class PoiService : IPoiService
         {
             if (!string.IsNullOrWhiteSpace(filter.Category) && !filter.Category.Equals("all", StringComparison.OrdinalIgnoreCase))
             {
-                var cat = filter.Category.Trim();
-                query = query.Where(p => p.Category.ToLower() == cat.ToLower());
+                var cat = filter.Category.Trim().ToLowerInvariant();
+                if (cat == "gate" || cat == "entrance")
+                {
+                    query = query.Where(p => p.Category.ToLower() == "entrance" || p.Category.ToLower() == "gate");
+                }
+                else
+                {
+                    query = query.Where(p => p.Category.ToLower() == cat);
+                }
             }
 
             if (filter.IsActive.HasValue)
@@ -70,7 +80,18 @@ public class PoiService : IPoiService
             .ThenBy(p => p.Name)
             .ToListAsync();
 
-        return list.Select(MapToDto);
+        List<ContentTranslation>? translations = null;
+        if (normalizedLang != "vi")
+        {
+            translations = await _context.ContentTranslations
+                .Where(ct => (ct.EntityType == "POI" || ct.EntityType == "Poi" || ct.EntityType == "Area") &&
+                             ct.LanguageCode.ToLower() == normalizedLang &&
+                             ct.IsPublished)
+                .AsNoTracking()
+                .ToListAsync();
+        }
+
+        return list.Select(p => MapToDto(p, normalizedLang, translations));
     }
 
     public async Task<PoiDto?> GetByIdAsync(int id)
@@ -397,7 +418,9 @@ public class PoiService : IPoiService
             if (narration != null)
             {
                 isFallback = true;
-                fallbackMessage = $"Bài thuyết minh hiện chưa hỗ trợ ngôn ngữ {targetCode.ToUpper()}, đang phát bản Tiếng Việt.";
+                fallbackMessage = targetCode == "en"
+                    ? "Narration is not yet available in English; playing Vietnamese audio as fallback."
+                    : $"Bài thuyết minh hiện chưa hỗ trợ ngôn ngữ {targetCode.ToUpper()}, đang phát bản Tiếng Việt.";
             }
         }
 
@@ -410,7 +433,9 @@ public class PoiService : IPoiService
             if (narration != null)
             {
                 isFallback = true;
-                fallbackMessage = $"English narration provided as fallback.";
+                fallbackMessage = targetCode == "vi"
+                    ? "Chưa có bản Tiếng Việt, đang phát bản Tiếng Anh dự phòng."
+                    : "English narration provided as fallback.";
             }
         }
 
@@ -430,8 +455,18 @@ public class PoiService : IPoiService
             if (narration != null)
             {
                 isFallback = true;
-                fallbackMessage = $"Bản thuyết minh ngôn ngữ {narration.Language?.Name ?? narration.Language?.Code}.";
+                fallbackMessage = targetCode == "en"
+                    ? $"Playing fallback narration in {narration.Language?.Name ?? narration.Language?.Code}."
+                    : $"Đang phát bản thuyết minh dự phòng ({narration.Language?.Name ?? narration.Language?.Code}).";
             }
+        }
+
+        var localizedPoiName = poi.Name;
+        var localizedPoiDesc = poi.Description;
+        if (targetCode == "en" && LocalizationHelper.TryGetEnglishPoi(poi.Code, out var enPoi))
+        {
+            localizedPoiName = enPoi.Name;
+            localizedPoiDesc = enPoi.Description;
         }
 
         if (narration == null)
@@ -440,14 +475,14 @@ public class PoiService : IPoiService
             return new PoiPublicNarrationDto
             {
                 PoiId = poi.PoiId,
-                PoiName = poi.Name,
+                PoiName = localizedPoiName,
                 Category = poi.Category,
                 Latitude = poi.Latitude,
                 Longitude = poi.Longitude,
                 LanguageCode = targetCode,
                 LanguageName = targetCode.ToUpper(),
-                Title = poi.Name,
-                Content = poi.Description ?? "Chưa có bài thuyết minh cho địa điểm này.",
+                Title = localizedPoiName,
+                Content = localizedPoiDesc ?? (targetCode == "en" ? "No audio narration is available for this location yet." : "Chưa có bài thuyết minh cho địa điểm này."),
                 AudioUrl = null,
                 DurationSeconds = null,
                 HasAudio = false,
@@ -459,7 +494,7 @@ public class PoiService : IPoiService
         return new PoiPublicNarrationDto
         {
             PoiId = poi.PoiId,
-            PoiName = poi.Name,
+            PoiName = localizedPoiName,
             Category = poi.Category,
             Latitude = poi.Latitude,
             Longitude = poi.Longitude,
@@ -467,6 +502,7 @@ public class PoiService : IPoiService
             LanguageName = narration.Language?.Name ?? targetCode.ToUpper(),
             Title = narration.Title,
             Content = narration.Content,
+            Transcript = LocalizationHelper.TryReadSidecarVtt(narration.AudioUrl, null),
             AudioUrl = narration.AudioUrl,
             DurationSeconds = narration.DurationSeconds,
             HasAudio = !string.IsNullOrWhiteSpace(narration.AudioUrl),
@@ -475,15 +511,45 @@ public class PoiService : IPoiService
         };
     }
 
-    private static PoiDto MapToDto(PointOfInterest p)
+    private static PoiDto MapToDto(PointOfInterest p) => MapToDto(p, "vi", null);
+
+    private static PoiDto MapToDto(PointOfInterest p, string lang, List<ContentTranslation>? translations)
     {
+        bool isDefaultVi = lang == "vi";
+        var poiTr = translations?.FirstOrDefault(ct =>
+            (ct.EntityType.Equals("POI", StringComparison.OrdinalIgnoreCase)) && ct.EntityId == p.PoiId);
+        var areaTr = p.AreaId.HasValue
+            ? translations?.FirstOrDefault(ct => ct.EntityType == "Area" && ct.EntityId == p.AreaId.Value)
+            : null;
+
+        bool hasValidDbPoi = LocalizationHelper.HasValidDbTranslation(poiTr?.Title, p.Name, lang);
+        EnglishPoiContent? enPoi = null;
+        bool hasEnCatalog = lang == "en" && LocalizationHelper.TryGetEnglishPoi(p.Code, out enPoi);
+        bool hasTr = isDefaultVi || hasValidDbPoi || hasEnCatalog;
+
+        string displayName = isDefaultVi
+            ? p.Name
+            : (hasValidDbPoi ? poiTr!.Title! : (hasEnCatalog ? enPoi!.Name : p.Name));
+
+        string? displayDesc = isDefaultVi
+            ? p.Description
+            : (hasValidDbPoi && !string.IsNullOrWhiteSpace(poiTr?.Description) && !LocalizationHelper.IsUntranslatedVietnamese(poiTr.Description, p.Description, lang)
+                ? poiTr.Description
+                : (hasEnCatalog ? enPoi!.Description : null));
+
+        bool hasValidDbArea = LocalizationHelper.HasValidDbTranslation(areaTr?.Title, p.Area?.Name, lang);
+        string? displayAreaName = p.Area == null
+            ? null
+            : (isDefaultVi ? p.Area.Name : (hasValidDbArea ? areaTr!.Title : p.Area.Name));
+
         var narrations = p.Narrations?.Select(MapNarrationToDto).ToList() ?? new List<PoiNarrationDto>();
         return new PoiDto
         {
             PoiId = p.PoiId,
             Code = p.Code,
-            Name = p.Name,
-            Description = p.Description,
+            OriginalName = p.Name,
+            Name = displayName,
+            Description = displayDesc,
             Category = p.Category,
             Latitude = p.Latitude,
             Longitude = p.Longitude,
@@ -493,7 +559,9 @@ public class PoiService : IPoiService
             VerificationSource = p.VerificationSource,
             ImageUrl = p.ImageUrl,
             AreaId = p.AreaId,
-            AreaName = p.Area?.Name,
+            AreaName = displayAreaName,
+            LanguageCode = lang,
+            HasTranslation = hasTr,
             CreatedBy = p.CreatedBy,
             CreatorName = p.Creator?.FullName ?? p.Creator?.Username,
             CreatedAt = p.CreatedAt,

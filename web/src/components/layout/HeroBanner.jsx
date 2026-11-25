@@ -1,59 +1,77 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ZooApi } from '../../services/api';
-import { ZOO_OPERATIONAL_INFO } from '../../services/operationalData';
+import { getZooOperationalInfo } from '../../services/operationalData';
 
 const HERO_SLIDES = [
     {
         id: 'tiger',
-        speciesName: 'Hổ Bengal',
+        speciesNameVi: 'Hổ Bengal',
+        speciesNameEn: 'Bengal Tiger',
         scientificName: 'Panthera tigris tigris',
-        statusLabel: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLabelVi: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLabelEn: 'ENDANGERED WILDLIFE CONSERVATION',
         statusLevel: 'EN',
-        habitat: 'Khu sinh cảnh rừng mưa tự nhiên',
+        habitatVi: 'Khu sinh cảnh rừng mưa tự nhiên',
+        habitatEn: 'Natural rainforest habitat zone',
         imageSrc: '/assets/hero-tiger.jpg',
-        alt: 'Hổ Bengal dũng mãnh tại Thảo Cầm Viên Sài Gòn'
+        altVi: 'Hổ Bengal dũng mãnh tại Thảo Cầm Viên Sài Gòn',
+        altEn: 'Bengal Tiger at Saigon Zoo & Botanical Gardens'
     },
     {
         id: 'lion',
-        speciesName: 'Sư tử Châu Phi',
+        speciesNameVi: 'Sư tử Châu Phi',
+        speciesNameEn: 'African Lion',
         scientificName: 'Panthera leo',
-        statusLabel: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLabelVi: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLabelEn: 'VULNERABLE WILDLIFE',
         statusLevel: 'VU',
-        habitat: 'Khu sinh thái đồng cỏ Savanna',
+        habitatVi: 'Khu sinh thái đồng cỏ Savanna',
+        habitatEn: 'Savanna grassland ecological zone',
         imageSrc: '/assets/hero-lion.jpg',
-        alt: 'Sư tử Châu Phi oai vệ tại Thảo Cầm Viên Sài Gòn'
+        altVi: 'Sư tử Châu Phi oai vệ tại Thảo Cầm Viên Sài Gòn',
+        altEn: 'African Lion at Saigon Zoo & Botanical Gardens'
     },
     {
         id: 'elephant',
-        speciesName: 'Voi Châu Á',
+        speciesNameVi: 'Voi Châu Á',
+        speciesNameEn: 'Asian Elephant',
         scientificName: 'Elephas maximus',
-        statusLabel: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLabelVi: 'BẢO TỒN ĐỘNG VẬT NGUY CẤP',
+        statusLabelEn: 'ENDANGERED WILDLIFE CONSERVATION',
         statusLevel: 'EN',
-        habitat: 'Khu bảo tồn thú ăn cỏ nhiệt đới',
+        habitatVi: 'Khu bảo tồn thú ăn cỏ nhiệt đới',
+        habitatEn: 'Tropical herbivore conservation sanctuary',
         imageSrc: '/assets/hero-elephant.jpg',
-        alt: 'Voi Châu Á hiền hòa tại Thảo Cầm Viên Sài Gòn'
+        altVi: 'Voi Châu Á hiền hòa tại Thảo Cầm Viên Sài Gòn',
+        altEn: 'Asian Elephant at Saigon Zoo & Botanical Gardens'
     },
     {
         id: 'eagle',
-        speciesName: 'Đại Bàng Hoàng Gia',
+        speciesNameVi: 'Đại Bàng Hoàng Gia',
+        speciesNameEn: 'Eastern Imperial Eagle',
         scientificName: 'Aquila heliaca',
-        statusLabel: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLabelVi: 'ĐỘNG VẬT SẮP NGUY CẤP',
+        statusLabelEn: 'VULNERABLE WILDLIFE',
         statusLevel: 'VU',
-        habitat: 'Khu chuồng chim vòm tự nhiên',
+        habitatVi: 'Khu chuồng chim vòm tự nhiên',
+        habitatEn: 'Natural tropical dome aviary',
         imageSrc: '/assets/hero-eagle.jpg',
-        alt: 'Đại Bàng Hoàng Gia sải cánh tại Thảo Cầm Viên Sài Gòn'
+        altVi: 'Đại Bàng Hoàng Gia sải cánh tại Thảo Cầm Viên Sài Gòn',
+        altEn: 'Eastern Imperial Eagle at Saigon Zoo & Botanical Gardens'
     }
 ];
 
 const SLIDE_INTERVAL_MS = 6000;
 
 export default function HeroBanner() {
-    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, openElectronicTicketModal, t } = useApp();
+    const { switchTab, setIsTicketModalOpen, currentSession, hasActiveSession, openElectronicTicketModal, currentLang, t } = useApp();
+    const isVi = (currentLang || 'vi').toLowerCase() === 'vi';
+    const operationalInfo = getZooOperationalInfo(currentLang);
 
     const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
     const [isPaused, setIsPaused] = useState(false);
-    const [ticketPriceSummary, setTicketPriceSummary] = useState('120.000đ (Người lớn) • 60.000đ (Trẻ em)');
+    const [ticketPrices, setTicketPrices] = useState({ adult: 120000, child: 60000 });
     const timerRef = useRef(null);
 
     // Load authoritative ticket types from database
@@ -61,15 +79,20 @@ export default function HeroBanner() {
         let isMounted = true;
         ZooApi.getTicketTypes().then(res => {
             if (isMounted && res && res.success && Array.isArray(res.data) && res.data.length > 0) {
-                const adult = res.data.find(t => t.name.toLowerCase().includes('người lớn') || t.name.toLowerCase().includes('adult'));
-                const child = res.data.find(t => t.name.toLowerCase().includes('trẻ em') || t.name.toLowerCase().includes('child'));
-                const adultPrice = adult ? `${Number(adult.price).toLocaleString('vi-VN')}đ (Người lớn)` : '120.000đ (Người lớn)';
-                const childPrice = child ? `${Number(child.price).toLocaleString('vi-VN')}đ (Trẻ em)` : '60.000đ (Trẻ em)';
-                setTicketPriceSummary(`${adultPrice} • ${childPrice}`);
+                const adult = res.data.find(tt => tt.name.toLowerCase().includes('người lớn') || tt.name.toLowerCase().includes('adult'));
+                const child = res.data.find(tt => tt.name.toLowerCase().includes('trẻ em') || tt.name.toLowerCase().includes('child'));
+                setTicketPrices({
+                    adult: adult ? Number(adult.price) : 120000,
+                    child: child ? Number(child.price) : 60000
+                });
             }
         }).catch(() => {});
         return () => { isMounted = false; };
     }, []);
+
+    const ticketPriceSummary = isVi
+        ? `${ticketPrices.adult.toLocaleString('vi-VN')}đ (Người lớn) • ${ticketPrices.child.toLocaleString('vi-VN')}đ (Trẻ em)`
+        : `${ticketPrices.adult.toLocaleString('en-US')} VND (Adult) • ${ticketPrices.child.toLocaleString('en-US')} VND (Child)`;
 
     // Preload all slide images on mount to prevent any delay during transitions
     useEffect(() => {
@@ -193,7 +216,7 @@ export default function HeroBanner() {
                                         <span className="live-dot"></span>
                                         <span>{t?.heroActiveSession || 'Phiên tham quan đang hoạt động:'}</span>
                                         <strong className="session-code font-mono">{currentSession.ticketCode}</strong>
-                                        <span className="session-user">• {currentSession.customerName || 'Khách tham quan'}</span>
+                                        <span className="session-user">• {currentSession.customerName || (isVi ? 'Khách tham quan' : 'Visitor')}</span>
                                     </div>
                                     <button 
                                         type="button"
@@ -232,10 +255,10 @@ export default function HeroBanner() {
                             onBlur={() => setIsPaused(false)}
                             role="region"
                             aria-roledescription="carousel"
-                            aria-label="Ảnh động vật tiêu biểu Thảo Cầm Viên"
+                            aria-label={isVi ? 'Ảnh động vật tiêu biểu Thảo Cầm Viên' : 'Featured Wildlife at Saigon Zoo'}
                         >
                             {/* Slide Counter / Indicators */}
-                            <div className="hero-carousel-nav" role="tablist" aria-label="Bộ điều khiển chọn slide">
+                            <div className="hero-carousel-nav" role="tablist" aria-label={isVi ? 'Bộ điều khiển chọn slide' : 'Slide indicators'}>
                                 {HERO_SLIDES.map((slide, idx) => (
                                     <button
                                         key={slide.id}
@@ -244,7 +267,7 @@ export default function HeroBanner() {
                                         className={`carousel-dot ${idx === currentSlideIndex ? 'active' : ''}`}
                                         onClick={() => handleManualSelect(idx)}
                                         aria-selected={idx === currentSlideIndex}
-                                        aria-label={`Xem ảnh loài ${slide.speciesName} (${idx + 1}/${HERO_SLIDES.length})`}
+                                        aria-label={`${isVi ? slide.speciesNameVi : slide.speciesNameEn} (${idx + 1}/${HERO_SLIDES.length})`}
                                     />
                                 ))}
                             </div>
@@ -254,7 +277,7 @@ export default function HeroBanner() {
                                 type="button"
                                 className="carousel-arrow prev"
                                 onClick={handleManualPrev}
-                                aria-label="Xem loài động vật trước đó"
+                                aria-label={isVi ? 'Xem loài động vật trước đó' : 'Previous featured species'}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="15 18 9 12 15 6"></polyline>
@@ -264,7 +287,7 @@ export default function HeroBanner() {
                                 type="button"
                                 className="carousel-arrow next"
                                 onClick={handleManualNext}
-                                aria-label="Xem loài động vật tiếp theo"
+                                aria-label={isVi ? 'Xem loài động vật tiếp theo' : 'Next featured species'}
                             >
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                                     <polyline points="9 18 15 12 9 6"></polyline>
@@ -274,6 +297,10 @@ export default function HeroBanner() {
                             {/* Render All Slides for Smooth Crossfade */}
                             {HERO_SLIDES.map((slide, idx) => {
                                 const isActive = idx === currentSlideIndex;
+                                const slideName = isVi ? slide.speciesNameVi : slide.speciesNameEn;
+                                const slideStatus = isVi ? slide.statusLabelVi : slide.statusLabelEn;
+                                const slideHabitat = isVi ? slide.habitatVi : slide.habitatEn;
+                                const slideAlt = isVi ? slide.altVi : slide.altEn;
                                 return (
                                     <div 
                                         key={slide.id}
@@ -282,7 +309,7 @@ export default function HeroBanner() {
                                     >
                                         <img 
                                             src={slide.imageSrc} 
-                                            alt={slide.alt}
+                                            alt={slideAlt}
                                             className="hero-slide-image hero-photography-img"
                                             loading={idx === 0 ? "eager" : "lazy"}
                                             onError={(e) => {
@@ -291,9 +318,9 @@ export default function HeroBanner() {
                                             }}
                                         />
                                         <div className="hero-photography-overlay">
-                                            <div className="photo-badge">{slide.statusLabel} • {slide.statusLevel}</div>
-                                            <h3 className="photo-species-title">{slide.speciesName} • {slide.scientificName}</h3>
-                                            <p className="photo-species-subtitle">{slide.habitat} • {t?.slideAvailableAudio || 'Có sẵn bài thuyết minh âm thanh'}</p>
+                                            <div className="photo-badge">{slideStatus} • {slide.statusLevel}</div>
+                                            <h3 className="photo-species-title">{slideName} • {slide.scientificName}</h3>
+                                            <p className="photo-species-subtitle">{slideHabitat} • {t?.slideAvailableAudio || 'Có sẵn bài thuyết minh âm thanh'}</p>
                                         </div>
                                     </div>
                                 );
@@ -313,7 +340,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">{t?.openingHoursLabel || 'Giờ mở cửa hàng ngày'}</span>
-                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.openingHours}</span>
+                            <span className="strip-val">{operationalInfo.openingHours}</span>
                         </div>
                     </div>
 
@@ -328,7 +355,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">{t?.addressLabel || 'Địa chỉ sở thú'}</span>
-                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.address}</span>
+                            <span className="strip-val">{operationalInfo.address}</span>
                         </div>
                     </div>
 
@@ -360,7 +387,7 @@ export default function HeroBanner() {
                         </div>
                         <div className="strip-content">
                             <span className="strip-label">{t?.gatesLabel || 'Cổng đón khách'}</span>
-                            <span className="strip-val">{ZOO_OPERATIONAL_INFO.gates}</span>
+                            <span className="strip-val">{operationalInfo.gates}</span>
                         </div>
                     </div>
                 </div>

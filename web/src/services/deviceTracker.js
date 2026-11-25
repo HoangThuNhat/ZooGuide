@@ -3,6 +3,8 @@ import { ZooApi, API_CONFIG } from './api';
 
 const STORAGE_KEY = 'zooguide_device_installation_id';
 const BUYER_STORAGE_KEY = 'zooguide_buyer_identity';
+const ACTIVE_TABS_KEY = 'zooguide_active_visitor_tabs';
+const TAB_TTL_MS = 45000;
 
 /**
  * Cấu hình chu kỳ Heartbeat và ngưỡng Online thống nhất toàn hệ thống:
@@ -83,6 +85,59 @@ let heartbeatTimer = null;
 let currentInstallationId = null;
 let activeHubConnection = null;
 
+function createTabId() {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    return 'tab-' + Date.now().toString(36) + '-' + Math.random().toString(36).substring(2, 10);
+}
+
+function readActiveTabsMap(now = Date.now()) {
+    try {
+        const raw = localStorage.getItem(ACTIVE_TABS_KEY);
+        if (!raw) return {};
+        const parsed = JSON.parse(raw);
+        if (!parsed || typeof parsed !== 'object') return {};
+        const cleaned = {};
+        for (const [id, ts] of Object.entries(parsed)) {
+            if (typeof ts === 'number' && now - ts <= TAB_TTL_MS) {
+                cleaned[id] = ts;
+            }
+        }
+        return cleaned;
+    } catch {
+        return {};
+    }
+}
+
+function writeActiveTabsMap(map) {
+    try {
+        if (Object.keys(map).length === 0) {
+            localStorage.removeItem(ACTIVE_TABS_KEY);
+        } else {
+            localStorage.setItem(ACTIVE_TABS_KEY, JSON.stringify(map));
+        }
+    } catch {
+        // Ignore storage quota / private-mode errors
+    }
+}
+
+function touchActiveTab(tabId) {
+    const now = Date.now();
+    const map = readActiveTabsMap(now);
+    map[tabId] = now;
+    writeActiveTabsMap(map);
+    return Object.keys(map).length;
+}
+
+function unregisterActiveTab(tabId) {
+    const now = Date.now();
+    const map = readActiveTabsMap(now);
+    delete map[tabId];
+    writeActiveTabsMap(map);
+    return Object.keys(map).length;
+}
+
 export function getSignalRConnection() {
     return activeHubConnection;
 }
@@ -90,10 +145,22 @@ export function getSignalRConnection() {
 export function initDeviceTracker(role = 'Visitor') {
     if (typeof window === 'undefined') return () => {};
 
+    // Không theo dõi trình duyệt của quản trị viên như thiết bị khách tham quan
+    if (String(role || '').toLowerCase() === 'admin' || String(role || '').toLowerCase() === 'staff') {
+        return () => {};
+    }
+
+    let isDisposed = false;
+    let isHeartbeatInFlight = false;
+    let disconnectHandled = false;
+    const tabId = createTabId();
+
     currentInstallationId = getOrCreateInstallationId();
+    touchActiveTab(tabId);
     const buyer = getStoredBuyerIdentity();
 
-    // 1. Khởi tạo SignalR Realtime Hub Connection
+    // 1. Khởi tạo SignalR Realtime Hub Connection (cục bộ theo từng vòng đời effect, an toàn với React StrictMode)
+    let localHubConnection = null;
     let hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?visitorId=${encodeURIComponent(currentInstallationId)}&role=${encodeURIComponent(role || 'Visitor')}`;
     if (buyer?.orderCode) {
         hubUrl += `&orderCode=${encodeURIComponent(buyer.orderCode)}`;
@@ -101,6 +168,24 @@ export function initDeviceTracker(role = 'Visitor') {
     if (buyer?.email) {
         hubUrl += `&buyerEmail=${encodeURIComponent(buyer.email)}`;
     }
+
+    // 2. HTTP Heartbeat & gia hạn SignalR định kỳ (chống gửi trùng song song)
+    const sendBeat = async () => {
+        if (isDisposed || isHeartbeatInFlight) return;
+        isHeartbeatInFlight = true;
+        try {
+            touchActiveTab(tabId);
+            const currentBuyer = getStoredBuyerIdentity();
+            if (localHubConnection && localHubConnection.state === signalR.HubConnectionState.Connected) {
+                localHubConnection.invoke('Heartbeat').catch(() => {});
+            }
+            await ZooApi.sendDeviceHeartbeat(currentInstallationId, currentBuyer);
+        } catch {
+            // Xử lý im lặng lỗi mạng tạm thời
+        } finally {
+            isHeartbeatInFlight = false;
+        }
+    };
 
     try {
         const hubConnection = new signalR.HubConnectionBuilder()
@@ -112,73 +197,92 @@ export function initDeviceTracker(role = 'Visitor') {
             .configureLogging(signalR.LogLevel.None)
             .build();
 
+        hubConnection.onreconnected(() => {
+            if (isDisposed) return;
+            const currentB = getStoredBuyerIdentity();
+            if (currentB && (currentB.orderCode || currentB.email)) {
+                hubConnection.invoke('RegisterBuyer', currentB.orderCode || '', currentB.email || '').catch(() => {});
+            }
+            sendBeat();
+        });
+
+        localHubConnection = hubConnection;
+        activeHubConnection = hubConnection;
+
         hubConnection.start()
             .then(() => {
+                if (isDisposed) {
+                    hubConnection.stop().catch(() => {});
+                    return;
+                }
                 activeHubConnection = hubConnection;
-                // Nếu có buyer identity mà chưa kịp gắn vào query string
                 const currentB = getStoredBuyerIdentity();
                 if (currentB && (currentB.orderCode || currentB.email)) {
                     hubConnection.invoke('RegisterBuyer', currentB.orderCode || '', currentB.email || '').catch(() => {});
                 }
             })
             .catch(err => {
-                console.warn('SignalR Realtime tracker unavailable, using HTTP fallback:', err?.message || err);
+                if (!isDisposed) {
+                    console.warn('SignalR Realtime tracker unavailable, using HTTP fallback:', err?.message || err);
+                }
             });
-
-        activeHubConnection = hubConnection;
     } catch (e) {
         console.warn('Error creating SignalR Hub connection:', e);
     }
 
-    // 2. HTTP Heartbeat dự phòng & cập nhật định kỳ
-    const sendBeat = async () => {
-        try {
-            const currentBuyer = getStoredBuyerIdentity();
-            if (activeHubConnection && activeHubConnection.state === signalR.HubConnectionState.Connected) {
-                activeHubConnection.invoke('Heartbeat').catch(() => {});
-            }
-            await ZooApi.sendDeviceHeartbeat(currentInstallationId, currentBuyer);
-        } catch (err) {
-            // Xử lý im lặng lỗi mạng tạm thời
-        }
-    };
-
     // Gửi ngay khi tải trang
     sendBeat();
 
-    // Chu kỳ 30s
+    // Chu kỳ 25 giây
     if (heartbeatTimer) clearInterval(heartbeatTimer);
-    heartbeatTimer = setInterval(sendBeat, HEARTBEAT_INTERVAL_MS);
+    const localTimer = setInterval(sendBeat, HEARTBEAT_INTERVAL_MS);
+    heartbeatTimer = localTimer;
 
     // Xử lý khi tab trở lại hiển thị
     const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
+        if (!isDisposed && document.visibilityState === 'visible') {
             sendBeat();
         }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // 3. Xử lý khi người dùng đóng tab, đóng trình duyệt hoặc điều hướng rời khỏi website
-    const handleBeforeUnload = () => {
+    // 3. Xử lý khi đóng tab / đóng trình duyệt:
+    //    Chỉ gửi disconnect beacon khi TAB CUỐI CÙNG trên trình duyệt này đóng,
+    //    tránh việc đóng 1 trong nhiều tab làm thiết bị đang mở ở tab khác bị đánh dấu offline.
+    const handlePageExit = () => {
+        if (disconnectHandled) return;
+        disconnectHandled = true;
         try {
-            const currentBuyer = getStoredBuyerIdentity();
-            if (activeHubConnection) {
-                activeHubConnection.stop().catch(() => {});
+            const remainingTabs = unregisterActiveTab(tabId);
+            if (localHubConnection) {
+                localHubConnection.stop().catch(() => {});
             }
-            ZooApi.sendDeviceDisconnect(currentInstallationId, currentBuyer);
-        } catch (e) {
+            if (remainingTabs === 0) {
+                const currentBuyer = getStoredBuyerIdentity();
+                ZooApi.sendDeviceDisconnect(currentInstallationId, currentBuyer);
+            }
+        } catch {
             // Ignore unload errors
         }
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handlePageExit);
+    window.addEventListener('beforeunload', handlePageExit);
 
     return () => {
-        if (heartbeatTimer) clearInterval(heartbeatTimer);
+        isDisposed = true;
+        clearInterval(localTimer);
+        if (heartbeatTimer === localTimer) {
+            heartbeatTimer = null;
+        }
         document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('beforeunload', handleBeforeUnload);
-        if (activeHubConnection) {
-            activeHubConnection.stop().catch(() => {});
-            activeHubConnection = null;
+        window.removeEventListener('pagehide', handlePageExit);
+        window.removeEventListener('beforeunload', handlePageExit);
+        unregisterActiveTab(tabId);
+        if (localHubConnection) {
+            localHubConnection.stop().catch(() => {});
+            if (activeHubConnection === localHubConnection) {
+                activeHubConnection = null;
+            }
         }
     };
 }

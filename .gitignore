@@ -68,3 +68,7 @@ diagram_definitions.py
 render_engine.py
 # Temporary scripts, generated data and cache
 /scratch/
+
+# Animal narration assets stored locally / Supabase
+src/API/wwwroot/storage/narration-audio/
+web/public/storage/narration-audio/

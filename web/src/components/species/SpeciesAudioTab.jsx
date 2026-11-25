@@ -96,7 +96,7 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                 );
 
             const matchesIucn = selectedIucn === 'all' ||
-                (sp.conservationStatus && sp.conservationStatus.toUpperCase().includes(selectedIucn.toUpperCase()));
+                (sp.conservationStatus && sp.conservationStatus.trim().toUpperCase().startsWith(selectedIucn.toUpperCase()));
 
             return matchesSearch && matchesIucn;
         });
@@ -162,34 +162,29 @@ export default function SpeciesAudioTab({ onSelectSpecies, onPlaySpeciesAudio, o
                         >
                             {t?.filterAll || 'Tất cả'} ({speciesWithDetails.length})
                         </button>
-                        <button
-                            className={`btn btn-sm ${selectedIucn === 'CR' ? 'btn-danger' : 'btn-outline'}`}
-                            style={{ borderRadius: '6px' }}
-                            onClick={() => setSelectedIucn(selectedIucn === 'CR' ? 'all' : 'CR')}
-                        >
-                            CR
-                        </button>
-                        <button
-                            className={`btn btn-sm ${selectedIucn === 'EN' ? 'btn-warning' : 'btn-outline'}`}
-                            style={{ borderRadius: '6px' }}
-                            onClick={() => setSelectedIucn(selectedIucn === 'EN' ? 'all' : 'EN')}
-                        >
-                            EN
-                        </button>
-                        <button
-                            className={`btn btn-sm ${selectedIucn === 'VU' ? 'btn-warning' : 'btn-outline'}`}
-                            style={{ borderRadius: '6px' }}
-                            onClick={() => setSelectedIucn(selectedIucn === 'VU' ? 'all' : 'VU')}
-                        >
-                            VU
-                        </button>
-                        <button
-                            className={`btn btn-sm ${selectedIucn === 'LC' ? 'btn-success' : 'btn-outline'}`}
-                            style={{ borderRadius: '6px' }}
-                            onClick={() => setSelectedIucn(selectedIucn === 'LC' ? 'all' : 'LC')}
-                        >
-                            LC
-                        </button>
+                        {[
+                            { code: 'CR', activeClass: 'btn-danger' },
+                            { code: 'EN', activeClass: 'btn-warning' },
+                            { code: 'VU', activeClass: 'btn-warning' },
+                            { code: 'NT', activeClass: 'btn-primary' },
+                            { code: 'LC', activeClass: 'btn-success' }
+                        ].map(item => {
+                            const count = speciesWithDetails.filter(
+                                sp => sp.conservationStatus && sp.conservationStatus.trim().toUpperCase().startsWith(item.code)
+                            ).length;
+                            const isActive = selectedIucn === item.code;
+                            return (
+                                <button
+                                    key={item.code}
+                                    data-iucn={item.code}
+                                    className={`btn btn-sm ${isActive ? item.activeClass : 'btn-outline'}`}
+                                    style={{ borderRadius: '6px' }}
+                                    onClick={() => setSelectedIucn(isActive ? 'all' : item.code)}
+                                >
+                                    {item.code} ({count})
+                                </button>
+                            );
+                        })}
                     </div>
                 </div>
 

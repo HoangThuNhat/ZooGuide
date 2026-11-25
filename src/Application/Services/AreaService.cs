@@ -179,9 +179,16 @@ public class AreaService : IAreaService
         var enclosures = a.Enclosures?.Select(e =>
         {
             var encTr = translations?.FirstOrDefault(ct => ct.EntityType == "Enclosure" && ct.EntityId == e.EnclosureId);
-            bool hasEncTr = isDefaultVi || (encTr != null && !string.IsNullOrWhiteSpace(encTr.Title));
-            string encDisplayName = encTr != null && !string.IsNullOrWhiteSpace(encTr.Title) ? encTr.Title : e.Name;
-            string? encDisplayDesc = encTr != null && !string.IsNullOrWhiteSpace(encTr.Description) ? encTr.Description : (hasEncTr ? e.Description : null);
+            bool hasValidDbEnc = LocalizationHelper.HasValidDbTranslation(encTr?.Title, e.Name, lang);
+            EnglishEnclosureContent? enEnc = null;
+            bool hasEnEnc = lang == "en" && LocalizationHelper.TryGetEnglishEnclosure(e.Code, out enEnc);
+            bool hasEncTr = isDefaultVi || hasValidDbEnc || hasEnEnc;
+            string encDisplayName = isDefaultVi ? e.Name : (hasValidDbEnc ? encTr!.Title! : (hasEnEnc ? enEnc!.Name : e.Name));
+            string? encDisplayDesc = isDefaultVi
+                ? e.Description
+                : (hasValidDbEnc && !string.IsNullOrWhiteSpace(encTr?.Description) && !LocalizationHelper.IsUntranslatedVietnamese(encTr.Description, e.Description, lang)
+                    ? encTr.Description
+                    : (hasEnEnc ? enEnc!.Description : null));
 
             var activeAnimals = e.Animals?.Where(an => an.Status == AnimalStatus.Active || an.Status == AnimalStatus.UnderTreatment).ToList()
                                 ?? new List<Animal>();
@@ -205,6 +212,7 @@ public class AreaService : IAreaService
                 MapY = e.MapY,
                 Latitude = e.Latitude,
                 Longitude = e.Longitude,
+                RadiusMeters = LocalizationHelper.GetRecommendedEnclosureRadiusMeters(e.Code),
                 AnimalCount = activeAnimals.Count,
                 CreatedAt = e.CreatedAt,
                 UpdatedAt = e.UpdatedAt,
@@ -212,39 +220,49 @@ public class AreaService : IAreaService
                 {
                     var anTr = translations?.FirstOrDefault(ct => ct.EntityType == "Animal" && ct.EntityId == an.AnimalId);
                     var spTr = an.Species != null ? translations?.FirstOrDefault(ct => ct.EntityType == "Species" && ct.EntityId == an.SpeciesId) : null;
-                    bool hasAnTr = isDefaultVi || (anTr != null && !string.IsNullOrWhiteSpace(anTr.Title));
+                    bool hasValidDbAn = LocalizationHelper.HasValidDbTranslation(anTr?.Title, an.Name, lang);
+                    EnglishAnimalContent? enAn = null;
+                    bool hasEnAn = lang == "en" && LocalizationHelper.TryGetEnglishAnimal(an.Name, out enAn);
+                    bool hasAnTr = isDefaultVi || hasValidDbAn || hasEnAn;
+                    bool hasValidDbSp = an.Species != null && LocalizationHelper.HasValidDbTranslation(spTr?.Title, an.Species.Name, lang);
+                    EnglishSpeciesContent? enSp = null;
+                    bool hasEnSp = lang == "en" && an.Species != null && LocalizationHelper.TryGetEnglishSpecies(an.Species.ScientificName, out enSp);
                     return new AnimalResponseDto
                     {
                         AnimalId = an.AnimalId,
                         SpeciesId = an.SpeciesId,
-                        SpeciesName = spTr != null && !string.IsNullOrWhiteSpace(spTr.Title) ? spTr.Title : (an.Species?.Name ?? string.Empty),
+                        SpeciesName = an.Species == null ? string.Empty : (isDefaultVi ? an.Species.Name : (hasValidDbSp ? spTr!.Title! : (hasEnSp ? enSp!.Name : an.Species.Name))),
                         ScientificName = an.Species?.ScientificName,
-                        ConservationStatus = an.Species?.ConservationStatus,
+                        ConservationStatus = hasEnSp ? enSp!.ConservationStatus : LocalizationHelper.LocalizeConservationStatus(an.Species?.ConservationStatus, lang),
                         AreaId = an.AreaId,
                         AreaName = areaDisplayName,
                         EnclosureId = an.EnclosureId,
                         EnclosureName = encDisplayName,
                         EnclosureCode = e.Code,
                         OriginalName = an.Name,
-                        Name = anTr != null && !string.IsNullOrWhiteSpace(anTr.Title) ? anTr.Title : an.Name,
-                        Description = anTr != null && !string.IsNullOrWhiteSpace(anTr.Description) ? anTr.Description : (hasAnTr ? an.Description : null),
+                        Name = isDefaultVi ? an.Name : (hasValidDbAn ? anTr!.Title! : (hasEnAn ? enAn!.Name : an.Name)),
+                        Description = isDefaultVi
+                            ? an.Description
+                            : (hasValidDbAn && !string.IsNullOrWhiteSpace(anTr?.Description) && !LocalizationHelper.IsUntranslatedVietnamese(anTr.Description, an.Description, lang)
+                                ? anTr.Description
+                                : (hasEnAn ? enAn!.Description : null)),
                         LanguageCode = lang,
                         HasTranslation = hasAnTr,
                         ReferenceSource = anTr?.SourceReference ?? an.ReferenceSource,
                         Gender = an.Gender.ToString(),
                         DateOfBirth = an.DateOfBirth,
-                        Origin = an.Origin,
-                        HealthStatus = an.HealthStatus,
-                        ConservationNote = an.ConservationNote,
+                        Origin = isDefaultVi ? an.Origin : (hasEnAn ? enAn!.Origin : null),
+                        HealthStatus = isDefaultVi ? an.HealthStatus : (hasEnAn ? enAn!.HealthStatus : null),
+                        ConservationNote = isDefaultVi ? an.ConservationNote : null,
                         ImageUrl = an.ImageUrl,
                         WeightKg = an.WeightKg,
                         TemperatureC = an.TemperatureC,
                         VeterinarianName = an.VeterinarianName,
                         HealthActionRequired = an.HealthActionRequired,
                         LastHealthCheckAt = an.LastHealthCheckAt,
-                        Habitat = an.Species?.Habitat,
-                        Diet = an.Species?.Diet,
-                        Lifespan = an.Species?.Lifespan,
+                        Habitat = isDefaultVi ? an.Species?.Habitat : (hasEnSp ? enSp!.Habitat : null),
+                        Diet = isDefaultVi ? an.Species?.Diet : (hasEnSp ? enSp!.Diet : null),
+                        Lifespan = isDefaultVi ? an.Species?.Lifespan : (hasEnSp ? enSp!.Lifespan : null),
                         Status = an.Status.ToString(),
                         CreatedAt = an.CreatedAt,
                         UpdatedAt = an.UpdatedAt

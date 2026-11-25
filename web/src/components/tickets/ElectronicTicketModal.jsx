@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ZooApi, API_CONFIG } from '../../services/api';
 
@@ -16,6 +16,18 @@ export default function ElectronicTicketModal() {
     } = useApp();
 
     const [isExiting, setIsExiting] = useState(false);
+
+    useEffect(() => {
+        if (!isElectronicTicketModalOpen) return undefined;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setIsElectronicTicketModalOpen(false);
+                if (setSelectedTicketForPass) setSelectedTicketForPass(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isElectronicTicketModalOpen, setIsElectronicTicketModalOpen, setSelectedTicketForPass]);
 
     if (!isElectronicTicketModalOpen) return null;
 
@@ -119,7 +131,7 @@ export default function ElectronicTicketModal() {
     };
 
     return (
-        <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 1200 }}>
+        <div className="modal-overlay" role="dialog" aria-modal="true">
             <div className="modal-backdrop" onClick={handleClose}></div>
             <div className="modal-dialog" style={{ maxWidth: '440px', padding: 0, borderRadius: '24px', border: 'none', background: 'transparent' }}>
                 

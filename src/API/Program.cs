@@ -199,6 +199,10 @@ if (!string.IsNullOrWhiteSpace(connectionString))
         options.UseNpgsql(connectionString, pgOptions =>
         {
             pgOptions.MigrationsAssembly(typeof(ZooGuideDbContext).Assembly.FullName);
+            pgOptions.EnableRetryOnFailure(
+                maxRetryCount: 3,
+                maxRetryDelay: TimeSpan.FromSeconds(2),
+                errorCodesToAdd: null);
         });
     });
 }

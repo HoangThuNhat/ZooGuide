@@ -32,11 +32,17 @@ public class SpeciesService : ISpeciesService
                 .Distinct()
                 .ToListAsync();
 
+            var matchingEnglishScientifics = LocalizationHelper
+                .FindMatchingEnglishSpeciesScientificNames(s)
+                .Select(sc => sc.ToLowerInvariant())
+                .ToList();
+
             query = query.Where(x =>
                 x.Name.ToLower().Contains(s) ||
                 (x.ScientificName != null && x.ScientificName.ToLower().Contains(s)) ||
                 (x.Description != null && x.Description.ToLower().Contains(s)) ||
-                matchingTranslatedSpeciesIds.Contains(x.SpeciesId));
+                matchingTranslatedSpeciesIds.Contains(x.SpeciesId) ||
+                (x.ScientificName != null && matchingEnglishScientifics.Contains(x.ScientificName.ToLower())));
         }
 
         if (!string.IsNullOrWhiteSpace(conservationStatus) && conservationStatus != "all")
@@ -70,12 +76,17 @@ public class SpeciesService : ISpeciesService
     private static SpeciesDto MapToDto(Species s, string lang, ContentTranslation? tr)
     {
         bool isDefaultVi = lang == "vi";
-        bool hasTr = isDefaultVi || (tr != null && !string.IsNullOrWhiteSpace(tr.Title));
+        bool hasValidDbTr = LocalizationHelper.HasValidDbTranslation(tr?.Title, s.Name, lang);
+        EnglishSpeciesContent? enSpec = null;
+        bool hasEnCatalog = lang == "en" && LocalizationHelper.TryGetEnglishSpecies(s.ScientificName, out enSpec);
+        bool hasTr = isDefaultVi || hasValidDbTr || hasEnCatalog;
 
-        string? habitat = isDefaultVi ? s.Habitat : null;
-        string? diet = isDefaultVi ? s.Diet : null;
-        string? lifespan = isDefaultVi ? s.Lifespan : null;
-        string? conservationStatus = s.ConservationStatus;
+        string? habitat = isDefaultVi ? s.Habitat : (hasEnCatalog ? enSpec!.Habitat : null);
+        string? diet = isDefaultVi ? s.Diet : (hasEnCatalog ? enSpec!.Diet : null);
+        string? lifespan = isDefaultVi ? s.Lifespan : (hasEnCatalog ? enSpec!.Lifespan : null);
+        string? conservationStatus = hasEnCatalog
+            ? enSpec!.ConservationStatus
+            : LocalizationHelper.LocalizeConservationStatus(s.ConservationStatus, lang);
 
         if (tr != null && !string.IsNullOrWhiteSpace(tr.ExtraJson))
         {
@@ -83,13 +94,18 @@ public class SpeciesService : ISpeciesService
             {
                 using var doc = JsonDocument.Parse(tr.ExtraJson);
                 var root = doc.RootElement;
-                if (root.TryGetProperty("habitat", out var h) && h.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("habitat", out var h) && h.ValueKind == JsonValueKind.String &&
+                    !LocalizationHelper.IsUntranslatedVietnamese(h.GetString(), s.Habitat, lang))
                     habitat = h.GetString();
-                if (root.TryGetProperty("diet", out var d) && d.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("diet", out var d) && d.ValueKind == JsonValueKind.String &&
+                    !LocalizationHelper.IsUntranslatedVietnamese(d.GetString(), s.Diet, lang))
                     diet = d.GetString();
-                if (root.TryGetProperty("lifespan", out var l) && l.ValueKind == JsonValueKind.String)
+                if (root.TryGetProperty("lifespan", out var l) && l.ValueKind == JsonValueKind.String &&
+                    !LocalizationHelper.IsUntranslatedVietnamese(l.GetString(), s.Lifespan, lang))
                     lifespan = l.GetString();
-                if (root.TryGetProperty("conservationStatus", out var cs) && cs.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(cs.GetString()))
+                if (root.TryGetProperty("conservationStatus", out var cs) && cs.ValueKind == JsonValueKind.String &&
+                    !string.IsNullOrWhiteSpace(cs.GetString()) &&
+                    !LocalizationHelper.IsUntranslatedVietnamese(cs.GetString(), s.ConservationStatus, lang))
                     conservationStatus = cs.GetString();
             }
             catch
@@ -98,18 +114,28 @@ public class SpeciesService : ISpeciesService
             }
         }
 
+        string displayName = isDefaultVi
+            ? s.Name
+            : (hasValidDbTr ? tr!.Title! : (hasEnCatalog ? enSpec!.Name : s.Name));
+
+        string? displayDescription = isDefaultVi
+            ? s.Description
+            : (hasValidDbTr && !string.IsNullOrWhiteSpace(tr?.Description) && !LocalizationHelper.IsUntranslatedVietnamese(tr.Description, s.Description, lang)
+                ? tr.Description
+                : (hasEnCatalog ? enSpec!.Description : null));
+
         return new SpeciesDto
         {
             SpeciesId = s.SpeciesId,
             OriginalName = s.Name,
-            Name = tr != null && !string.IsNullOrWhiteSpace(tr.Title) ? tr.Title : s.Name,
+            Name = displayName,
             ScientificName = s.ScientificName,
-            Description = tr != null && !string.IsNullOrWhiteSpace(tr.Description) ? tr.Description : (hasTr ? s.Description : null),
+            Description = displayDescription,
             ConservationStatus = conservationStatus,
             ImageUrl = s.ImageUrl,
-            Habitat = habitat ?? (hasTr ? s.Habitat : null),
-            Diet = diet ?? (hasTr ? s.Diet : null),
-            Lifespan = lifespan ?? (hasTr ? s.Lifespan : null),
+            Habitat = habitat,
+            Diet = diet,
+            Lifespan = lifespan,
             ReferenceSource = tr?.SourceReference ?? s.ReferenceSource,
             LanguageCode = lang,
             HasTranslation = hasTr,

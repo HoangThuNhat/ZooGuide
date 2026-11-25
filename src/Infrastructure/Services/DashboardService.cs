@@ -81,17 +81,51 @@ public class DashboardService : IDashboardService
         var cutoff5Min = now.AddMinutes(-5);
         var cutoff15Min = now.AddMinutes(-15);
 
-        var totalTrackedDevices = await _context.DeviceActivities.AsNoTracking().CountAsync();
-        var activeDevices60Sec = await _context.DeviceActivities.AsNoTracking()
-            .CountAsync(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff60Sec);
-        var dbActiveDeviceIds5Min = (await _context.DeviceActivities.AsNoTracking()
-            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff5Min && !string.IsNullOrEmpty(d.InstallationId))
-            .Select(d => d.InstallationId)
-            .ToListAsync())
-            .Select(id => id.Trim().ToLowerInvariant())
-            .Distinct()
+        var allDeviceActivities = await _context.DeviceActivities
+            .AsNoTracking()
+            .Where(d => !string.IsNullOrEmpty(d.InstallationId))
+            .Select(d => new
+            {
+                d.InstallationId,
+                d.IsActive,
+                d.DisconnectedAt,
+                d.LastSeenAt,
+                d.UpdatedAt
+            })
+            .ToListAsync();
+
+        var visitorDeviceActivities = allDeviceActivities
+            .Where(d => !d.InstallationId.Trim().StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        var totalTrackedDevices = visitorDeviceActivities
+            .Select(d => d.InstallationId.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        var dbActiveDeviceIds1Min = visitorDeviceActivities
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff60Sec)
+            .Select(d => d.InstallationId.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var activeDevices60Sec = dbActiveDeviceIds1Min.Count;
+
+        var dbActiveDeviceIds5Min = visitorDeviceActivities
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff5Min)
+            .Select(d => d.InstallationId.Trim().ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var activeDevices5Min = dbActiveDeviceIds5Min.Count;
+
+        // Bản đồ các thiết bị đã chủ động ngắt kết nối (IsActive = false hoặc DisconnectedAt != null)
+        // để không bị sự kiện telemetry cũ kéo ngược lại thành online
+        var disconnectedDeviceTimestamps = visitorDeviceActivities
+            .Where(d => !d.IsActive || d.DisconnectedAt != null)
+            .GroupBy(d => d.InstallationId.Trim().ToLowerInvariant(), StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Max(x => x.DisconnectedAt ?? x.UpdatedAt ?? x.LastSeenAt),
+                StringComparer.OrdinalIgnoreCase);
 
         dbSw.Stop();
         var dbLatencyMs = Math.Max(1, dbSw.ElapsedMilliseconds);
@@ -249,19 +283,43 @@ public class DashboardService : IDashboardService
             .Where(e => (!utcFrom.HasValue || e.CreatedAt >= utcFrom.Value) && (!utcTo.HasValue || e.CreatedAt <= utcTo.Value))
             .ToList();
 
-        // Kết hợp thiết bị trực tuyến trong 5 phút gần nhất:
-        // Chỉ tính thiết bị có hoạt động thực tế (DEVICE_ACTIVITIES, Telemetry 5p, hoặc SignalR đã gửi heartbeat),
-        // không lấy kết nối SignalR tồn tại đơn thuần làm bằng chứng duy nhất.
-        var telemetryActiveDeviceIds5Min = allTelemetryEvents
-            .Where(e => e.Category != "ALERT_STATE" && e.CreatedAt >= cutoff5Min && !string.IsNullOrWhiteSpace(e.InstallationId))
-            .Select(e => e.InstallationId!.Trim().ToLowerInvariant())
+        // Kết hợp thiết bị trực tuyến trong 1 phút (60 giây) và 5 phút gần nhất:
+        // Chỉ tính thiết bị có hoạt động thực tế (DEVICE_ACTIVITIES, Telemetry, hoặc SignalR đã gửi heartbeat),
+        // loại trừ kết nối giám sát Admin và thiết bị đã chủ động ngắt kết nối (IsActive = false / DisconnectedAt != null).
+        bool IsNotDisconnectedAfter(string normalizedDevId, DateTime eventUtc)
+        {
+            if (disconnectedDeviceTimestamps.TryGetValue(normalizedDevId, out var disconnectedAtUtc))
+            {
+                return eventUtc > disconnectedAtUtc;
+            }
+            return true;
+        }
+
+        var telemetryActiveDeviceIds1Min = allTelemetryEvents
+            .Where(e => e.Category != "ALERT_STATE" && e.CreatedAt >= cutoff60Sec && !string.IsNullOrWhiteSpace(e.InstallationId))
+            .Select(e => new { Id = e.InstallationId!.Trim().ToLowerInvariant(), e.CreatedAt })
+            .Where(x => !x.Id.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase) && IsNotDisconnectedAfter(x.Id, x.CreatedAt))
+            .Select(x => x.Id)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var telemetryActiveDeviceIds5Min = allTelemetryEvents
+            .Where(e => e.Category != "ALERT_STATE" && e.CreatedAt >= cutoff5Min && !string.IsNullOrWhiteSpace(e.InstallationId))
+            .Select(e => new { Id = e.InstallationId!.Trim().ToLowerInvariant(), e.CreatedAt })
+            .Where(x => !x.Id.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase) && IsNotDisconnectedAfter(x.Id, x.CreatedAt))
+            .Select(x => x.Id)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var onlineDevicesCombined1MinSet = new HashSet<string>(dbActiveDeviceIds1Min, StringComparer.OrdinalIgnoreCase);
+        onlineDevicesCombined1MinSet.UnionWith(telemetryActiveDeviceIds1Min);
+        onlineDevicesCombined1MinSet.UnionWith(signalRVerifiedIds);
 
         var onlineDevicesCombined5MinSet = new HashSet<string>(dbActiveDeviceIds5Min, StringComparer.OrdinalIgnoreCase);
         onlineDevicesCombined5MinSet.UnionWith(telemetryActiveDeviceIds5Min);
         onlineDevicesCombined5MinSet.UnionWith(signalRVerifiedIds);
 
+        var onlineDevicesCombined1MinCount = onlineDevicesCombined1MinSet.Count;
         var onlineDevicesCombined5MinCount = onlineDevicesCombined5MinSet.Count;
         var activeDevices = onlineDevicesCombined5MinCount;
 
@@ -1111,10 +1169,14 @@ public class DashboardService : IDashboardService
             TotalTicketsSold = totalTicketsSold,
             ActiveBuyerConnections = activeBuyerConnections,
             OnlineUsers = activeTicketBuyers,
+            ActiveDevices1Min = activeDevices60Sec,
             ActiveDevices5Min = activeDevices5Min,
             TotalTrackedDevices = totalTrackedDevices,
             SignalRConnectedDevicesCount = signalRConnectedIds.Count,
             SignalRVerifiedDevicesCount = signalRVerifiedIds.Count,
+            DbActiveDevices1MinCount = dbActiveDeviceIds1Min.Count,
+            TelemetryActiveDevices1MinCount = telemetryActiveDeviceIds1Min.Count,
+            OnlineDevicesCombined1MinCount = onlineDevicesCombined1MinCount,
             DbActiveDevices5MinCount = dbActiveDeviceIds5Min.Count,
             TelemetryActiveDevices5MinCount = telemetryActiveDeviceIds5Min.Count,
             OnlineDevicesCombined5MinCount = onlineDevicesCombined5MinCount,
@@ -1207,15 +1269,19 @@ public class DashboardService : IDashboardService
 
         _context.NarrationTelemetryEvents.Add(entity);
 
-        // Nếu có InstallationId, cập nhật đồng thời LastSeenAt trong DEVICE_ACTIVITIES để đồng bộ trạng thái khách đang sử dụng
-        if (!string.IsNullOrWhiteSpace(entity.InstallationId))
+        // Nếu có InstallationId (không phải kết nối giám sát Admin), cập nhật đồng thời LastSeenAt trong DEVICE_ACTIVITIES
+        if (!string.IsNullOrWhiteSpace(entity.InstallationId) &&
+            !entity.InstallationId.StartsWith("admin_dashboard_", StringComparison.OrdinalIgnoreCase))
         {
-            var dev = await _context.DeviceActivities.FirstOrDefaultAsync(d => d.InstallationId == entity.InstallationId);
+            var normalizedInstallId = entity.InstallationId.Trim().ToLowerInvariant();
+            var dev = await _context.DeviceActivities
+                .FirstOrDefaultAsync(d => d.InstallationId.ToLower() == normalizedInstallId);
             if (dev != null)
             {
                 dev.LastSeenAt = now;
                 dev.UpdatedAt = now;
                 dev.IsActive = true;
+                dev.DisconnectedAt = null;
             }
         }
 

@@ -142,7 +142,7 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                                 className={`filter-zone-pill ${filterZone === zoneKey ? 'active' : ''}`}
                                 onClick={() => setFilterZone(zoneKey)}
                             >
-                                {area.code} • {area.name || area.nameVi}
+                                {area.name || area.nameVi}
                             </button>
                         );
                     })}
@@ -177,14 +177,14 @@ export default function AnimalsTab({ onPlayAudio, onLocateMap }) {
                 </div>
             ) : loadError ? (
                 <div id="animals-error-state" className="empty-state" style={{ backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#B91C1C' }}>
-                    <h4 className="font-bold text-base mb-2">⚠️ Không thể tải danh sách động vật</h4>
+                    <h4 className="font-bold text-base mb-2">⚠️ {t?.animalsLoadErrorTitle || 'Không thể tải danh sách động vật'}</h4>
                     <p className="text-sm mb-4">{loadError}</p>
                     <button
                         type="button"
                         className="btn btn-sm btn-primary"
                         onClick={() => setReloadCounter(c => c + 1)}
                     >
-                        Thử lại
+                        {t?.retryBtn || 'Thử lại'}
                     </button>
                 </div>
             ) : animals.length === 0 ? (

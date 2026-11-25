@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import PwaInstallButton from '../common/PwaInstallButton';
 
@@ -17,6 +17,15 @@ export default function Header() {
     } = useApp();
 
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+    useEffect(() => {
+        if (!isMobileMenuOpen) return undefined;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') setIsMobileMenuOpen(false);
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isMobileMenuOpen]);
 
     const handleNavClick = (tab) => {
         switchTab(tab);
@@ -288,7 +297,7 @@ export default function Header() {
                                     openElectronicTicketModal();
                                 }}
                             >
-                                Xem Thẻ Tham Quan ({currentSession.ticketCode})
+                                {t?.heroViewPass || 'Xem Thẻ Tham Quan'} ({currentSession.ticketCode})
                             </button>
                         ) : (
                             <>
@@ -300,7 +309,7 @@ export default function Header() {
                                         switchTab('tickets');
                                     }}
                                 >
-                                    Đặt Vé Trực Tuyến
+                                    {t?.heroBtnBuyTicket || 'Đặt Vé Trực Tuyến'}
                                 </button>
                                 <button
                                     className="btn btn-sm btn-outline"
@@ -310,7 +319,7 @@ export default function Header() {
                                         setIsTicketModalOpen(true);
                                     }}
                                 >
-                                    Kích Hoạt Vé
+                                    {t?.btnActivateTicket || 'Kích Hoạt Vé'}
                                 </button>
                             </>
                         )}

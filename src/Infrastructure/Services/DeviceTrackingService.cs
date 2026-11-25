@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
@@ -12,11 +13,28 @@ namespace ZooGuide.Infrastructure.Services;
 
 public class DeviceTrackingService : IDeviceTrackingService
 {
+    private const string AdminDashboardPrefix = "admin_dashboard_";
     private readonly ZooGuideDbContext _context;
 
     public DeviceTrackingService(ZooGuideDbContext context)
     {
         _context = context;
+    }
+
+    private static string NormalizeInstallationId(string installationId)
+    {
+        var normalized = installationId.Trim();
+        if (normalized.Length > 64)
+        {
+            normalized = normalized.Substring(0, 64);
+        }
+        return normalized.ToLowerInvariant();
+    }
+
+    private static bool IsAdminMonitorId(string? installationId)
+    {
+        return !string.IsNullOrWhiteSpace(installationId) &&
+               installationId.Trim().StartsWith(AdminDashboardPrefix, StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<DeviceHeartbeatResponseDto> RecordHeartbeatAsync(
@@ -33,11 +51,18 @@ public class DeviceTrackingService : IDeviceTrackingService
             };
         }
 
-        var normalizedId = installationId.Trim();
-        if (normalizedId.Length > 64)
+        if (IsAdminMonitorId(installationId))
         {
-            normalizedId = normalizedId.Substring(0, 64);
+            return new DeviceHeartbeatResponseDto
+            {
+                Success = false,
+                InstallationId = NormalizeInstallationId(installationId),
+                ServerTimeUtc = DateTime.UtcNow,
+                Message = "Bỏ qua heartbeat từ kết nối giám sát Admin."
+            };
         }
+
+        var normalizedId = NormalizeInstallationId(installationId);
 
         var sanitizedUserAgent = !string.IsNullOrWhiteSpace(userAgent) && userAgent.Length > 255
             ? userAgent.Substring(0, 255)
@@ -55,7 +80,7 @@ public class DeviceTrackingService : IDeviceTrackingService
         var now = DateTime.UtcNow;
 
         var existing = await _context.DeviceActivities
-            .FirstOrDefaultAsync(d => d.InstallationId == normalizedId);
+            .FirstOrDefaultAsync(d => d.InstallationId.ToLower() == normalizedId);
 
         if (existing == null)
         {
@@ -90,7 +115,7 @@ public class DeviceTrackingService : IDeviceTrackingService
                 // Xử lý race condition khi 2 request đầu tiên tới đồng thời
                 _context.Entry(newDevice).State = EntityState.Detached;
                 existing = await _context.DeviceActivities
-                    .FirstOrDefaultAsync(d => d.InstallationId == normalizedId);
+                    .FirstOrDefaultAsync(d => d.InstallationId.ToLower() == normalizedId);
             }
         }
 
@@ -136,16 +161,20 @@ public class DeviceTrackingService : IDeviceTrackingService
     {
         if (string.IsNullOrWhiteSpace(installationId)) return false;
 
-        var normalizedId = installationId.Trim();
-        var existing = await _context.DeviceActivities
-            .FirstOrDefaultAsync(d => d.InstallationId == normalizedId);
+        var normalizedId = NormalizeInstallationId(installationId);
+        var matchingDevices = await _context.DeviceActivities
+            .Where(d => d.InstallationId.ToLower() == normalizedId)
+            .ToListAsync();
 
-        if (existing != null)
+        if (matchingDevices.Count > 0)
         {
             var now = DateTime.UtcNow;
-            existing.DisconnectedAt = now;
-            existing.IsActive = false;
-            existing.UpdatedAt = now;
+            foreach (var existing in matchingDevices)
+            {
+                existing.DisconnectedAt = now;
+                existing.IsActive = false;
+                existing.UpdatedAt = now;
+            }
             await _context.SaveChangesAsync();
             return true;
         }
@@ -155,34 +184,67 @@ public class DeviceTrackingService : IDeviceTrackingService
 
     public async Task<int> GetActiveDevicesCountAsync(int thresholdSeconds = 60)
     {
-        var cutoff = DateTime.UtcNow.AddSeconds(-thresholdSeconds);
-        return await _context.DeviceActivities
+        var effectiveSeconds = Math.Max(1, thresholdSeconds);
+        var cutoff = DateTime.UtcNow.AddSeconds(-effectiveSeconds);
+        var activeIds = await _context.DeviceActivities
             .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoff);
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff && !string.IsNullOrEmpty(d.InstallationId))
+            .Select(d => d.InstallationId)
+            .ToListAsync();
+
+        return activeIds
+            .Where(id => !IsAdminMonitorId(id))
+            .Select(NormalizeInstallationId)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
     }
 
     public async Task<ActiveDevicesSummaryDto> GetSummaryAsync(int thresholdSeconds = 60)
     {
         var now = DateTime.UtcNow;
-        var cutoffThreshold = now.AddSeconds(-thresholdSeconds);
+        var effectiveSeconds = Math.Max(1, thresholdSeconds);
+        var cutoffThreshold = now.AddSeconds(-effectiveSeconds);
         var cutoff5Min = now.AddMinutes(-5);
         var cutoff1Hour = now.AddHours(-1);
 
-        var activeThreshold = await _context.DeviceActivities
+        var allDevices = await _context.DeviceActivities
             .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoffThreshold);
+            .Where(d => !string.IsNullOrEmpty(d.InstallationId))
+            .Select(d => new
+            {
+                d.InstallationId,
+                d.IsActive,
+                d.DisconnectedAt,
+                d.LastSeenAt
+            })
+            .ToListAsync();
 
-        var active5Min = await _context.DeviceActivities
-            .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoff5Min);
+        var visitorDevices = allDevices
+            .Where(d => !IsAdminMonitorId(d.InstallationId))
+            .ToList();
 
-        var total = await _context.DeviceActivities
-            .AsNoTracking()
-            .CountAsync();
+        var activeThreshold = visitorDevices
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoffThreshold)
+            .Select(d => NormalizeInstallationId(d.InstallationId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
 
-        var heartbeats1Hour = await _context.DeviceActivities
-            .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= cutoff1Hour);
+        var active5Min = visitorDevices
+            .Where(d => d.IsActive && d.DisconnectedAt == null && d.LastSeenAt >= cutoff5Min)
+            .Select(d => NormalizeInstallationId(d.InstallationId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        var total = visitorDevices
+            .Select(d => NormalizeInstallationId(d.InstallationId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
+
+        var heartbeats1Hour = visitorDevices
+            .Where(d => d.LastSeenAt >= cutoff1Hour)
+            .Select(d => NormalizeInstallationId(d.InstallationId))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Count();
 
         return new ActiveDevicesSummaryDto
         {
@@ -190,7 +252,7 @@ public class DeviceTrackingService : IDeviceTrackingService
             ActiveCount5Minutes = active5Min,
             TotalTrackedInstallations = total,
             HeartbeatsLastHour = heartbeats1Hour,
-            OnlineThresholdSeconds = thresholdSeconds,
+            OnlineThresholdSeconds = effectiveSeconds,
             CalculatedAtUtc = now
         };
     }

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
 // Visitor Portal
 import VisitorPortal from './pages/visitor/VisitorPortal';
@@ -25,11 +25,17 @@ import ErrorBoundary from './components/common/ErrorBoundary';
 import { initDeviceTracker } from './services/deviceTracker';
 
 export default function App() {
-    // Start truthful active-device heartbeat monitoring
+    const location = useLocation();
+    const isAdminRoute = location.pathname.startsWith('/admin');
+
+    // Chỉ theo dõi thiết bị khách tham quan; tuyệt đối không đếm trình duyệt Admin làm thiết bị khách
     useEffect(() => {
-        const cleanup = initDeviceTracker();
+        if (isAdminRoute) {
+            return undefined;
+        }
+        const cleanup = initDeviceTracker('Visitor');
         return cleanup;
-    }, []);
+    }, [isAdminRoute]);
 
     return (
         <>

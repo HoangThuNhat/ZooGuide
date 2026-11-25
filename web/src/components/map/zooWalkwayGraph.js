@@ -155,11 +155,11 @@ export const WALKWAY_EDGES = [
 
 // 3. Danh sách các điểm xuất phát tiện lợi cho du khách Thảo Cầm Viên
 export const POPULAR_START_POINTS = [
-    { id: 'gate_a', name: 'Cổng Chính A (Lê Duẩn & Nguyễn Bỉnh Khiêm)', lat: 10.785800, lng: 106.704600 },
-    { id: 'gate_b', name: 'Cổng B (Số 2B Nguyễn Bỉnh Khiêm)', lat: 10.786400, lng: 106.705800 },
-    { id: 'gate_c', name: 'Cổng C (Số 1 Nguyễn Thị Minh Khai)', lat: 10.788600, lng: 106.703200 },
-    { id: 'gate_e', name: 'Cổng E (Bờ Kênh Nhiêu Lộc)', lat: 10.787600, lng: 106.707800 },
-    { id: 'poi_hung', name: 'Đền Thờ Vua Hùng Lịch Sử', lat: 10.786500, lng: 106.704500 }
+    { id: 'gate_a', name: 'Cổng Chính A (Lê Duẩn & Nguyễn Bỉnh Khiêm)', nameEn: 'Main Gate A (Le Duan & Nguyen Binh Khiem)', lat: 10.785800, lng: 106.704600 },
+    { id: 'gate_b', name: 'Cổng B (Số 2B Nguyễn Bỉnh Khiêm)', nameEn: 'Gate B (2B Nguyen Binh Khiem)', lat: 10.786400, lng: 106.705800 },
+    { id: 'gate_c', name: 'Cổng C (Số 1 Nguyễn Thị Minh Khai)', nameEn: 'Gate C (1 Nguyen Thi Minh Khai)', lat: 10.788600, lng: 106.703200 },
+    { id: 'gate_e', name: 'Cổng E (Bờ Kênh Nhiêu Lộc)', nameEn: 'Gate E (Nhieu Loc Canal Bank)', lat: 10.787600, lng: 106.707800 },
+    { id: 'poi_hung', name: 'Đền Thờ Vua Hùng Lịch Sử', nameEn: 'Historic Hung Kings Temple', lat: 10.786500, lng: 106.704500 }
 ];
 
 /**

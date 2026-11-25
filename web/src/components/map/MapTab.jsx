@@ -134,7 +134,26 @@ function calculateHaversineDistance(lat1, lon1, lat2, lon2) {
     return R * c;
 }
 
-export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration, onPlayPoiAudio }) {
+// Chuẩn hóa category giữa Backend POI ('Entrance', 'Landmark', ...) và Frontend Map filter ('gate', 'landmark', ...)
+function normalizeMarkerCategory(rawCategory, fallback = 'landmark') {
+    const normalized = String(rawCategory || '').trim().toLowerCase();
+    if (!normalized) return fallback;
+    if (normalized === 'entrance' || normalized === 'gate') return 'gate';
+    return normalized;
+}
+
+const ENGLISH_LANDMARK_FALLBACKS = {
+    'GATE-A': { name: 'Main Gate A (Le Duan & Nguyen Binh Khiem)', description: 'Main entrance of Saigon Zoo facing Le Duan Boulevard, with central ticket booths, electric tram stop, and visitor information center.' },
+    'GATE-B': { name: 'Gate B (2B Nguyen Binh Khiem)', description: 'Side entrance along Nguyen Binh Khiem Street, convenient for visitors parking motorbikes and cars.' },
+    'GATE-C': { name: 'Gate C (1 Nguyen Thi Minh Khai)', description: 'Nguyen Thi Minh Khai entrance near Thi Nghe Bridge, offering easy connections to city bus routes.' },
+    'GATE-E': { name: 'Gate E (Nhieu Loc Canal Bank)', description: 'Shaded riverside walkway overlooking Nhieu Loc Canal and eco-tourism boats.' },
+    'POI-HUNG': { name: 'Historic Hung Kings Temple', description: 'Traditional royal-style temple built in 1926 to honor the Hung Kings, surrounded by century-old heritage trees.' },
+    'POI-MUSEUM': { name: 'Ho Chi Minh City Museum of History', description: 'Museum preserving more than 40,000 priceless historical and cultural artifacts of Vietnam.' },
+    'POI-TREE': { name: 'Heritage African Mahogany Tree (Over 130 Years Old)', description: 'One of the oldest and largest ancient trees in Saigon Zoo, with a trunk circumference over 8 meters and a sweeping canopy.' },
+    'POI-LAKE': { name: 'Ecological Lotus Lake & Water Pavilion', description: 'A breezy central scenic lake crossed by wooden bridges where visitors stroll and watch schools of fish.' }
+};
+
+export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarration, onPlayPoiAudio, onUnlockAudio }) {
     const { 
         showToast, 
         navTargetAnimal,
@@ -147,6 +166,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         audioState,
         t
     } = useApp();
+    const isVi = (currentLang || 'vi').toLowerCase() === 'vi';
 
     // Dữ liệu từ Supabase API
     const [areas, setAreas] = useState([]);
@@ -155,6 +175,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const [dbPois, setDbPois] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
+    const [poiLoadWarning, setPoiLoadWarning] = useState(null);
+    const [mapZoom, setMapZoom] = useState(17);
 
     // Trạng thái tìm kiếm & phân loại
     const [activeCategory, setActiveCategory] = useState('all');
@@ -192,39 +214,64 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const audioCooldownMapRef = useRef(new Map());
     const insideZonesRef = useRef(new Set());
     const isPlayingRef = useRef(false);
+    const hasReceivedFirstGpsFixRef = useRef(false);
+    const outOfZooNotifiedRef = useRef(false);
+
+    useEffect(() => {
+        if (!showGpsPermissionModal) return;
+        const onKeyDown = (e) => {
+            if (e.key === 'Escape') setShowGpsPermissionModal(false);
+        };
+        window.addEventListener('keydown', onKeyDown);
+        return () => window.removeEventListener('keydown', onKeyDown);
+    }, [showGpsPermissionModal]);
 
     useEffect(() => {
         isPlayingRef.current = Boolean(audioState?.isPlaying);
     }, [audioState?.isPlaying]);
 
+    // Khi du khách vừa kích hoạt phiên vé hợp lệ, xóa bộ nhớ cooldown/insideZones cũ
+    // để điểm tham quan họ vừa đứng trước lúc nhập vé có thể tự động phát ngay lập tức.
+    useEffect(() => {
+        if (hasActiveSession && currentSession?.sessionId) {
+            insideZonesRef.current.clear();
+            audioCooldownMapRef.current.clear();
+        }
+    }, [hasActiveSession, currentSession?.sessionId]);
+
     // 1. Tải dữ liệu thực tế từ Supabase API
     const loadMapData = useCallback(async (lang = currentLang) => {
         setIsLoading(true);
         setLoadError(null);
+        setPoiLoadWarning(null);
         try {
             const [resAreas, resEnclosures, resAnimals, resPois] = await Promise.all([
                 ZooApi.getAreas(lang),
                 ZooApi.getEnclosures({ lang }),
                 ZooApi.getAnimals({ lang }),
-                ZooApi.getPois({ isActive: true })
+                ZooApi.getPois({ isActive: true, lang })
             ]);
 
             if (resAreas && resAreas.success) setAreas(resAreas.data || []);
             if (resEnclosures && resEnclosures.success) setEnclosures(resEnclosures.data || []);
             if (resAnimals && resAnimals.success) setAnimals(resAnimals.data || []);
-            if (resPois && resPois.success) setDbPois(resPois.data || []);
+            if (resPois && resPois.success) {
+                setDbPois(resPois.data || []);
+            } else {
+                setPoiLoadWarning(t?.mapPoiLoadWarn || 'Không thể tải đầy đủ điểm tham quan (POI) từ máy chủ. Các khu vực và chuồng thú vẫn hiển thị bình thường.');
+            }
 
             const allFailed = !resAreas?.success && !resEnclosures?.success && !resAnimals?.success && !resPois?.success;
             if (allFailed) {
-                setLoadError(resAreas?.message || resEnclosures?.message || "Không thể tải dữ liệu bản đồ từ máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.");
+                setLoadError(resAreas?.message || resEnclosures?.message || (isVi ? 'Không thể tải dữ liệu bản đồ từ máy chủ. Vui lòng kiểm tra kết nối mạng và thử lại.' : 'Unable to load map data from the server. Please check your connection and retry.'));
             }
         } catch (err) {
             console.error("MapTab loadMapData error:", err);
-            setLoadError(err.message || "Không thể kết nối đến máy chủ cơ sở dữ liệu.");
+            setLoadError(err.message || (isVi ? 'Không thể kết nối đến máy chủ cơ sở dữ liệu.' : 'Unable to connect to the database server.'));
         } finally {
             setIsLoading(false);
         }
-    }, [currentLang]);
+    }, [currentLang, isVi, t?.mapPoiLoadWarn]);
 
     useEffect(() => {
         loadMapData(currentLang);
@@ -232,10 +279,16 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
     // 2. Hợp nhất Marker chuẩn với dữ liệu thực tế từ Supabase (Areas, Enclosures, Animals, POIs)
     const mergedMarkers = useMemo(() => {
-        const markerList = REAL_MAP_LANDMARKS.map(lm => ({
-            ...lm,
-            radiusMeters: lm.radiusMeters || 40
-        }));
+        const markerList = REAL_MAP_LANDMARKS.map(lm => {
+            const enFallback = !isVi ? ENGLISH_LANDMARK_FALLBACKS[lm.code] : null;
+            return {
+                ...lm,
+                name: enFallback ? enFallback.name : lm.name,
+                description: enFallback ? enFallback.description : lm.description,
+                category: normalizeMarkerCategory(lm.category, 'landmark'),
+                radiusMeters: lm.radiusMeters || 50
+            };
+        });
 
         // Bổ sung các Phân khu (Areas) thực tế từ cơ sở dữ liệu
         areas.forEach(dbArea => {
@@ -321,6 +374,9 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 if (matchIdx >= 0) {
                     markerList[matchIdx].poiId = poi.poiId;
                     markerList[matchIdx].isVerified = poi.isCoordinateVerified ?? poi.isVerified ?? markerList[matchIdx].isVerified;
+                    if (poi.name) {
+                        markerList[matchIdx].name = poi.name;
+                    }
                     if (poi.latitude && poi.longitude) {
                         markerList[matchIdx].lat = Number(poi.latitude);
                         markerList[matchIdx].lng = Number(poi.longitude);
@@ -328,17 +384,18 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     if (Number(poi.radiusMeters) > 0) {
                         markerList[matchIdx].radiusMeters = Number(poi.radiusMeters);
                     }
-                    if (poi.description && !markerList[matchIdx].description) {
+                    if (poi.description) {
                         markerList[matchIdx].description = poi.description;
                     }
-                    // KHÔNG ghi đè category cụ thể của chuồng bằng 'Enclosure' chung chung
+                    // Chuẩn hóa category ('Entrance' -> 'gate'), KHÔNG ghi đè category sinh thái cụ thể của chuồng bằng 'enclosure'
                     if (markerList[matchIdx].category === 'gate' || markerList[matchIdx].category === 'landmark') {
-                        if (poi.category && poi.category.toLowerCase() !== 'enclosure') {
-                            markerList[matchIdx].category = poi.category.toLowerCase();
+                        const normalizedPoiCat = normalizeMarkerCategory(poi.category, markerList[matchIdx].category);
+                        if (normalizedPoiCat !== 'enclosure') {
+                            markerList[matchIdx].category = normalizedPoiCat;
                         }
                     }
                     markerList[matchIdx].hasAudio = poi.hasAudio;
-                } else if ((poi.category || '').toLowerCase() !== 'enclosure') {
+                } else if (normalizeMarkerCategory(poi.category, 'landmark') !== 'enclosure') {
                     // Tránh tạo thêm marker trùng lặp nếu là chuồng thú
                     markerList.push({
                         id: `poi_${poi.poiId}`,
@@ -346,11 +403,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         nodeId: `node_poi_${poi.poiId}`,
                         code: poi.code || `POI-${poi.poiId}`,
                         name: poi.name,
-                        description: poi.description || 'Điểm tham quan tại Thảo Cầm Viên Sài Gòn.',
+                        description: poi.description || (isVi ? 'Điểm tham quan tại Thảo Cầm Viên Sài Gòn.' : 'Point of interest at Saigon Zoo & Botanical Gardens.'),
                         lat: Number(poi.latitude) || 10.7876,
                         lng: Number(poi.longitude) || 106.7053,
-                        radiusMeters: Number(poi.radiusMeters) || 40,
-                        category: (poi.category || 'landmark').toLowerCase(),
+                        radiusMeters: Number(poi.radiusMeters) || 50,
+                        category: normalizeMarkerCategory(poi.category, 'landmark'),
                         isVerified: Boolean(poi.isCoordinateVerified),
                         hasAudio: Boolean(poi.hasAudio),
                         residentAnimals: [],
@@ -361,7 +418,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         }
 
         return markerList;
-    }, [areas, enclosures, animals, dbPois]);
+    }, [areas, enclosures, animals, dbPois, isVi]);
 
     // 3. Lọc danh sách marker
     const filteredMarkers = useMemo(() => {
@@ -446,14 +503,20 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
         userLocationLayerRef.current = userLocationLayer;
         mapInstanceRef.current = map;
 
+        const handleZoomEnd = () => {
+            setMapZoom(map.getZoom());
+        };
+        map.on('zoomend', handleZoomEnd);
+
         return () => {
+            map.off('zoomend', handleZoomEnd);
             map.remove();
             mapInstanceRef.current = null;
         };
     }, []);
 
-    // 5. Cập nhật Marker lên bản đồ Leaflet
-    const createCustomDivIcon = useCallback((marker, isSelected) => {
+    // 5. Cập nhật Marker lên bản đồ Leaflet (hỗ trợ compact pin khi zoom < 18 để chống chồng chéo)
+    const createCustomDivIcon = useCallback((marker, isSelected, useCompactPin = false) => {
         let bgColor = '#15803D'; // Xanh lá cây tự nhiên mặc định
         let label = marker.name?.split('(')[0]?.trim();
 
@@ -469,6 +532,30 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
         const verifiedDotColor = marker.isVerified ? '#4ADE80' : '#FCD34D';
 
+        if (useCompactPin && !isSelected) {
+            return L.divIcon({
+                className: 'custom-leaflet-marker compact-pin',
+                html: `
+                    <div style="
+                        width: 18px;
+                        height: 18px;
+                        border-radius: 50%;
+                        background: ${bgColor};
+                        border: 2.5px solid #FFFFFF;
+                        box-shadow: 0 2px 6px rgba(0,0,0,0.28);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        cursor: pointer;
+                    ">
+                        <span style="width: 5px; height: 5px; border-radius: 50%; background: ${verifiedDotColor}; display: block;"></span>
+                    </div>
+                `,
+                iconSize: [18, 18],
+                iconAnchor: [9, 9]
+            });
+        }
+
         return L.divIcon({
             className: 'custom-leaflet-marker',
             html: `
@@ -478,9 +565,9 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     gap: 5px;
                     background: ${isSelected ? '#0F172A' : bgColor};
                     color: #FFFFFF;
-                    padding: ${isSelected ? '4px 8px' : '3px 6px'};
+                    padding: ${isSelected ? '5px 10px' : '3px 7px'};
                     border-radius: 6px;
-                    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+                    box-shadow: ${isSelected ? '0 4px 12px rgba(15,23,42,0.38)' : '0 2px 6px rgba(0,0,0,0.18)'};
                     border: 2px solid ${isSelected ? '#FEF08A' : '#FFFFFF'};
                     font-size: 11px;
                     font-weight: 700;
@@ -489,7 +576,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     cursor: pointer;
                     transition: transform 0.15s ease;
                 ">
-                    <span style="width: 7px; height: 7px; border-radius: 50%; background: ${verifiedDotColor}; display: inline-block;"></span>
+                    <span style="width: 7px; height: 7px; border-radius: 50%; background: ${verifiedDotColor}; display: inline-block; flex-shrink: 0;"></span>
                     <span style="max-width: 120px; overflow: hidden; text-overflow: ellipsis;">${label}</span>
                 </div>
             `,
@@ -639,24 +726,53 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             });
     };
 
-    // Render lại markers khi danh sách filteredMarkers hoặc selectedMarker thay đổi
+    // Render lại markers khi danh sách filteredMarkers, mapZoom hoặc selectedMarker thay đổi
     useEffect(() => {
         if (!markersLayerRef.current || !mapInstanceRef.current) return;
 
         markersLayerRef.current.clearLayers();
 
-        filteredMarkers.forEach(marker => {
-            const isSelected = selectedMarker?.id === marker.id;
-            const icon = createCustomDivIcon(marker, isSelected);
+        // Ở mức zoom < 18 và chưa lọc/tìm kiếm cụ thể: hiển thị pin gọn kèm tooltip cho các chuồng để tránh chồng chéo 50 nhãn
+        const shouldCondenseLabels = mapZoom < 18 && activeCategory === 'all' && !searchKeyword.trim();
 
-            const leafletMarker = L.marker([marker.lat, marker.lng], { icon });
+        // Tính dịch nhẹ vị trí hiển thị nếu 2 marker trùng/sát tọa độ (<12m) — không làm thay đổi lat/lng gốc của Geofence
+        const placedCoords = [];
+
+        filteredMarkers.forEach((marker) => {
+            const isSelected = selectedMarker?.id === marker.id;
+            const useCompactPin = shouldCondenseLabels && !isSelected && marker.category !== 'gate';
+            const icon = createCustomDivIcon(marker, isSelected, useCompactPin);
+
+            let displayLat = marker.lat;
+            let displayLng = marker.lng;
+            let nearCount = 0;
+            for (const prev of placedCoords) {
+                if (calculateHaversineDistance(displayLat, displayLng, prev.lat, prev.lng) < 12) {
+                    nearCount++;
+                }
+            }
+            if (nearCount > 0 && !isSelected) {
+                const angle = (nearCount * 137.5) * (Math.PI / 180);
+                const radiusDeg = 0.000055 * Math.min(nearCount, 4);
+                displayLat += Math.sin(angle) * radiusDeg;
+                displayLng += Math.cos(angle) * radiusDeg;
+            }
+            placedCoords.push({ lat: displayLat, lng: displayLng });
+
+            const zOffset = isSelected ? 1000 : (marker.category === 'gate' ? 300 : (marker.category === 'area' ? 100 : 200));
+            const leafletMarker = L.marker([displayLat, displayLng], { icon, zIndexOffset: zOffset });
+
+            if (useCompactPin) {
+                leafletMarker.bindTooltip(marker.name, { direction: 'top', offset: [0, -10] });
+            }
+
             leafletMarker.on('click', () => {
                 handleSelectMarker(marker);
             });
 
             leafletMarker.addTo(markersLayerRef.current);
         });
-    }, [filteredMarkers, selectedMarker, createCustomDivIcon, handleSelectMarker]);
+    }, [filteredMarkers, selectedMarker, mapZoom, activeCategory, searchKeyword, createCustomDivIcon, handleSelectMarker]);
 
     // 7. Nhận điều hướng từ trang Động vật (navTargetAnimal)
     useEffect(() => {
@@ -963,18 +1079,64 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
         if (candidate.poiId && onPlayPoiAudio) {
             onPlayPoiAudio(candidate.poiId, true, 'GPS_AUTO');
-            showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
+            showToast(
+                isVi
+                    ? `Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`
+                    : `Auto Audio Guide: ${candidate.name} (${Math.round(candidate.dist)}m away)`,
+                'success'
+            );
         } else if (candidate.residentAnimals && candidate.residentAnimals.length > 0) {
-            if (onPlayAudio) {
-                onPlayAudio(candidate.residentAnimals[0], true, 'GPS_AUTO');
-            } else if (onOpenSpeciesNarration) {
-                onOpenSpeciesNarration(candidate.residentAnimals[0]);
+            // Chọn thông minh cá thể đại diện cho chuồng có nhiều loài/cá thể (vd: enc_24 có 2 loài Chà Vá)
+            // đồng thời mở panel chi tiết chuồng để khách có thể chọn nghe các cá thể khác trong cùng chuồng.
+            const primaryAnimal =
+                candidate.residentAnimals.find(a => a.status === 'Active' && a.speciesId) ||
+                candidate.residentAnimals[0];
+
+            if (candidate.residentAnimals.length > 1) {
+                setSelectedMarker(candidate);
             }
-            showToast(`Tự động thuyết minh: ${candidate.name} (cách ${Math.round(candidate.dist)}m)`, 'success');
+
+            if (onPlayAudio) {
+                onPlayAudio(primaryAnimal, true, 'GPS_AUTO');
+            } else if (onOpenSpeciesNarration) {
+                onOpenSpeciesNarration(primaryAnimal);
+            }
+
+            const multiSuffix = candidate.residentAnimals.length > 1
+                ? (isVi ? ` (${candidate.residentAnimals.length} loài trong chuồng)` : ` (${candidate.residentAnimals.length} animals in enclosure)`)
+                : '';
+            showToast(
+                isVi
+                    ? `Tự động thuyết minh: ${candidate.name}${multiSuffix} (cách ${Math.round(candidate.dist)}m)`
+                    : `Auto Audio Guide: ${candidate.name}${multiSuffix} (${Math.round(candidate.dist)}m away)`,
+                'success'
+            );
         }
-    }, [mergedMarkers, hasActiveSession, currentSession, clearSession, currentLang, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast, t]);
+    }, [mergedMarkers, hasActiveSession, currentSession, clearSession, currentLang, isVi, onPlayPoiAudio, onOpenSpeciesNarration, onPlayAudio, showToast, t]);
+
+    const stopAutoNarrationTracking = useCallback((silent = false) => {
+        if (watchIdRef.current) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
+        }
+        insideZonesRef.current.clear();
+        audioCooldownMapRef.current.clear();
+        hasReceivedFirstGpsFixRef.current = false;
+        outOfZooNotifiedRef.current = false;
+        setIsAutoNarrationActive(false);
+        setAutoNarrationStatus("");
+        setCurrentGpsAccuracy(null);
+        if (!silent) {
+            showToast(isVi ? "Đã tắt chế độ thuyết minh tự động." : "Auto GPS audio guide turned off.", "info");
+        }
+    }, [showToast, isVi]);
 
     const startAutoNarrationTracking = useCallback(() => {
+        // Mở khóa HTMLAudioElement ngay trong thao tác nhấn nút của người dùng (Mobile Safari / Chrome autoplay policy)
+        if (onUnlockAudio) {
+            onUnlockAudio();
+        }
+
         if (!navigator.geolocation) {
             ZooApi.recordDashboardTelemetry({
                 category: 'GPS',
@@ -986,12 +1148,14 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 errorCode: 'GEOLOCATION_UNSUPPORTED',
                 errorMessage: 'Trình duyệt không hỗ trợ định vị GPS'
             });
-            showToast("Trình duyệt của bạn không hỗ trợ định vị GPS.", "error");
+            showToast(isVi ? "Trình duyệt của bạn không hỗ trợ định vị GPS." : "Your browser does not support GPS geolocation.", "error");
             return;
         }
 
+        hasReceivedFirstGpsFixRef.current = false;
+        outOfZooNotifiedRef.current = false;
         setIsAutoNarrationActive(true);
-        setAutoNarrationStatus("Đang định vị GPS...");
+        setAutoNarrationStatus(isVi ? "Đang yêu cầu quyền và xác định tín hiệu GPS..." : "Requesting location permission and acquiring GPS fix...");
         setShowGpsPermissionModal(false);
 
         if (watchIdRef.current) {
@@ -1006,19 +1170,62 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 const heading = pos?.coords?.heading;
 
                 if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
-                    setAutoNarrationStatus("GPS chưa trả về tọa độ hợp lệ...");
+                    setAutoNarrationStatus(isVi ? "GPS chưa trả về tọa độ hợp lệ..." : "Waiting for valid GPS coordinates...");
                     return;
                 }
 
                 setCurrentGpsAccuracy(accuracy);
                 updateUserGpsMarker(userLat, userLng, accuracy, heading);
 
-                if (accuracy > 65) {
-                    setAutoNarrationStatus(`GPS đang ổn định (±${Math.round(accuracy)}m). Cần độ chính xác <65m để kích hoạt Geofence...`);
+                const withinZoo = isCoordinateWithinZooBounds(userLat, userLng);
+                const isFirstFix = !hasReceivedFirstGpsFixRef.current;
+                if (isFirstFix) {
+                    hasReceivedFirstGpsFixRef.current = true;
+                    if (withinZoo) {
+                        showToast(
+                            isVi
+                                ? `Đã bật định vị & thuyết minh tự động tại Thảo Cầm Viên (±${Math.round(accuracy)}m).`
+                                : `Auto GPS audio guide active inside Saigon Zoo (±${Math.round(accuracy)}m).`,
+                            "success"
+                        );
+                    }
+                }
+
+                if (!withinZoo) {
+                    const distKm = (calculateHaversineDistance(userLat, userLng, SAIGON_ZOO_CENTER[0], SAIGON_ZOO_CENTER[1]) / 1000).toFixed(1);
+                    setAutoNarrationStatus(
+                        isVi
+                            ? `Ngoài khuôn viên Thảo Cầm Viên (~${distKm} km) • Tự động phát chỉ kích hoạt trong sở thú`
+                            : `Outside Saigon Zoo grounds (~${distKm} km away) • Auto narration activates inside the zoo`
+                    );
+                    if (!outOfZooNotifiedRef.current) {
+                        outOfZooNotifiedRef.current = true;
+                        showToast(
+                            isVi
+                                ? `Bạn đang ở ngoài khuôn viên Thảo Cầm Viên (cách ~${distKm} km). Thuyết minh tự động sẽ kích hoạt khi bạn vào sở thú.`
+                                : `You are outside Saigon Zoo (~${distKm} km away). Auto narration will activate once you enter the zoo.`,
+                            "info"
+                        );
+                    }
                     return;
                 }
 
-                setAutoNarrationStatus(`Đang quét Geofence tự động (±${Math.round(accuracy)}m)`);
+                outOfZooNotifiedRef.current = false;
+
+                if (accuracy > 65) {
+                    setAutoNarrationStatus(
+                        isVi
+                            ? `Độ chính xác GPS thấp (±${Math.round(accuracy)}m). Cần độ chính xác < 65m để kích hoạt Geofence...`
+                            : `Low GPS accuracy (±${Math.round(accuracy)}m). Accuracy under 65m is needed to trigger geofence...`
+                    );
+                    return;
+                }
+
+                setAutoNarrationStatus(
+                    isVi
+                        ? `Đang quét Geofence tự động (±${Math.round(accuracy)}m)`
+                        : `Scanning geofences automatically (±${Math.round(accuracy)}m)`
+                );
                 evaluateAutoNarrationTrigger(userLat, userLng, accuracy);
             },
             (err) => {
@@ -1034,31 +1241,22 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     errorMessage: err.code === 1 ? 'Khách từ chối cấp quyền vị trí GPS' : 'Mất tín hiệu hoặc hết thời gian chờ GPS'
                 });
                 if (err.code === 1) {
-                    showToast("Quyền truy cập vị trí bị từ chối. Vui lòng cho phép quyền vị trí trong trình duyệt.", "error");
-                    stopAutoNarrationTracking();
+                    showToast(
+                        isVi
+                            ? "Quyền truy cập vị trí bị từ chối. Vui lòng bật quyền Location trong trình duyệt để sử dụng thuyết minh tự động."
+                            : "Location permission denied. Please enable location access in your browser to use Auto Audio Guide.",
+                        "error"
+                    );
+                    stopAutoNarrationTracking(true);
                 } else if (err.code === 2) {
-                    setAutoNarrationStatus("Mất tín hiệu GPS. Đang đợi kết nối lại...");
+                    setAutoNarrationStatus(isVi ? "Mất tín hiệu GPS. Đang đợi kết nối lại..." : "GPS signal lost. Waiting to reconnect...");
                 } else if (err.code === 3) {
-                    setAutoNarrationStatus("Đang làm mới tín hiệu GPS...");
+                    setAutoNarrationStatus(isVi ? "Hết thời gian chờ GPS. Đang tự động làm mới tín hiệu..." : "GPS timeout. Retrying signal lock...");
                 }
             },
             { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
         );
-
-        showToast("Đã bật chế độ định vị & thuyết minh tự động (Geofencing GPS).", "success");
-    }, [currentLang, currentSession?.sessionId, evaluateAutoNarrationTrigger, showToast, updateUserGpsMarker]);
-
-    const stopAutoNarrationTracking = useCallback(() => {
-        if (watchIdRef.current) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-        }
-        insideZonesRef.current.clear();
-        setIsAutoNarrationActive(false);
-        setAutoNarrationStatus("");
-        setCurrentGpsAccuracy(null);
-        showToast("Đã tắt chế độ thuyết minh tự động.", "info");
-    }, [showToast]);
+    }, [currentLang, currentSession?.sessionId, evaluateAutoNarrationTrigger, isCoordinateWithinZooBounds, isVi, onUnlockAudio, showToast, stopAutoNarrationTracking, updateUserGpsMarker]);
 
     useEffect(() => {
         return () => {
@@ -1108,18 +1306,18 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 700, color: '#0F172A' }}>
-                                Bản Đồ Địa Lý Thảo Cầm Viên Sài Gòn
+                                {t?.mapPageTitle || 'Bản Đồ Địa Lý Thảo Cầm Viên Sài Gòn'}
                             </h2>
                         </div>
                         <p style={{ margin: '2px 0 0 0', fontSize: '0.8125rem', color: '#15803D', fontWeight: 600 }}>
-                            Nền tảng bản đồ địa lý thực tế (OpenStreetMap) • Tọa độ GPS chính xác 2 Nguyễn Bỉnh Khiêm, Quận 1
+                            {t?.mapPageSubtitle || 'Nền tảng bản đồ địa lý thực tế (OpenStreetMap) • Tọa độ GPS chính xác 2 Nguyễn Bỉnh Khiêm, Quận 1'}
                         </p>
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                         {/* Dropdown điểm xuất phát */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: '#F0FDF4', padding: '6px 12px', borderRadius: '6px', border: '1px solid #BBF7D0' }}>
-                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>Điểm xuất phát:</span>
+                            <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#166534' }}>{t?.mapStartFrom || 'Điểm xuất phát:'}</span>
                             <select
                                 style={{
                                     border: 'none',
@@ -1139,11 +1337,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                             >
                                 {userGpsLocation && (
                                     <option value="user_gps">
-                                        📍 Vị trí GPS hiện tại ({userGpsLocation.lat.toFixed(4)}, {userGpsLocation.lng.toFixed(4)})
+                                        {isVi ? '📍 Vị trí GPS hiện tại' : '📍 My Current GPS'} ({userGpsLocation.lat.toFixed(4)}, {userGpsLocation.lng.toFixed(4)})
                                     </option>
                                 )}
                                 {POPULAR_START_POINTS.map(sp => (
-                                    <option key={sp.id} value={sp.id}>{sp.name}</option>
+                                    <option key={sp.id} value={sp.id}>{isVi ? sp.name : (sp.nameEn || sp.name)}</option>
                                 ))}
                             </select>
                         </div>
@@ -1161,7 +1359,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                     outline: 'none',
                                     background: '#F8FAFC'
                                 }}
-                                placeholder="Tìm chuồng, thú, khu vực, cổng..."
+                                placeholder={t?.mapSearchPlaceholder || 'Tìm chuồng, thú, khu vực, cổng...'}
                                 value={searchKeyword}
                                 onChange={(e) => setSearchKeyword(e.target.value)}
                             />
@@ -1197,7 +1395,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                             disabled={isLoading}
                             style={{ borderRadius: '6px', fontWeight: 600 }}
                         >
-                            {isLoading ? 'Đang tải...' : 'Làm mới'}
+                            {isLoading ? (t?.loadingShort || 'Đang tải...') : (t?.mapRefreshBtn || 'Làm mới')}
                         </button>
                     </div>
                 </div>
@@ -1213,19 +1411,20 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     scrollbarWidth: 'none'
                 }}>
                     {[
-                        { key: 'all', label: 'Tất cả địa điểm', count: mergedMarkers.length },
-                        { key: 'area', label: 'Phân khu bảo tồn', count: mergedMarkers.filter(m => m.category === 'area').length },
-                        { key: 'carnivore', label: 'Động vật ăn thịt', count: mergedMarkers.filter(m => m.category === 'carnivore').length },
-                        { key: 'herbivore', label: 'Động vật ăn cỏ', count: mergedMarkers.filter(m => m.category === 'herbivore').length },
-                        { key: 'bird', label: 'Vườn chim', count: mergedMarkers.filter(m => m.category === 'bird').length },
-                        { key: 'primate', label: 'Linh trưởng', count: mergedMarkers.filter(m => m.category === 'primate').length },
-                        { key: 'petting', label: 'Thú thân thiện', count: mergedMarkers.filter(m => m.category === 'petting').length },
-                        { key: 'reptile', label: 'Bò sát & Lưỡng cư', count: mergedMarkers.filter(m => m.category === 'reptile').length },
-                        { key: 'gate', label: 'Cổng ra vào', count: mergedMarkers.filter(m => m.category === 'gate').length },
-                        { key: 'landmark', label: 'Di tích & Cảnh quan', count: mergedMarkers.filter(m => ['landmark', 'botanical', 'attraction'].includes(m.category)).length }
+                        { key: 'all', label: t?.mapCatAll || 'Tất cả địa điểm', count: mergedMarkers.length },
+                        { key: 'area', label: t?.mapCatArea || 'Phân khu bảo tồn', count: mergedMarkers.filter(m => m.category === 'area').length },
+                        { key: 'carnivore', label: t?.mapCatCarnivore || 'Động vật ăn thịt', count: mergedMarkers.filter(m => m.category === 'carnivore').length },
+                        { key: 'herbivore', label: t?.mapCatHerbivore || 'Động vật ăn cỏ', count: mergedMarkers.filter(m => m.category === 'herbivore').length },
+                        { key: 'bird', label: t?.mapCatBird || 'Vườn chim', count: mergedMarkers.filter(m => m.category === 'bird').length },
+                        { key: 'primate', label: t?.mapCatPrimate || 'Linh trưởng', count: mergedMarkers.filter(m => m.category === 'primate').length },
+                        { key: 'petting', label: t?.mapCatPetting || 'Thú thân thiện', count: mergedMarkers.filter(m => m.category === 'petting').length },
+                        { key: 'reptile', label: t?.mapCatReptile || 'Bò sát & Lưỡng cư', count: mergedMarkers.filter(m => m.category === 'reptile').length },
+                        { key: 'gate', label: t?.mapCatGate || 'Cổng ra vào', count: mergedMarkers.filter(m => m.category === 'gate').length },
+                        { key: 'landmark', label: t?.mapCatLandmark || 'Di tích & Cảnh quan', count: mergedMarkers.filter(m => ['landmark', 'botanical', 'attraction'].includes(m.category)).length }
                     ].map(cat => (
                         <button
                             key={cat.key}
+                            data-map-category={cat.key}
                             onClick={() => setActiveCategory(cat.key)}
                             style={{
                                 padding: '5px 12px',
@@ -1246,18 +1445,43 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 </div>
             </div>
 
-            {/* Báo lỗi nếu có */}
+            {/* Báo lỗi nghiêm trọng nếu toàn bộ dữ liệu thất bại */}
             {loadError && (
                 <div style={{ background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', padding: '10px 16px', borderRadius: '12px', marginBottom: '12px', fontSize: '0.88rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
-                    <span>⚠️ Lỗi tải dữ liệu: {loadError}</span>
+                    <span>⚠️ {loadError}</span>
                     <button
                         type="button"
                         className="btn btn-sm"
                         style={{ background: '#DC2626', color: '#FFF', borderRadius: '6px', padding: '4px 12px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
                         onClick={() => loadMapData(currentLang)}
                     >
-                        Thử lại
+                        {t?.retryBtn || 'Thử lại'}
                     </button>
+                </div>
+            )}
+
+            {/* Cảnh báo không chặn khi riêng API POI gặp lỗi */}
+            {!loadError && poiLoadWarning && (
+                <div id="map-poi-warning" style={{ background: '#FFFBEB', border: '1px solid #FCD34D', color: '#92400E', padding: '10px 16px', borderRadius: '10px', marginBottom: '12px', fontSize: '0.84rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+                    <span>⚠️ {poiLoadWarning}</span>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                        <button
+                            type="button"
+                            className="btn btn-sm"
+                            style={{ background: '#D97706', color: '#FFF', borderRadius: '6px', padding: '4px 12px', fontWeight: 700, border: 'none', cursor: 'pointer' }}
+                            onClick={() => loadMapData(currentLang)}
+                        >
+                            {t?.retryBtn || 'Thử lại'}
+                        </button>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline"
+                            style={{ borderRadius: '6px', padding: '4px 8px', fontSize: '0.78rem' }}
+                            onClick={() => setPoiLoadWarning(null)}
+                        >
+                            ✕
+                        </button>
+                    </div>
                 </div>
             )}
 
@@ -1284,19 +1508,20 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     }}></span>
                     <div>
                         <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#0F172A' }}>
-                            {isAutoNarrationActive ? 'Thuyết minh tự động (GPS) đang bật' : 'Chế độ thuyết minh tự động (GPS)'}
+                            {isAutoNarrationActive ? (t?.mapAutoOnTitle || 'Thuyết minh tự động (GPS) đang bật') : (t?.mapAutoOffTitle || 'Chế độ thuyết minh tự động (GPS)')}
                         </div>
                         <div style={{ fontSize: '0.78rem', color: '#64748B' }}>
                             {isAutoNarrationActive 
-                                ? (autoNarrationStatus || 'Đang theo dõi vị trí thực tế của bạn tại Thảo Cầm Viên...') 
-                                : 'Tự động phát audio khi tiến vào bán kính Geofence (RadiusMeters) của chuồng thú hoặc điểm tham quan'}
+                                ? (autoNarrationStatus || (isVi ? 'Đang theo dõi vị trí thực tế của bạn tại Thảo Cầm Viên...' : 'Tracking your live GPS position inside Saigon Zoo...'))
+                                : (t?.mapAutoOffDesc || 'Tự động phát audio khi tiến vào bán kính Geofence của chuồng thú hoặc điểm tham quan')}
                         </div>
                     </div>
                 </div>
 
                 <button
                     type="button"
-                    onClick={isAutoNarrationActive ? stopAutoNarrationTracking : () => setShowGpsPermissionModal(true)}
+                    id="btn-toggle-auto-gps"
+                    onClick={isAutoNarrationActive ? () => stopAutoNarrationTracking(false) : () => setShowGpsPermissionModal(true)}
                     style={{
                         minHeight: '44px',
                         padding: '8px 18px',
@@ -1310,13 +1535,15 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         boxShadow: '0 2px 6px rgba(0,0,0,0.1)'
                     }}
                 >
-                    {isAutoNarrationActive ? 'Tắt Thuyết Minh Tự Động' : 'Bật Thuyết Minh Tự Động (GPS)'}
+                    {isAutoNarrationActive ? (t?.mapAutoTurnOff || 'Tắt Thuyết Minh Tự Động') : (t?.mapAutoTurnOn || 'Bật Thuyết Minh Tự Động (GPS)')}
                 </button>
             </div>
 
-            {/* Khung chứa Bản Đồ Địa Lý Thực Tế Leaflet */}
+            {/* Khung chứa Bản Đồ Địa Lý Thực Tế Leaflet (isolated stacking context) */}
             <div style={{
                 position: 'relative',
+                isolation: 'isolate',
+                zIndex: 1,
                 width: '100%',
                 height: '68vh',
                 minHeight: '520px',
@@ -1331,7 +1558,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     position: 'absolute',
                     top: '16px',
                     right: '16px',
-                    zIndex: 1000,
+                    zIndex: 800,
                     display: 'flex',
                     flexDirection: 'column',
                     gap: '8px'
@@ -1391,8 +1618,8 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         <button
                             type="button"
                             className="btn btn-icon btn-sm"
-                            title={isAutoNarrationActive ? "Tắt thuyết minh tự động" : "Bật thuyết minh tự động (GPS)"}
-                            onClick={isAutoNarrationActive ? stopAutoNarrationTracking : () => setShowGpsPermissionModal(true)}
+                            title={isAutoNarrationActive ? (t?.mapAutoTurnOff || "Tắt thuyết minh tự động") : (t?.mapAutoTurnOn || "Bật thuyết minh tự động (GPS)")}
+                            onClick={isAutoNarrationActive ? () => stopAutoNarrationTracking(false) : () => setShowGpsPermissionModal(true)}
                             style={{
                                 width: '36px',
                                 height: '36px',
@@ -1412,12 +1639,12 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
                 {/* Floating Status Pill khi Thuyết Minh Tự Động Đang Bật */}
                 {isAutoNarrationActive && (
-                    <div style={{
+                    <div id="gps-auto-status-pill" style={{
                         position: 'absolute',
                         top: '16px',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        zIndex: 1000,
+                        zIndex: 800,
                         background: 'rgba(21, 128, 61, 0.95)',
                         color: '#FFFFFF',
                         padding: '8px 18px',
@@ -1431,11 +1658,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         backdropFilter: 'blur(8px)',
                         maxWidth: '90%'
                     }}>
-                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#86EFAC' }}></span>
-                        <span>{autoNarrationStatus || 'Đang quét điểm tham quan gần bạn (<25m)...'}</span>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#86EFAC', flexShrink: 0 }}></span>
+                        <span>{autoNarrationStatus || (isVi ? 'Đang quét điểm tham quan gần bạn...' : 'Scanning nearby exhibits...')}</span>
                         <button
                             type="button"
-                            onClick={stopAutoNarrationTracking}
+                            onClick={() => stopAutoNarrationTracking(false)}
                             style={{
                                 background: 'rgba(255,255,255,0.2)',
                                 border: 'none',
@@ -1448,60 +1675,13 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                 justifyContent: 'center',
                                 cursor: 'pointer',
                                 fontSize: '0.75rem',
-                                marginLeft: '4px'
+                                marginLeft: '4px',
+                                flexShrink: 0
                             }}
-                            title="Tắt chế độ tự động"
+                            title={t?.mapAutoTurnOff || "Tắt chế độ tự động"}
                         >
                             ✕
                         </button>
-                    </div>
-                )}
-
-                {/* Hộp Thoại Giải Thích & Xin Quyền GPS (Task E) */}
-                {showGpsPermissionModal && (
-                    <div className="modal-overlay" role="dialog" aria-modal="true" style={{ zIndex: 2000 }}>
-                        <div className="modal-backdrop" onClick={() => setShowGpsPermissionModal(false)}></div>
-                        <div className="modal-dialog" style={{ maxWidth: '480px', borderRadius: '18px', overflow: 'hidden' }}>
-                            <div style={{ background: '#15803D', color: '#FFF', padding: '20px', textAlign: 'center' }}>
-                                <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
-                                    Thuyết Minh Tự Động (GPS)
-                                </h3>
-                                <p style={{ margin: '6px 0 0', fontSize: '0.85rem', opacity: 0.9 }}>
-                                    Trải nghiệm hướng dẫn viên số thông minh
-                                </p>
-                            </div>
-                            <div style={{ padding: '20px', background: '#FFF' }}>
-                                <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
-                                    <p style={{ margin: '0 0 10px' }}>
-                                        Khi bạn kích hoạt chế độ này, ZooGuide sẽ theo dõi vị trí GPS của bạn trên thực địa tại Thảo Cầm Viên:
-                                    </p>
-                                    <ul style={{ paddingLeft: '20px', margin: '0 0 12px', fontSize: '0.85rem', color: '#475569' }}>
-                                        <li>Tự động kích hoạt bài thuyết minh khi bạn tiến lại gần chuồng nuôi thú hoặc di tích trong phạm vi <strong>25 mét</strong>.</li>
-                                        <li>Tránh phát trùng lặp hoặc chồng âm thanh khi bạn đang đứng xem thú.</li>
-                                        <li>Chức năng do chính bạn chủ động kích hoạt và có thể tắt bất kỳ lúc nào.</li>
-                                        <li>Yêu cầu có phiên vé tham quan hợp lệ để nghe trọn vẹn toàn bộ các bài thuyết minh.</li>
-                                    </ul>
-                                </div>
-                                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline"
-                                        style={{ minHeight: '44px', padding: '10px 16px', borderRadius: '8px' }}
-                                        onClick={() => setShowGpsPermissionModal(false)}
-                                    >
-                                        Để sau
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn-primary"
-                                        style={{ minHeight: '44px', padding: '10px 20px', borderRadius: '8px', background: '#15803D', color: '#FFF', fontWeight: 700 }}
-                                        onClick={startAutoNarrationTracking}
-                                    >
-                                        Cho Phép & Bắt Đầu
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 )}
 
@@ -1510,7 +1690,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     position: 'absolute',
                     bottom: '16px',
                     right: '16px',
-                    zIndex: 1000,
+                    zIndex: 800,
                     background: 'rgba(255, 255, 255, 0.92)',
                     backdropFilter: 'blur(6px)',
                     padding: '6px 12px',
@@ -1525,11 +1705,11 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                 }}>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#16A34A', display: 'inline-block' }}></span>
-                        <strong>Tọa độ đã xác minh</strong>
+                        <strong>{t?.mapVerifiedCoord || 'Tọa độ đã xác minh'}</strong>
                     </span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B', display: 'inline-block' }}></span>
-                        <span>Đang cập nhật</span>
+                        <span>{t?.mapUpdatingCoord || 'Đang cập nhật'}</span>
                     </span>
                 </div>
 
@@ -1539,7 +1719,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         position: 'absolute',
                         top: '16px',
                         left: '16px',
-                        zIndex: 1000,
+                        zIndex: 800,
                         background: 'rgba(15, 23, 42, 0.95)',
                         color: '#F8FAFC',
                         padding: '12px 16px',
@@ -1552,21 +1732,35 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '10px' }}>
                             <div>
                                 <span style={{ fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.5px', color: '#38BDF8', fontWeight: 800 }}>
-                                    LỘ TRÌNH ĐI BỘ THỰC TẾ
+                                    {t?.mapRouteTitle || 'LỘ TRÌNH ĐI BỘ THỰC TẾ'}
                                 </span>
                                 <div style={{ fontSize: '0.95rem', fontWeight: 800, color: '#FFFFFF', marginTop: '2px' }}>
                                     ➔ {activeRoute.destinationName}
                                 </div>
                                 <div style={{ fontSize: '0.76rem', color: '#94A3B8', marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                    <span>Từ: <strong>{activeRoute.startNode?.name?.split('(')[0]?.trim()}</strong></span>
+                                    <span>{t?.mapRouteFrom || 'Từ:'} <strong>{(() => {
+                                        const startId = activeRoute.startNode?.id;
+                                        const matchedStart = POPULAR_START_POINTS.find(sp => sp.id === startId);
+                                        const startLabel = matchedStart ? (isVi ? matchedStart.name : (matchedStart.nameEn || matchedStart.name)) : activeRoute.startNode?.name;
+                                        return startLabel?.split('(')[0]?.trim();
+                                    })()}</strong></span>
                                     <span>•</span>
-                                    <span>Cự ly: <strong style={{ color: '#38BDF8' }}>{activeRoute.totalDistanceM}m</strong></span>
+                                    <span>{t?.mapRouteDist || 'Cự ly:'} <strong style={{ color: '#38BDF8' }}>{activeRoute.totalDistanceM}m</strong></span>
                                     <span>•</span>
-                                    <span>~<strong style={{ color: '#FCD34D' }}>{activeRoute.timeMin} phút</strong></span>
+                                    <span>~<strong style={{ color: '#FCD34D' }}>{activeRoute.timeMin} {t?.mapRouteMin || 'phút'}</strong></span>
                                 </div>
                                 {activeRoute.compassDirection && (
                                     <div style={{ fontSize: '0.75rem', color: '#86EFAC', marginTop: '4px', fontWeight: 600 }}>
-                                        🧭 Hướng di chuyển: <strong>{activeRoute.compassDirection} ({activeRoute.bearingDegrees}°)</strong>
+                                        🧭 {t?.mapRouteDir || 'Hướng di chuyển:'} <strong>{isVi ? activeRoute.compassDirection : ({
+                                            'Bắc': 'North',
+                                            'Đông Bắc': 'Northeast',
+                                            'Đông': 'East',
+                                            'Đông Nam': 'Southeast',
+                                            'Nam': 'South',
+                                            'Tây Nam': 'Southwest',
+                                            'Tây': 'West',
+                                            'Tây Bắc': 'Northwest'
+                                        }[activeRoute.compassDirection] || activeRoute.compassDirection)} ({activeRoute.bearingDegrees}°)</strong>
                                     </div>
                                 )}
                             </div>
@@ -1604,7 +1798,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                     fontWeight: 700
                                 }}
                             >
-                                {showRouteSteps ? '▲ Thu gọn các trạm dừng' : `▼ Chi tiết (${activeRoute.waypoints.length} điểm mốc)`}
+                                {showRouteSteps ? (t?.mapRouteHideSteps || '▲ Thu gọn các trạm dừng') : `▼ ${activeRoute.waypoints.length} ${t?.mapRouteShowSteps || 'điểm mốc'}`}
                             </button>
 
                             {showRouteSteps && (
@@ -1630,6 +1824,55 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                     }}
                 />
             </div>
+
+            {/* Hộp Thoại Giải Thích & Xin Quyền GPS (đặt ngoài map isolated context để nổi trên toàn trang ở z-index modal-overlay = 1400) */}
+            {showGpsPermissionModal && (
+                <div id="gps-permission-modal" className="modal-overlay" role="dialog" aria-modal="true">
+                    <div className="modal-backdrop" onClick={() => setShowGpsPermissionModal(false)}></div>
+                    <div className="modal-dialog" style={{ maxWidth: 'min(480px, calc(100vw - 24px))', borderRadius: '18px', overflow: 'hidden' }}>
+                        <div style={{ background: '#15803D', color: '#FFF', padding: '20px', textAlign: 'center' }}>
+                            <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>
+                                {t?.gpsModalTitle || 'Thuyết Minh Tự Động (GPS)'}
+                            </h3>
+                            <p style={{ margin: '6px 0 0', fontSize: '0.85rem', opacity: 0.9 }}>
+                                {t?.gpsModalSub || 'Trải nghiệm hướng dẫn viên số thông minh'}
+                            </p>
+                        </div>
+                        <div style={{ padding: '20px', background: '#FFF' }}>
+                            <div style={{ fontSize: '0.9rem', color: '#334155', lineHeight: 1.6, marginBottom: '16px' }}>
+                                <p style={{ margin: '0 0 10px' }}>
+                                    {t?.gpsModalIntro || 'Khi bạn kích hoạt chế độ này, ZooGuide sẽ theo dõi vị trí GPS của bạn trên thực địa tại Thảo Cầm Viên:'}
+                                </p>
+                                <ul style={{ paddingLeft: '20px', margin: '0 0 12px', fontSize: '0.85rem', color: '#475569' }}>
+                                    <li>{t?.gpsModalBullet1 || 'Tự động kích hoạt bài thuyết minh khi bạn tiến vào bán kính Geofence thực tế của chuồng thú (30m) hoặc điểm tham quan (50m).'}</li>
+                                    <li>{t?.gpsModalBullet2 || 'Tránh phát trùng lặp hoặc chồng âm thanh khi bạn đang đứng xem thú.'}</li>
+                                    <li>{t?.gpsModalBullet3 || 'Chức năng do chính bạn chủ động kích hoạt và có thể tắt bất kỳ lúc nào.'}</li>
+                                    <li>{t?.gpsModalBullet4 || 'Yêu cầu có phiên vé tham quan hợp lệ để nghe trọn vẹn toàn bộ các bài thuyết minh.'}</li>
+                                </ul>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                <button
+                                    type="button"
+                                    className="btn btn-outline"
+                                    style={{ minHeight: '44px', padding: '10px 16px', borderRadius: '8px' }}
+                                    onClick={() => setShowGpsPermissionModal(false)}
+                                >
+                                    {t?.gpsModalLater || 'Để sau'}
+                                </button>
+                                <button
+                                    type="button"
+                                    id="btn-gps-allow-start"
+                                    className="btn btn-primary"
+                                    style={{ minHeight: '44px', padding: '10px 20px', borderRadius: '8px', background: '#15803D', color: '#FFF', fontWeight: 700 }}
+                                    onClick={startAutoNarrationTracking}
+                                >
+                                    {t?.gpsModalAllow || 'Cho Phép & Bắt Đầu'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Thẻ Thông Tin Chi Tiết Điểm Tham Quan (Location Detail Sheet) */}
             {selectedMarker && (
@@ -1657,7 +1900,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                         padding: '2px 8px',
                                         borderRadius: '10px'
                                     }}>
-                                        ✓ Tọa độ đã xác minh thực tế
+                                        {t?.mapVerifiedCoordFull || '✓ Tọa độ đã xác minh thực tế'}
                                     </span>
                                 ) : (
                                     <span style={{
@@ -1668,15 +1911,15 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                         padding: '2px 8px',
                                         borderRadius: '10px'
                                     }}>
-                                        Đang cập nhật tọa độ
+                                        {t?.mapUpdatingCoordFull || 'Đang cập nhật tọa độ'}
                                     </span>
                                 )}
                             </div>
 
                             <div style={{ fontSize: '0.78rem', color: '#64748B', fontWeight: 600, marginBottom: '8px' }}>
-                                Mã địa điểm: {selectedMarker.code} • Tọa độ GPS: {selectedMarker.lat.toFixed(6)}, {selectedMarker.lng.toFixed(6)} • Bán kính Geofence: {selectedMarker.radiusMeters || 30}m
+                                {isVi ? 'Mã địa điểm' : 'Code'}: {selectedMarker.code} • GPS: {selectedMarker.lat.toFixed(6)}, {selectedMarker.lng.toFixed(6)} • {isVi ? 'Bán kính Geofence' : 'Geofence Radius'}: {selectedMarker.radiusMeters || 30}m
                                 {userGpsLocation && (
-                                    <span> • Cách vị trí của bạn: <strong>{Math.round(calculateHaversineDistance(userGpsLocation.lat, userGpsLocation.lng, selectedMarker.lat, selectedMarker.lng))}m</strong></span>
+                                    <span> • {isVi ? 'Cách vị trí của bạn' : 'Distance from you'}: <strong>{Math.round(calculateHaversineDistance(userGpsLocation.lat, userGpsLocation.lng, selectedMarker.lat, selectedMarker.lng))}m</strong></span>
                                 )}
                             </div>
 
@@ -1689,7 +1932,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                 <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: '12px', marginTop: '6px' }}>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                                         <div style={{ fontSize: '0.86rem', fontWeight: 800, color: '#15803D' }}>
-                                            Động vật cư ngụ tại chuồng này {!isLoadingEnclosureAnimals && !enclosureAnimalsError && `(${enclosureAnimals.length} cá thể)`}:
+                                            {t?.mapResidentsTitle || 'Động vật cư ngụ tại chuồng này'} {!isLoadingEnclosureAnimals && !enclosureAnimalsError && `(${enclosureAnimals.length} ${t?.individualsCount || 'cá thể'})`}:
                                         </div>
                                         {isLoadingEnclosureAnimals && (
                                             <span style={{ fontSize: '0.74rem', color: '#64748B', fontWeight: 600 }}>Đang kiểm tra...</span>
@@ -1857,7 +2100,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
                                                                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
                                                                 </svg>
-                                                                <span>Nghe Audio</span>
+                                                                <span>{t?.listenNarration || 'Nghe Audio'}</span>
                                                             </button>
                                                             <button
                                                                 className="btn btn-sm btn-outline"
@@ -1872,7 +2115,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                                                     if (onOpenDetail) onOpenDetail(animal);
                                                                 }}
                                                             >
-                                                                Chi tiết
+                                                                {t?.viewDetails || 'Chi tiết'}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -1906,7 +2149,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                         <path d="M3 18v-6a9 9 0 0 1 18 0v6"></path>
                                         <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path>
                                     </svg>
-                                    <span>Thuyết minh điểm này</span>
+                                    <span>{t?.mapListenPoiBtn || 'Thuyết minh điểm này'}</span>
                                 </button>
                             )}
 
@@ -1925,7 +2168,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                         handleSelectMarker(selectedMarker, 'user_gps');
                                     }}
                                 >
-                                    📍 Chỉ đường từ GPS của tôi
+                                    {t?.mapRouteFromGpsBtn || '📍 Chỉ đường từ GPS của tôi'}
                                 </button>
                             )}
 
@@ -1938,7 +2181,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                 }}
                                 onClick={() => handleSelectMarker(selectedMarker)}
                             >
-                                ➔ Chỉ đường từ điểm xuất phát
+                                {t?.mapRouteFromStartBtn || '➔ Chỉ đường từ điểm xuất phát'}
                             </button>
 
                             <button
@@ -1953,7 +2196,7 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                                     if (geofenceLayerRef.current) geofenceLayerRef.current.clearLayers();
                                 }}
                             >
-                                Đóng thông tin
+                                {t?.mapCloseSheetBtn || 'Đóng thông tin'}
                             </button>
                         </div>
                     </div>

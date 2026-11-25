@@ -23,6 +23,7 @@ export default function AdminDashboardPage() {
     const [signalRConnected, setSignalRConnected] = useState(false);
     const [lastSyncTime, setLastSyncTime] = useState(null);
     const hubConnectionRef = useRef(null);
+    const filterStateRef = useRef({ periodFilter: 'all', customFromDate: '', customToDate: '' });
 
     // Bộ lọc & trạng thái tương tác tại các phân khu
     const [poiFilterMode, setPoiFilterMode] = useState('all'); // all | unready | missingLang | ready
@@ -109,34 +110,50 @@ export default function AdminDashboardPage() {
     }, [periodFilter, customFromDate, customToDate, getFilterDates]);
 
     useEffect(() => {
+        filterStateRef.current = { periodFilter, customFromDate, customToDate };
+    }, [periodFilter, customFromDate, customToDate]);
+
+    const fetchDashboardDataRef = useRef(fetchDashboardData);
+    useEffect(() => {
+        fetchDashboardDataRef.current = fetchDashboardData;
+    }, [fetchDashboardData]);
+
+    useEffect(() => {
         if (periodFilter !== 'custom') {
             fetchDashboardData(periodFilter, customFromDate, customToDate);
         }
     }, [periodFilter]);
 
-    // Kết nối SignalR Realtime Hub (/hubs/online) với debounce chống gọi API quá nhiều
+    // Kết nối SignalR Realtime Hub (/api/hubs/online) một lần duy nhất suốt vòng đời Dashboard
     useEffect(() => {
         let isMounted = true;
         let refreshDebounceTimer = null;
         const adminVisitorId = localStorage.getItem('zooguide_admin_visitor_id') || `admin_dashboard_${Date.now()}`;
         localStorage.setItem('zooguide_admin_visitor_id', adminVisitorId);
 
-        const hubUrl = `/hubs/online?visitorId=${encodeURIComponent(adminVisitorId)}&role=Admin`;
+        const hubUrl = `${API_CONFIG.BASE_URL}/hubs/online?visitorId=${encodeURIComponent(adminVisitorId)}&role=Admin`;
 
         const connection = new signalR.HubConnectionBuilder()
-            .withUrl(hubUrl)
+            .withUrl(hubUrl, {
+                skipNegotiation: false,
+                transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.LongPolling
+            })
             .withAutomaticReconnect([0, 2000, 5000, 10000])
             .configureLogging(signalR.LogLevel.Warning)
             .build();
+
+        const triggerSilentRefresh = () => {
+            if (!isMounted) return;
+            const { periodFilter: pf, customFromDate: cf, customToDate: ct } = filterStateRef.current;
+            fetchDashboardDataRef.current(pf, cf, ct, true);
+        };
 
         const scheduleDebouncedRefresh = () => {
             if (!isMounted) return;
             if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
             refreshDebounceTimer = setTimeout(() => {
-                if (isMounted) {
-                    fetchDashboardData(periodFilter, customFromDate, customToDate, true);
-                }
-            }, 1500);
+                triggerSilentRefresh();
+            }, 1200);
         };
 
         connection.on('ActiveBuyersUpdated', (payload) => {
@@ -177,7 +194,7 @@ export default function AdminDashboardPage() {
         connection.onreconnected(() => {
             if (isMounted) {
                 setSignalRConnected(true);
-                fetchDashboardData(periodFilter, customFromDate, customToDate, true);
+                triggerSilentRefresh();
             }
         });
 
@@ -187,7 +204,11 @@ export default function AdminDashboardPage() {
 
         connection.start()
             .then(() => {
-                if (isMounted) setSignalRConnected(true);
+                if (isMounted) {
+                    setSignalRConnected(true);
+                } else {
+                    connection.stop().catch(() => {});
+                }
             })
             .catch(() => {
                 if (isMounted) setSignalRConnected(false);
@@ -195,22 +216,21 @@ export default function AdminDashboardPage() {
 
         hubConnectionRef.current = connection;
 
-        // Cơ chế refresh dự phòng định kỳ (30 giây/lần khi có SignalR, 15 giây/lần khi mất kết nối SignalR)
+        // Cơ chế refresh định kỳ mỗi 1 phút (60 giây)
         const pollTimer = setInterval(() => {
-            if (isMounted) {
-                fetchDashboardData(periodFilter, customFromDate, customToDate, true);
-            }
-        }, 25000);
+            triggerSilentRefresh();
+        }, 60000);
 
         return () => {
             isMounted = false;
             clearInterval(pollTimer);
             if (refreshDebounceTimer) clearTimeout(refreshDebounceTimer);
-            if (hubConnectionRef.current) {
-                hubConnectionRef.current.stop().catch(() => {});
+            connection.stop().catch(() => {});
+            if (hubConnectionRef.current === connection) {
+                hubConnectionRef.current = null;
             }
         };
-    }, [periodFilter, customFromDate, customToDate, fetchDashboardData]);
+    }, []);
 
     const handleApplyCustomFilter = (e) => {
         e.preventDefault();
@@ -603,14 +623,14 @@ export default function AdminDashboardPage() {
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #0284C7' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">2. Phiên tham quan</span>
+                                        <span className="saas-kpi-title">2. Phiên tham quan (TicketSession)</span>
                                         <Link to="/admin/ticket-sessions" className="saas-kpi-link">Giám sát →</Link>
                                     </div>
                                     <div className="saas-kpi-value-row">
                                         <span className="saas-kpi-value" style={{ color: (stats.activeSessions ?? 0) > 0 ? '#15803D' : '#0F172A' }}>
                                             {stats.activeSessions ?? 0}
                                         </span>
-                                        <span className="saas-kpi-unit">đang hoạt động</span>
+                                        <span className="saas-kpi-unit">phiên còn hiệu lực</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
@@ -667,21 +687,24 @@ export default function AdminDashboardPage() {
                             <div className="saas-kpi-card" style={{ borderLeft: '3px solid #059669' }}>
                                 <div>
                                     <div className="saas-kpi-top">
-                                        <span className="saas-kpi-title">5. Thiết bị trực tuyến (1 phút gần nhất)</span>
+                                        <span className="saas-kpi-title">5. Thiết bị đang hoạt động (1 phút)</span>
                                         <span className="saas-status-dot-badge" style={{ fontSize: '0.73rem', color: signalRConnected ? '#15803D' : '#64748B' }}>
                                             <span className={`saas-dot ${signalRConnected ? 'success' : 'neutral'}`} />
-                                            {signalRConnected ? 'Trực tuyến' : 'Định kỳ'}
+                                            {signalRConnected ? 'Trực tuyến • 1 phút/lần' : 'Cập nhật mỗi 1 phút'}
                                         </span>
                                     </div>
                                     <div className="saas-kpi-value-row">
                                         <span className="saas-kpi-value" style={{ color: '#059669' }}>
-                                            {stats.onlineDevicesCombined1MinCount ?? stats.activeDevices ?? 0}
+                                            {stats.onlineDevicesCombined1MinCount ?? stats.activeDevices1Min ?? 0}
                                         </span>
-                                        <span className="saas-kpi-unit">thiết bị đang hoạt động</span>
+                                        <span className="saas-kpi-unit">thiết bị khách duy nhất</span>
                                     </div>
                                 </div>
                                 <div className="saas-kpi-meta">
-                                    Hoạt động 1 phút gần nhất: <strong>{stats.dbActiveDevices1MinCount ?? stats.activeDevices1Min ?? 0}</strong> • Xác thực kết nối: <strong>{stats.signalRVerifiedDevicesCount ?? 0}</strong>
+                                    Heartbeat 1 phút (60s): <strong>{stats.dbActiveDevices1MinCount ?? stats.activeDevices1Min ?? 0}</strong> • SignalR xác thực: <strong>{stats.signalRVerifiedDevicesCount ?? 0}</strong>
+                                    <div style={{ marginTop: '3px', fontSize: '0.73rem', color: '#64748B' }}>
+                                        Hoạt động 5 phút gần nhất: <strong>{stats.onlineDevicesCombined5MinCount ?? stats.activeDevices ?? 0}</strong> • Tổng thiết bị đã ghi nhận: <strong>{stats.totalTrackedDevices ?? 0}</strong>
+                                    </div>
                                 </div>
                             </div>
 

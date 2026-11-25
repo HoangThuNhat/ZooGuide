@@ -22,29 +22,41 @@ export default function AnimalDetailModal({ onPlayAudio, onNavigate }) {
         return () => { isMounted = false; };
     }, [selectedAnimalForDetail, currentLang]);
 
+    useEffect(() => {
+        if (!selectedAnimalForDetail) return undefined;
+        const handleKeyDown = (e) => {
+            if (e.key === 'Escape') {
+                setSelectedAnimalForDetail(null);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [selectedAnimalForDetail, setSelectedAnimalForDetail]);
+
     if (!selectedAnimalForDetail) return null;
     const animal = localizedAnimal || selectedAnimalForDetail;
     const displayName = animal.name || animal.nameVi;
-    const enclosureDisplay = animal.enclosureName || animal.enclosure?.name || (animal.enclosureCode ? `Chuồng ${animal.enclosureCode}` : null);
+    const isEn = currentLang === 'en';
+    const enclosureDisplay = animal.enclosureName || animal.enclosure?.name || (animal.enclosureCode ? `${t?.mapEnclosuresLabel || (isEn ? 'Enclosure' : 'Chuồng')} ${animal.enclosureCode}` : null);
     const lat = animal.enclosure?.latitude ?? animal.area?.latitude ?? null;
     const lng = animal.enclosure?.longitude ?? animal.area?.longitude ?? null;
 
     return (
-        <div id="animal-detail-modal" className="modal-overlay" role="dialog" aria-modal="true">
+        <div id="animal-detail-modal" className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="detail-modal-title">
             <div className="modal-backdrop" onClick={() => setSelectedAnimalForDetail(null)}></div>
-            <div className="modal-dialog" style={{ maxWidth: '640px' }}>
+            <div className="modal-dialog" style={{ maxWidth: 'min(640px, calc(100vw - 24px))' }}>
                 {animal.imageUrl && (
                     <div className="card-media" style={{ height: '240px', borderRadius: '16px 16px 0 0' }}>
                         <img id="detail-modal-img" src={animal.imageUrl} alt={displayName} className="card-img" />
                     </div>
                 )}
                 <div className="modal-body">
-                    <div className="flex justify-between items-start mb-2">
-                        <div>
+                    <div className="flex justify-between items-start gap-3 mb-2">
+                        <div style={{ minWidth: 0, flex: 1 }}>
                             <span id="detail-modal-zone" className="callout-badge">
-                                {animal.zoneName} ({animal.zoneCode})
+                                {animal.zoneName || animal.area?.name || (isEn ? 'Conservation Zone' : 'Phân khu bảo tồn')}
                             </span>
-                            <h3 id="detail-modal-title" className="text-xl font-bold mt-1">{displayName}</h3>
+                            <h3 id="detail-modal-title" className="text-xl font-bold mt-1" style={{ color: '#0F172A' }}>{displayName}</h3>
                             <p id="detail-modal-latin" className="text-sm text-muted italic">{animal.scientificName}</p>
                             {!animal.hasTranslation && currentLang !== 'vi' && (
                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginTop: '4px', fontSize: '0.72rem', color: '#B45309', backgroundColor: '#FEF3C7', padding: '2px 8px', borderRadius: '4px', fontWeight: 500 }}>
@@ -59,8 +71,10 @@ export default function AnimalDetailModal({ onPlayAudio, onNavigate }) {
                         </div>
                         <button
                             id="btn-close-animal-modal"
+                            type="button"
                             className="btn btn-icon btn-sm"
-                            aria-label="Close"
+                            aria-label={t?.closeBtn || (isEn ? 'Close' : 'Đóng')}
+                            style={{ flexShrink: 0 }}
                             onClick={() => setSelectedAnimalForDetail(null)}
                         >
                             ✕
@@ -69,39 +83,39 @@ export default function AnimalDetailModal({ onPlayAudio, onNavigate }) {
 
                     <div className="ticket-detail-grid mt-4">
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.animalFamilyLabel || 'Loài'}</span>
+                            <span className="ticket-meta-label">{t?.animalFamilyLabel || 'Loài'}</span>
                             <p id="detail-modal-species" className="font-semibold text-sm">{animal.species || '—'}</p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.animalOriginLabel || 'Phân bố tự nhiên'}</span>
+                            <span className="ticket-meta-label">{t?.animalOriginLabel || 'Phân bố tự nhiên'}</span>
                             <p id="detail-modal-origin" className="font-semibold text-sm">{animal.origin || '—'}</p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.animalDietLabel || 'Thức ăn chính'}</span>
+                            <span className="ticket-meta-label">{t?.animalDietLabel || 'Thức ăn chính'}</span>
                             <p id="detail-modal-diet" className="font-semibold text-sm">{animal.diet || '—'}</p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.animalWeightLifespanLabel || 'Cân nặng & Tuổi thọ'}</span>
+                            <span className="ticket-meta-label">{t?.animalWeightLifespanLabel || 'Cân nặng & Tuổi thọ'}</span>
                             <p className="font-semibold text-sm">
                                 <span id="detail-modal-weight">{animal.weight || '—'}</span> • <span id="detail-modal-lifespan">{animal.lifespan || '—'}</span>
                             </p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.animalHealthLabel || 'Hồ sơ sức khỏe'}</span>
+                            <span className="ticket-meta-label">{t?.animalHealthLabel || 'Hồ sơ sức khỏe'}</span>
                             <p id="detail-modal-health" className="font-semibold text-sm text-success">{animal.healthStatus || '—'}</p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">IUCN</span>
+                            <span className="ticket-meta-label">IUCN</span>
                             <p id="detail-modal-breeding" className="font-semibold text-sm">{animal.iucnStatus || '—'}</p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">{t?.mapEnclosuresLabel || 'Chuồng nuôi'}</span>
+                            <span className="ticket-meta-label">{t?.mapEnclosuresLabel || 'Chuồng nuôi'}</span>
                             <p id="detail-modal-enclosure" className="font-semibold text-sm">
                                 {enclosureDisplay ? `${enclosureDisplay}${animal.enclosureCode ? ` (${animal.enclosureCode})` : ''}` : (animal.zoneName || '—')}
                             </p>
                         </div>
                         <div>
-                            <span className="ticket-meta-label text-muted">Tọa độ vị trí (WGS84)</span>
+                            <span className="ticket-meta-label">{t?.animalCoordsLabel || (isEn ? 'Location Coordinates (WGS84)' : 'Tọa độ vị trí (WGS84)')}</span>
                             <p id="detail-modal-coords" className="font-semibold text-sm">
                                 {lat != null && lng != null ? `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}` : '10.78760, 106.70530'}
                             </p>

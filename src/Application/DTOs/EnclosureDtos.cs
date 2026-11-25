@@ -25,6 +25,7 @@ public class EnclosureResponse
     public decimal? MapY { get; set; }
     public decimal? Latitude { get; set; }
     public decimal? Longitude { get; set; }
+    public decimal RadiusMeters { get; set; } = 30m;
     public int AnimalCount { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? UpdatedAt { get; set; }

@@ -26,8 +26,12 @@ public class PoisController : ControllerBase
     [HttpGet]
     [AllowAnonymous]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<PoiDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll([FromQuery] PoiFilterDto filter)
+    public async Task<IActionResult> GetAll([FromQuery] PoiFilterDto filter, [FromQuery] string? lang = null)
     {
+        if (!string.IsNullOrWhiteSpace(lang) && string.IsNullOrWhiteSpace(filter.LanguageCode))
+        {
+            filter.LanguageCode = lang;
+        }
         var list = await _poiService.GetAllAsync(filter);
         return Ok(ApiResponse<IEnumerable<PoiDto>>.Ok(list));
     }

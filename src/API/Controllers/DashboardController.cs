@@ -119,7 +119,8 @@ public class DashboardController : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<OnlineUsersSummaryDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOnlineUsers(
         [FromServices] IOnlineUserTracker onlineTracker,
-        [FromServices] ZooGuideDbContext dbContext)
+        [FromServices] ZooGuideDbContext dbContext,
+        [FromServices] IDeviceTrackingService deviceTrackingService)
     {
         var totalBuyers = await dbContext.TicketOrders
             .AsNoTracking()
@@ -135,9 +136,7 @@ public class DashboardController : ControllerBase
 
         var activeBuyers = onlineTracker.GetActiveTicketBuyersCount();
         var activeBuyerDevices = onlineTracker.GetActiveTicketBuyerDevicesCount();
-        var activeDevices = await dbContext.DeviceActivities
-            .AsNoTracking()
-            .CountAsync(d => d.LastSeenAt >= DateTime.UtcNow.AddSeconds(-60));
+        var activeDevices = await deviceTrackingService.GetActiveDevicesCountAsync(60);
         var activeConnections = onlineTracker.GetActiveBuyerConnectionsCount();
 
         var summary = new OnlineUsersSummaryDto
