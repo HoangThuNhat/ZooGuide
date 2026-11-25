@@ -72,3 +72,10 @@ render_engine.py
 # Animal narration assets stored locally / Supabase
 src/API/wwwroot/storage/narration-audio/
 web/public/storage/narration-audio/
+
+# Project documentation - local only
+Tai lieu/
+Tài liệu/
+*.docx
+*.doc
+*.pdf
