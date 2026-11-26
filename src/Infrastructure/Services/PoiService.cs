@@ -127,6 +127,20 @@ public class PoiService : IPoiService
     {
         if (string.IsNullOrWhiteSpace(dto.Name))
             throw new ArgumentException("Tên điểm tham quan không được để trống.");
+            // Kiểm tra tên POI có bị trùng sau khi chuẩn hóa
+var normalizedName = dto.Name.Trim();
+
+var existingName = await _context.PointsOfInterest
+    .AsNoTracking()
+    .FirstOrDefaultAsync(p =>
+        p.Name.Trim().ToLower() == normalizedName.ToLower());
+
+if (existingName != null)
+{
+    throw new InvalidOperationException(
+        $"POI '{normalizedName}' đã tồn tại trong hệ thống " +
+        $"(Mã: {existingName.Code}, ID: {existingName.PoiId}).");
+}
 
         var code = string.IsNullOrWhiteSpace(dto.Code)
             ? $"POI-{Guid.NewGuid().ToString()[..6].ToUpper()}"

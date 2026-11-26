@@ -248,6 +248,53 @@ if (
 
         const lat = Number(formData.latitude);
         const lng = Number(formData.longitude);
+        // Kiểm tra POI có nằm gần một POI đã tồn tại không
+const toRad = (value) => (value * Math.PI) / 180;
+
+const calculateDistance = (lat1, lng1, lat2, lng2) => {
+    const earthRadius = 6371000;
+
+    const dLat = toRad(lat2 - lat1);
+    const dLng = toRad(lng2 - lng1);
+
+    const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) *
+        Math.cos(toRad(lat2)) *
+        Math.sin(dLng / 2) ** 2;
+
+    return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const nearbyPoi = pois.find(p => {
+    const distance = calculateDistance(
+        lat,
+        lng,
+        Number(p.latitude),
+        Number(p.longitude)
+    );
+
+    return distance <= 10 && p.poiId !== editingPoi?.poiId;
+});
+
+if (nearbyPoi) {
+    const distance = calculateDistance(
+        lat,
+        lng,
+        Number(nearbyPoi.latitude),
+        Number(nearbyPoi.longitude)
+    );
+
+    const confirmDuplicate = window.confirm(
+        `CẢNH BÁO: POI mới có vị trí rất gần POI đã tồn tại!\n\n` +
+        `Tên: ${nearbyPoi.name}\n` +
+        `Mã: ${nearbyPoi.code}\n` +
+        `Khoảng cách: ${distance.toFixed(2)} mét\n\n` +
+        `Bạn có chắc chắn muốn tiếp tục tạo POI mới không?`
+    );
+
+    if (!confirmDuplicate) return;
+}
         if (isNaN(lat) || isNaN(lng) || lat === 0 || lng === 0) {
             showToast('Vui lòng nhập tọa độ địa lý WGS84 hợp lệ.', 'error');
             return;
