@@ -274,7 +274,7 @@ const nearbyPoi = pois.find(p => {
         Number(p.longitude)
     );
 
-    return distance <= 10 && p.poiId !== editingPoi?.poiId;
+    return distance <= 11 && p.poiId !== editingPoi?.poiId;
 });
 
 if (nearbyPoi) {
