@@ -56,6 +56,9 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Property(u => u.LastLoginAt)
             .IsRequired(false);
 
+        builder.Property(u => u.PasswordChangedAt)
+            .IsRequired(false);
+
         // Relationships
         builder.HasMany(u => u.TicketSessions)
             .WithOne(ts => ts.User)

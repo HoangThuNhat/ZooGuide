@@ -40,7 +40,10 @@ public class AuthController : ControllerBase
         try
         {
             var response = await _authService.LoginAsync(request);
-            return Ok(ApiResponse<LoginResponse>.Ok(response, "Đăng nhập thành công. Chào mừng quản trị viên!"));
+            var msg = response.MustChangePassword
+                ? "Your password has expired. Please change your password to continue."
+                : "Đăng nhập thành công. Chào mừng quản trị viên!";
+            return Ok(ApiResponse<LoginResponse>.Ok(response, msg));
         }
         catch (ArgumentException ex)
         {
@@ -83,6 +86,46 @@ public class AuthController : ControllerBase
         }
 
         return Ok(ApiResponse<UserProfileDto>.Ok(profile));
+    }
+
+    /// <summary>
+    /// Thay đổi mật khẩu tài khoản quản trị (Admin/Staff)
+    /// </summary>
+    [HttpPost("change-password")]
+    [Authorize(Roles = "Admin,Staff")]
+    [ProducesResponseType(typeof(ApiResponse<ChangePasswordResponse>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !int.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(ApiResponse<object>.Fail("Không xác định được danh tính người dùng từ token."));
+        }
+
+        try
+        {
+            var result = await _authService.ChangePasswordAsync(userId, request);
+            return Ok(ApiResponse<ChangePasswordResponse>.Ok(result, "Đổi mật khẩu thành công. Bạn có thể tiếp tục sử dụng hệ thống."));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, ApiResponse<object>.Fail(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, ApiResponse<object>.Fail($"Lỗi khi đổi mật khẩu: {ex.Message}"));
+        }
     }
 
     /// <summary>

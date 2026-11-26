@@ -695,6 +695,432 @@ public class AdminAuthIntegrationTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
     }
 
+    // 24. Admin đổi mật khẩu chưa tới 24 giờ -> Đăng nhập bình thường (MustChangePassword = false)
+    [Fact]
+    public async Task AdminPasswordChangedLessThan24HoursAgo_LoginReturnsMustChangePasswordFalse()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-12);
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        var body = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.NotNull(body?.Data);
+        Assert.False(body!.Data!.MustChangePassword);
+        Assert.False(body.Data.User.MustChangePassword);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body.Data.Token);
+        var statsRes = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.OK, statsRes.StatusCode);
+    }
+
+    // 25. Admin mật khẩu đạt/vượt 24 giờ -> Bắt buộc đổi mật khẩu (MustChangePassword = true) và không tự reset PasswordChangedAt khi login
+    [Fact]
+    public async Task AdminPasswordReaches24Hours_LoginReturnsMustChangePasswordTrue_AndDoesNotResetPasswordChangedAt()
+    {
+        var originalChangedAt = DateTime.UtcNow.AddHours(-24).AddMinutes(-5);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = originalChangedAt;
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        var body = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.NotNull(body?.Data);
+        Assert.True(body!.Data!.MustChangePassword);
+        Assert.True(body.Data.User.MustChangePassword);
+        Assert.Equal(originalChangedAt, body.Data.User.PasswordChangedAt);
+    }
+
+    // 26. Staff mật khẩu đạt/vượt 24 giờ -> Bắt buộc đổi mật khẩu (MustChangePassword = true)
+    [Fact]
+    public async Task StaffPasswordReaches24Hours_LoginReturnsMustChangePasswordTrue()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var staffUser = await db.Users.FirstAsync(u => u.Username == "staff_test");
+            staffUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-25);
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "staff_test",
+            Password = "Staff@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        var body = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.NotNull(body?.Data);
+        Assert.True(body!.Data!.MustChangePassword);
+        Assert.True(body.Data.User.MustChangePassword);
+    }
+
+    // 27. Tài khoản quản trị cũ có PasswordChangedAt = null và CreatedAt > 24 giờ trước -> Backfill từ CreatedAt và bắt buộc đổi mật khẩu
+    [Fact]
+    public async Task ExistingAdminWithNullPasswordChangedAtAndOldCreatedAt_BackfillsFromCreatedAtAndRequiresPasswordChange()
+    {
+        var oldCreatedAt = DateTime.UtcNow.AddDays(-3);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.CreatedAt = oldCreatedAt;
+            adminUser.PasswordChangedAt = null;
+            // Ngay cả khi LastLoginAt hoặc UpdatedAt là mới, hệ thống cũng không được dùng chúng thay cho PasswordChangedAt
+            adminUser.LastLoginAt = DateTime.UtcNow.AddMinutes(-10);
+            adminUser.UpdatedAt = DateTime.UtcNow.AddMinutes(-5);
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+
+        var body = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.NotNull(body?.Data);
+        Assert.True(body!.Data!.MustChangePassword);
+        Assert.Equal(oldCreatedAt, body.Data.User.PasswordChangedAt);
+    }
+
+    // 28. Admin hết hạn mật khẩu gọi Dashboard API hoặc các API quản trị khác -> Bị từ chối 403 Forbidden (PASSWORD_CHANGE_REQUIRED)
+    [Fact]
+    public async Task ExpiredAdmin_AccessingDashboardOrAdminApis_IsDeniedWith403Forbidden()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-26);
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var dashboardRes = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.Forbidden, dashboardRes.StatusCode);
+        var rawContent = await dashboardRes.Content.ReadAsStringAsync();
+        Assert.Contains("PASSWORD_CHANGE_REQUIRED", rawContent);
+
+        var logsRes = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.Forbidden, logsRes.StatusCode);
+    }
+
+    // 29. Tải lại trang trước khi đổi mật khẩu (GET /api/auth/me) -> Vẫn trả về MustChangePassword = true
+    [Fact]
+    public async Task RefreshPageBeforeChangingPassword_GetCurrentUserStillRequiresPasswordChange()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-30);
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var meRes = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meRes.StatusCode);
+
+        var meBody = await meRes.Content.ReadFromJsonAsync<ApiResponse<UserProfileDto>>(_jsonOptions);
+        Assert.NotNull(meBody?.Data);
+        Assert.True(meBody!.Data!.MustChangePassword);
+    }
+
+    // 30. Đổi mật khẩu sai mật khẩu hiện tại -> Bị từ chối 400 BadRequest
+    [Fact]
+    public async Task ChangePassword_WithIncorrectCurrentPassword_IsRejectedWith400BadRequest()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "WrongOldPassword123",
+            NewPassword = "NewAdmin@Pass456",
+            ConfirmPassword = "NewAdmin@Pass456"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, changeRes.StatusCode);
+        var body = await changeRes.Content.ReadFromJsonAsync<ApiResponse<object>>(_jsonOptions);
+        Assert.False(body?.Success);
+        Assert.Contains("không chính xác", body?.Message ?? "");
+    }
+
+    // 31. Đổi mật khẩu với xác nhận mật khẩu không khớp -> Bị từ chối 400 BadRequest
+    [Fact]
+    public async Task ChangePassword_WithMismatchedConfirmation_IsRejectedWith400BadRequest()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@Pass123",
+            NewPassword = "NewAdmin@Pass456",
+            ConfirmPassword = "DifferentConfirm@Pass789"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, changeRes.StatusCode);
+        var body = await changeRes.Content.ReadFromJsonAsync<ApiResponse<object>>(_jsonOptions);
+        Assert.False(body?.Success);
+        Assert.Contains("không khớp", body?.Message ?? "");
+    }
+
+    // 32. Đổi mật khẩu mới trùng với mật khẩu cũ -> Bị từ chối 400 BadRequest
+    [Fact]
+    public async Task ChangePassword_WithNewPasswordIdenticalToOldPassword_IsRejectedWith400BadRequest()
+    {
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        var token = (await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions))!.Data!.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@Pass123",
+            NewPassword = "Admin@Pass123",
+            ConfirmPassword = "Admin@Pass123"
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, changeRes.StatusCode);
+        var body = await changeRes.Content.ReadFromJsonAsync<ApiResponse<object>>(_jsonOptions);
+        Assert.False(body?.Success);
+        Assert.Contains("không được trùng", body?.Message ?? "");
+    }
+
+    // 33. Gọi API đổi mật khẩu khi chưa đăng nhập -> 401 Unauthorized
+    [Fact]
+    public async Task ChangePassword_WithoutAuthentication_Returns401Unauthorized()
+    {
+        var client = _factory.CreateClient();
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@Pass123",
+            NewPassword = "NewAdmin@Pass456",
+            ConfirmPassword = "NewAdmin@Pass456"
+        });
+
+        Assert.Equal(HttpStatusCode.Unauthorized, changeRes.StatusCode);
+    }
+
+    // 34. Admin hết hạn mật khẩu gọi API đổi mật khẩu thành công -> Cập nhật PasswordChangedAt, lưu salted hash và truy cập lại Dashboard bình thường
+    [Fact]
+    public async Task ExpiredAdmin_ChangesPasswordSuccessfully_UpdatesPasswordChangedAtAndUnlocksDashboardAccess()
+    {
+        var expiredTime = DateTime.UtcNow.AddHours(-28);
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = expiredTime;
+            await db.SaveChangesAsync();
+        }
+
+        var client = _factory.CreateClient();
+        var loginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, loginRes.StatusCode);
+        var loginBody = await loginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.True(loginBody!.Data!.MustChangePassword);
+
+        var token = loginBody.Data.Token;
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        // Trước khi đổi mật khẩu: gọi Dashboard bị chặn 403
+        var statsBefore = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.Forbidden, statsBefore.StatusCode);
+
+        // Nhưng được phép gọi API đổi mật khẩu
+        var beforeChangeUtc = DateTime.UtcNow.AddSeconds(-2);
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@Pass123",
+            NewPassword = "Admin@NewPass2026",
+            ConfirmPassword = "Admin@NewPass2026"
+        });
+        Assert.Equal(HttpStatusCode.OK, changeRes.StatusCode);
+
+        var changeBody = await changeRes.Content.ReadFromJsonAsync<ApiResponse<ChangePasswordResponse>>(_jsonOptions);
+        Assert.NotNull(changeBody?.Data);
+        Assert.True(changeBody!.Success);
+        Assert.False(changeBody.Data!.MustChangePassword);
+        Assert.True(changeBody.Data.PasswordChangedAt >= beforeChangeUtc);
+
+        // Kiểm tra DB: không lưu plaintext, lưu đúng salted hash và PasswordChangedAt đã cập nhật
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var updatedAdmin = await db.Users.AsNoTracking().FirstAsync(u => u.Username == "admin_test");
+            Assert.NotEqual("Admin@NewPass2026", updatedAdmin.PasswordHash);
+            Assert.Equal(ZooGuideDataSeeder.HashPassword("Admin@NewPass2026"), updatedAdmin.PasswordHash);
+            Assert.NotNull(updatedAdmin.PasswordChangedAt);
+            Assert.True(updatedAdmin.PasswordChangedAt >= beforeChangeUtc);
+        }
+
+        // Sau khi đổi mật khẩu: gọi Dashboard và các API quản trị bình thường (200 OK)
+        var statsAfter = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.OK, statsAfter.StatusCode);
+
+        var logsAfter = await client.GetAsync("/api/admin/logs");
+        Assert.Equal(HttpStatusCode.OK, logsAfter.StatusCode);
+
+        var meAfter = await client.GetAsync("/api/auth/me");
+        Assert.Equal(HttpStatusCode.OK, meAfter.StatusCode);
+        var meBody = await meAfter.Content.ReadFromJsonAsync<ApiResponse<UserProfileDto>>(_jsonOptions);
+        Assert.False(meBody!.Data!.MustChangePassword);
+    }
+
+    // 35. Kiểm thử 10 kịch bản bắt buộc trong yêu cầu (23h, 24h, đổi mật khẩu xong logout & login lại, và Visitor không bị ảnh hưởng)
+    [Fact]
+    public async Task MandatoryScenarios_23HoursAllowed_24HoursExpired_ChangePasswordAndReloginAfterLogout_WorksCorrectly()
+    {
+        var client = _factory.CreateClient();
+
+        // Kịch bản 1 & 2: Admin đăng nhập sau 23 giờ kể từ khi tạo/đổi mật khẩu -> Được truy cập bình thường (MustChangePassword = false)
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-23);
+            await db.SaveChangesAsync();
+        }
+
+        var login23hRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login23hRes.StatusCode);
+        var login23hBody = await login23hRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.False(login23hBody!.Data!.MustChangePassword);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login23hBody.Data.Token);
+        var dash23hRes = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.OK, dash23hRes.StatusCode);
+
+        // Kịch bản 3, 4, 5: Admin đăng nhập sau 24 giờ -> Bắt buộc đổi mật khẩu, trả về thông báo chuẩn và chặn gọi API quản trị trực tiếp
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<ZooGuideDbContext>();
+            var adminUser = await db.Users.FirstAsync(u => u.Username == "admin_test");
+            adminUser.PasswordChangedAt = DateTime.UtcNow.AddHours(-24);
+            await db.SaveChangesAsync();
+        }
+
+        client.DefaultRequestHeaders.Authorization = null;
+        var login24hRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@Pass123"
+        });
+        Assert.Equal(HttpStatusCode.OK, login24hRes.StatusCode);
+        var login24hBody = await login24hRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.True(login24hBody!.Data!.MustChangePassword);
+        Assert.Equal("Your password has expired. Please change your password to continue.", login24hBody.Message);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", login24hBody.Data.Token);
+        var blockedDashRes = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.Forbidden, blockedDashRes.StatusCode);
+        var blockedJson = await blockedDashRes.Content.ReadAsStringAsync();
+        Assert.Contains("Your password has expired. Please change your password to continue.", blockedJson);
+
+        // Kịch bản 8 & 9: Admin đổi mật khẩu thành công, sau đó đăng xuất và đăng nhập lại bằng mật khẩu mới -> Không bị yêu cầu đổi mật khẩu ngay lập tức
+        var changeRes = await client.PostAsJsonAsync("/api/auth/change-password", new ChangePasswordRequest
+        {
+            CurrentPassword = "Admin@Pass123",
+            NewPassword = "Admin@BrandNew2026",
+            ConfirmPassword = "Admin@BrandNew2026"
+        });
+        Assert.Equal(HttpStatusCode.OK, changeRes.StatusCode);
+
+        var logoutRes = await client.PostAsync("/api/auth/logout", null);
+        Assert.Equal(HttpStatusCode.OK, logoutRes.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = null;
+        var reloginRes = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Username = "admin_test",
+            Password = "Admin@BrandNew2026"
+        });
+        Assert.Equal(HttpStatusCode.OK, reloginRes.StatusCode);
+        var reloginBody = await reloginRes.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(_jsonOptions);
+        Assert.False(reloginBody!.Data!.MustChangePassword);
+        Assert.False(reloginBody.Data.User.MustChangePassword);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", reloginBody.Data.Token);
+        var dashAfterRelogin = await client.GetAsync("/api/dashboard/stats");
+        Assert.Equal(HttpStatusCode.OK, dashAfterRelogin.StatusCode);
+
+        // Kịch bản 10: Các API và luồng của Visitor hoàn toàn không bị ảnh hưởng
+        client.DefaultRequestHeaders.Authorization = null;
+        var visitorAnimalsRes = await client.GetAsync("/api/animals");
+        Assert.Equal(HttpStatusCode.OK, visitorAnimalsRes.StatusCode);
+        var visitorAreasRes = await client.GetAsync("/api/areas");
+        Assert.Equal(HttpStatusCode.OK, visitorAreasRes.StatusCode);
+    }
+
     private static readonly System.Text.Json.JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,

@@ -29,6 +29,7 @@ public class AuthService : IAuthService
     public const string DefaultAudience = "ZooGuideClients";
     public const int AdminAbsoluteSessionHours = 8;
     public const int AdminInactivityTimeoutMinutes = 15;
+    public const int AdminPasswordExpirationHours = 24;
 
     public AuthService(ZooGuideDbContext context, IConfiguration configuration)
     {
@@ -89,14 +90,23 @@ public class AuthService : IAuthService
             throw new UnauthorizedAccessException("Tài khoản không có quyền truy cập vào phân hệ quản trị viên.");
         }
 
-        // Cập nhật thời điểm đăng nhập gần nhất (không dùng User.UpdatedAt làm trạng thái của JWT session)
+        // Cập nhật thời điểm đăng nhập gần nhất (không dùng User.UpdatedAt hoặc LastLoginAt để tính tuổi mật khẩu)
         var loginTime = TruncateToMillisecond(DateTime.UtcNow);
         user.LastLoginAt = loginTime;
+
+        // Backfill PasswordChangedAt từ CreatedAt cho tài khoản quản trị cũ nếu chưa có
+        if (!user.PasswordChangedAt.HasValue)
+        {
+            user.PasswordChangedAt = EnsureUtc(user.CreatedAt);
+        }
+
         if (passwordHashUpgraded)
         {
             user.UpdatedAt = loginTime;
         }
         await _context.SaveChangesAsync();
+
+        bool mustChangePassword = IsPasswordExpired(user.PasswordChangedAt, user.CreatedAt, loginTime);
 
         // Tạo JWT Token với giới hạn phiên tuyệt đối tối đa 8 giờ kể từ lúc đăng nhập
         var tokenExpiry = loginTime.AddHours(AdminAbsoluteSessionHours);
@@ -110,7 +120,9 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Role = user.Role,
             Status = user.Status,
-            LastLoginAt = user.LastLoginAt
+            LastLoginAt = user.LastLoginAt,
+            PasswordChangedAt = user.PasswordChangedAt,
+            MustChangePassword = mustChangePassword
         };
 
         return new LoginResponse
@@ -118,6 +130,7 @@ public class AuthService : IAuthService
             Token = token,
             TokenType = "Bearer",
             ExpiresAt = tokenExpiry,
+            MustChangePassword = mustChangePassword,
             User = profile
         };
     }
@@ -127,6 +140,15 @@ public class AuthService : IAuthService
         var user = await _context.Users.FindAsync(userId);
         if (user == null) return null;
 
+        bool isAdminOrStaff = user.Role == UserRole.Admin || user.Role == UserRole.Staff;
+        if (isAdminOrStaff && !user.PasswordChangedAt.HasValue)
+        {
+            user.PasswordChangedAt = EnsureUtc(user.CreatedAt);
+            await _context.SaveChangesAsync();
+        }
+
+        bool mustChangePassword = isAdminOrStaff && IsPasswordExpired(user.PasswordChangedAt, user.CreatedAt);
+
         return new UserProfileDto
         {
             UserId = user.UserId,
@@ -135,7 +157,115 @@ public class AuthService : IAuthService
             FullName = user.FullName,
             Role = user.Role,
             Status = user.Status,
-            LastLoginAt = user.LastLoginAt
+            LastLoginAt = user.LastLoginAt,
+            PasswordChangedAt = user.PasswordChangedAt,
+            MustChangePassword = mustChangePassword
+        };
+    }
+
+    public async Task<ChangePasswordResponse> ChangePasswordAsync(int userId, ChangePasswordRequest request)
+    {
+        if (request == null)
+            throw new ArgumentNullException(nameof(request));
+
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+            throw new ArgumentException("Vui lòng nhập mật khẩu hiện tại.");
+
+        if (string.IsNullOrWhiteSpace(request.NewPassword))
+            throw new ArgumentException("Vui lòng nhập mật khẩu mới.");
+
+        if (string.IsNullOrWhiteSpace(request.ConfirmPassword))
+            throw new ArgumentException("Vui lòng nhập xác nhận mật khẩu mới.");
+
+        if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
+            throw new ArgumentException("Mật khẩu mới và xác nhận mật khẩu không khớp.");
+
+        if (request.NewPassword.Length < 6)
+            throw new ArgumentException("Mật khẩu mới phải có độ dài tối thiểu 6 ký tự.");
+
+        if (string.Equals(request.CurrentPassword, request.NewPassword, StringComparison.Ordinal))
+            throw new ArgumentException("Mật khẩu mới không được trùng với mật khẩu hiện tại.");
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
+        if (user == null)
+            throw new UnauthorizedAccessException("Không tìm thấy thông tin tài khoản người dùng.");
+
+        if (user.Status == UserStatus.Locked)
+            throw new InvalidOperationException("Tài khoản đã bị khóa.");
+
+        if (user.Role != UserRole.Admin && user.Role != UserRole.Staff)
+            throw new UnauthorizedAccessException("Chỉ tài khoản quản trị (Admin/Staff) mới được phép sử dụng chức năng này.");
+
+        // Xác minh mật khẩu hiện tại
+        var currentSaltedHash = ZooGuideDataSeeder.HashPassword(request.CurrentPassword);
+        var currentRawHash = HashRaw(request.CurrentPassword);
+        bool isCurrentValid = string.Equals(user.PasswordHash, currentSaltedHash, StringComparison.OrdinalIgnoreCase)
+                           || string.Equals(user.PasswordHash, currentRawHash, StringComparison.OrdinalIgnoreCase);
+
+        if (!isCurrentValid)
+        {
+            throw new ArgumentException("Mật khẩu hiện tại không chính xác.");
+        }
+
+        // Kiểm tra mật khẩu mới không trùng với hash mật khẩu hiện tại trong DB
+        var newSaltedHash = ZooGuideDataSeeder.HashPassword(request.NewPassword);
+        var newRawHash = HashRaw(request.NewPassword);
+        if (string.Equals(user.PasswordHash, newSaltedHash, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(user.PasswordHash, newRawHash, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("Mật khẩu mới không được trùng với mật khẩu hiện tại.");
+        }
+
+        var changedTime = TruncateToMillisecond(DateTime.UtcNow);
+        user.PasswordHash = newSaltedHash;
+        user.PasswordChangedAt = changedTime;
+        user.UpdatedAt = changedTime;
+
+        await _context.SaveChangesAsync();
+
+        var profile = new UserProfileDto
+        {
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            FullName = user.FullName,
+            Role = user.Role,
+            Status = user.Status,
+            LastLoginAt = user.LastLoginAt,
+            PasswordChangedAt = user.PasswordChangedAt,
+            MustChangePassword = false
+        };
+
+        return new ChangePasswordResponse
+        {
+            PasswordChangedAt = changedTime,
+            MustChangePassword = false,
+            User = profile
+        };
+    }
+
+    public bool IsPasswordExpired(DateTime? passwordChangedAt, DateTime createdAt, DateTime? nowUtc = null)
+    {
+        var effectiveChangedAt = EnsureUtc(passwordChangedAt ?? createdAt);
+        var referenceNow = EnsureUtc(nowUtc ?? DateTime.UtcNow);
+        var expirationHours = AdminPasswordExpirationHours;
+        var configuredHours = _configuration["Auth:AdminPasswordExpirationHours"];
+        if (!string.IsNullOrWhiteSpace(configuredHours) &&
+            int.TryParse(configuredHours, out var parsedHours) &&
+            parsedHours > 0)
+        {
+            expirationHours = parsedHours;
+        }
+        return (referenceNow - effectiveChangedAt) >= TimeSpan.FromHours(expirationHours);
+    }
+
+    private static DateTime EnsureUtc(DateTime dt)
+    {
+        return dt.Kind switch
+        {
+            DateTimeKind.Utc => dt,
+            DateTimeKind.Local => dt.ToUniversalTime(),
+            _ => DateTime.SpecifyKind(dt, DateTimeKind.Utc)
         };
     }
 

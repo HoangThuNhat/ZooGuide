@@ -18,9 +18,17 @@ export default function AdminLoginPage() {
     const reason = params.get('reason');
 
     useEffect(() => {
-        // If already authenticated and token valid, go straight to admin
+        // If already authenticated and token valid, check whether password change is required
         if (ZooApi.isAuthenticated()) {
-            navigate(redirectPath, { replace: true });
+            const storedUser = ZooApi.getStoredUser();
+            if (storedUser?.mustChangePassword) {
+                const target = redirectPath && redirectPath !== '/admin/change-password'
+                    ? `/admin/change-password?redirect=${encodeURIComponent(redirectPath)}`
+                    : '/admin/change-password';
+                navigate(target, { replace: true });
+            } else {
+                navigate(redirectPath, { replace: true });
+            }
         }
         if (
             reason === 'session_expired' ||
@@ -58,6 +66,18 @@ export default function AdminLoginPage() {
                     ZooApi.logout();
                     setErrorMessage('Tài khoản của bạn không có quyền truy cập khu vực quản trị.');
                     setIsLoading(false);
+                    return;
+                }
+                const mustChangePassword = Boolean(
+                    res.mustChangePassword ||
+                    res.data?.mustChangePassword ||
+                    user?.mustChangePassword
+                );
+                if (mustChangePassword) {
+                    const target = redirectPath && redirectPath !== '/admin' && redirectPath !== '/admin/change-password'
+                        ? `/admin/change-password?redirect=${encodeURIComponent(redirectPath)}`
+                        : '/admin/change-password';
+                    navigate(target, { replace: true });
                     return;
                 }
                 navigate(redirectPath, { replace: true });

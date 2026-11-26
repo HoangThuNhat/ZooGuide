@@ -19,6 +19,7 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public DateTime? PasswordChangedAt { get; set; }
 
     // Navigation properties
     public virtual ICollection<TicketSession> TicketSessions { get; set; } = new List<TicketSession>();

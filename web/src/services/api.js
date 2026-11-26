@@ -686,6 +686,22 @@ export async function authFetch(url, options = {}) {
     // Chỉ kết thúc phiên khi 401 Unauthorized (notifyBackend: false để không gọi lặp logout API); với 403 Forbidden giữ nguyên phiên
     if (res.status === 401) {
         expireAdminSession('session_expired', { notifyBackend: false });
+    } else if (res.status === 403 && typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        try {
+            const cloned = res.clone();
+            const json = await cloned.json().catch(() => null);
+            if (json?.errorCode === 'PASSWORD_CHANGE_REQUIRED' || json?.mustChangePassword === true) {
+                const stored = getStoredUser();
+                if (stored) {
+                    localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ ...stored, mustChangePassword: true }));
+                }
+                window.dispatchEvent(new CustomEvent('zooguide:password-change-required', {
+                    detail: { message: json?.message }
+                }));
+            }
+        } catch {
+            // Ignore clone/parse errors
+        }
     }
     return res;
 }
@@ -771,21 +787,87 @@ export const ZooApi = {
                 };
             }
             if (json.data?.token) {
-                setAuthSession(json.data.token, json.data.user, {
+                const mustChangePassword = Boolean(json.data.mustChangePassword || json.data.user?.mustChangePassword);
+                const userWithFlag = json.data.user
+                    ? { ...json.data.user, mustChangePassword }
+                    : null;
+                setAuthSession(json.data.token, userWithFlag, {
                     isNewLogin: true,
                     expiresAt: json.data.expiresAt
                 });
             }
+            const mustChangePassword = Boolean(json.data?.mustChangePassword || json.data?.user?.mustChangePassword);
             return {
                 success: true,
                 data: json.data,
-                user: json.data?.user,
+                user: json.data?.user ? { ...json.data.user, mustChangePassword } : null,
                 token: json.data?.token,
+                mustChangePassword,
                 message: json.message
             };
         } catch (err) {
             console.error('ZooApi.login error:', err);
             return { success: false, message: 'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại mạng.' };
+        }
+    },
+
+    async changePassword(currentPassword, newPassword, confirmPassword) {
+        try {
+            const token = getAuthToken();
+            if (!token) {
+                return {
+                    success: false,
+                    status: 401,
+                    message: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.'
+                };
+            }
+
+            const res = await authFetch(`${API_CONFIG.BASE_URL}/auth/change-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    currentPassword,
+                    newPassword,
+                    confirmPassword
+                })
+            });
+
+            const json = await res.json().catch(() => null);
+            if (!res.ok || !json?.success) {
+                return {
+                    success: false,
+                    status: res.status,
+                    message: json?.message || 'Đổi mật khẩu không thành công. Vui lòng kiểm tra lại thông tin.'
+                };
+            }
+
+            recordAdminActivity(true);
+
+            const updatedUser = json.data?.user
+                ? { ...json.data.user, mustChangePassword: false }
+                : (getStoredUser() ? { ...getStoredUser(), mustChangePassword: false, passwordChangedAt: json.data?.passwordChangedAt } : null);
+
+            if (updatedUser) {
+                setAuthSession(token, updatedUser, { isNewLogin: false });
+            }
+
+            broadcastAdminAuthEvent({
+                type: 'ADMIN_PASSWORD_CHANGED',
+                user: updatedUser
+            });
+
+            return {
+                success: true,
+                data: json.data,
+                user: updatedUser,
+                message: json.message || 'Đổi mật khẩu thành công.'
+            };
+        } catch (err) {
+            console.error('ZooApi.changePassword error:', err);
+            return {
+                success: false,
+                message: 'Không thể kết nối đến máy chủ để đổi mật khẩu. Vui lòng thử lại.'
+            };
         }
     },
 
@@ -802,10 +884,16 @@ export const ZooApi = {
                 return { success: false, status: res.status };
             }
             const json = await res.json();
+            const mustChangePassword = Boolean(json.data?.mustChangePassword);
             if (json.data) {
-                setAuthSession(token, json.data, { isNewLogin: false });
+                setAuthSession(token, { ...json.data, mustChangePassword }, { isNewLogin: false });
             }
-            return { success: true, data: json.data, user: json.data };
+            return {
+                success: true,
+                data: json.data,
+                user: json.data ? { ...json.data, mustChangePassword } : null,
+                mustChangePassword
+            };
         } catch (err) {
             console.error('ZooApi.getCurrentUser error:', err);
             return { success: false, message: err.message };

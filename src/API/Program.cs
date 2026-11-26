@@ -170,6 +170,12 @@ builder.Services.AddAuthentication(options =>
                     context.Fail("Phiên làm việc đã kết thúc hoặc bị thu hồi.");
                     return;
                 }
+
+                // Lưu trạng thái hết hạn mật khẩu 24 giờ của Admin/Staff vào HttpContext để Middleware chặn các API quản trị
+                if (authService != null && authService.IsPasswordExpired(user.PasswordChangedAt, user.CreatedAt, nowUtc))
+                {
+                    context.HttpContext.Items["MustChangePassword"] = true;
+                }
             }
         }
     };
@@ -260,6 +266,42 @@ app.UseCors("AllowAll");
 app.UseStaticFiles();
 app.UseHttpsRedirection();
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.User?.Identity?.IsAuthenticated == true &&
+        context.Items.TryGetValue("MustChangePassword", out var mustChangeObj) &&
+        mustChangeObj is true)
+    {
+        var endpoint = context.GetEndpoint();
+        var authorizeData = endpoint?.Metadata.GetOrderedMetadata<Microsoft.AspNetCore.Authorization.IAuthorizeData>();
+        var allowAnonymous = endpoint?.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.IAllowAnonymous>();
+
+        if (authorizeData != null && authorizeData.Count > 0 && allowAnonymous == null)
+        {
+            var path = context.Request.Path.Value ?? string.Empty;
+            bool isAllowedAuthEndpoint =
+                path.Equals("/api/auth/me", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/api/auth/change-password", StringComparison.OrdinalIgnoreCase) ||
+                path.Equals("/api/auth/logout", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAllowedAuthEndpoint)
+            {
+                context.Response.StatusCode = StatusCodes.Status403Forbidden;
+                context.Response.ContentType = "application/json; charset=utf-8";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    success = false,
+                    errorCode = "PASSWORD_CHANGE_REQUIRED",
+                    mustChangePassword = true,
+                    message = "Your password has expired. Please change your password to continue."
+                });
+                return;
+            }
+        }
+    }
+
+    await next();
+});
 app.UseAuthorization();
 app.MapControllers();
 app.MapHub<ZooGuide.API.Hubs.OnlineTrackerHub>("/hubs/online");
@@ -330,7 +372,7 @@ app.MapGet("/api/health", async (ZooGuideDbContext dbContext) =>
 .WithName("HealthCheck")
 .WithOpenApi();
 
-// Seed initial data if development & ensure telemetry schema exists
+// Seed initial data if development & ensure telemetry and password-expiration schema exists
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetService<ZooGuideDbContext>();
@@ -341,6 +383,14 @@ using (var scope = app.Services.CreateScope())
             if (dbContext.Database.IsRelational())
             {
                 await dbContext.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE ""USERS""
+            ADD COLUMN IF NOT EXISTS ""PasswordChangedAt"" TIMESTAMPTZ NULL;
+
+            UPDATE ""USERS""
+            SET ""PasswordChangedAt"" = ""CreatedAt""
+            WHERE ""PasswordChangedAt"" IS NULL
+              AND ""Role"" IN ('Admin', 'Staff');
+
             CREATE TABLE IF NOT EXISTS ""NARRATION_TELEMETRY_EVENTS"" (
                 ""TelemetryEventId"" BIGSERIAL PRIMARY KEY,
                 ""Category"" VARCHAR(40) NOT NULL,

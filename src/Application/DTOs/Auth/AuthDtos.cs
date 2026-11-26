@@ -22,6 +22,8 @@ public class UserProfileDto
     public UserRole Role { get; set; }
     public UserStatus Status { get; set; }
     public DateTime? LastLoginAt { get; set; }
+    public DateTime? PasswordChangedAt { get; set; }
+    public bool MustChangePassword { get; set; }
 }
 
 public class LoginResponse
@@ -29,5 +31,20 @@ public class LoginResponse
     public string Token { get; set; } = string.Empty;
     public string TokenType { get; set; } = "Bearer";
     public DateTime ExpiresAt { get; set; }
+    public bool MustChangePassword { get; set; }
+    public UserProfileDto User { get; set; } = null!;
+}
+
+public class ChangePasswordRequest
+{
+    public string CurrentPassword { get; set; } = string.Empty;
+    public string NewPassword { get; set; } = string.Empty;
+    public string ConfirmPassword { get; set; } = string.Empty;
+}
+
+public class ChangePasswordResponse
+{
+    public DateTime PasswordChangedAt { get; set; }
+    public bool MustChangePassword { get; set; }
     public UserProfileDto User { get; set; } = null!;
 }

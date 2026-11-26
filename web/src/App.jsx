@@ -8,6 +8,7 @@ import VisitorPortal from './pages/visitor/VisitorPortal';
 import AdminLayout from './components/admin/layout/AdminLayout';
 import AdminProtectedRoute from './components/admin/layout/AdminProtectedRoute';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
+import AdminChangePasswordPage from './pages/admin/AdminChangePasswordPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminSpeciesPage from './pages/admin/AdminSpeciesPage';
 import AdminAnimalsPage from './pages/admin/AdminAnimalsPage';
@@ -47,8 +48,9 @@ export default function App() {
                     {/* Visitor Routes */}
                     <Route path="/" element={<VisitorPortal />} />
 
-                    {/* Admin Login Route */}
+                    {/* Admin Login & Mandatory Password Change Routes */}
                     <Route path="/admin/login" element={<AdminLoginPage />} />
+                    <Route path="/admin/change-password" element={<AdminChangePasswordPage />} />
 
                     {/* Protected Admin Management Routes */}
                     <Route path="/admin" element={<AdminProtectedRoute />}>

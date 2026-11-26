@@ -54,6 +54,7 @@ CREATE TABLE public."USERS" (
     "CreatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     "UpdatedAt" TIMESTAMPTZ NULL,
     "LastLoginAt" TIMESTAMPTZ NULL,
+    "PasswordChangedAt" TIMESTAMPTZ NULL,
 
     CONSTRAINT "PK_USERS" PRIMARY KEY ("UserId"),
     CONSTRAINT "UQ_Users_Username" UNIQUE ("Username"),

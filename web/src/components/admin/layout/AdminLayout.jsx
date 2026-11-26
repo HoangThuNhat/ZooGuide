@@ -80,8 +80,14 @@ export default function AdminLayout() {
             return;
         }
         const u = getStoredUser();
-        if (u) setCurrentUser(u);
-    }, [location.pathname, redirectToLoginExpired]);
+        if (u) {
+            setCurrentUser(u);
+            if (u.mustChangePassword) {
+                const redirectParam = encodeURIComponent(locationPathRef.current || '/admin');
+                navigate(`/admin/change-password?redirect=${redirectParam}`, { replace: true });
+            }
+        }
+    }, [location.pathname, redirectToLoginExpired, navigate]);
 
     // Bộ giám sát Inactivity Timeout (15 phút), Absolute Session Timeout (8 giờ) và đồng bộ đa tab
     // Giữ tham chiếu ổn định để không bị reset timer khi chuyển qua lại giữa các trang Admin
@@ -122,6 +128,12 @@ export default function AdminLayout() {
             const reason = event?.detail?.reason || 'session_expired';
             clearAuthSession({ broadcast: false, reason });
             redirectToLoginExpired(reason);
+        };
+
+        const handlePasswordChangeRequired = () => {
+            if (isDisposed) return;
+            const redirectParam = encodeURIComponent(locationPathRef.current || '/admin');
+            navigate(`/admin/change-password?redirect=${redirectParam}`, { replace: true });
         };
 
         const handleStorageChange = (event) => {
@@ -176,6 +188,7 @@ export default function AdminLayout() {
         window.addEventListener('focus', handleVisibilityOrFocus);
         document.addEventListener('visibilitychange', handleVisibilityOrFocus);
         window.addEventListener('zooguide:unauthorized', handleUnauthorizedEvent);
+        window.addEventListener('zooguide:password-change-required', handlePasswordChangeRequired);
         window.addEventListener('storage', handleStorageChange);
 
         const intervalId = window.setInterval(verifyActiveSession, 1000);
@@ -189,6 +202,7 @@ export default function AdminLayout() {
             window.removeEventListener('focus', handleVisibilityOrFocus);
             document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
             window.removeEventListener('zooguide:unauthorized', handleUnauthorizedEvent);
+            window.removeEventListener('zooguide:password-change-required', handlePasswordChangeRequired);
             window.removeEventListener('storage', handleStorageChange);
             if (channel) {
                 try { channel.close(); } catch {}

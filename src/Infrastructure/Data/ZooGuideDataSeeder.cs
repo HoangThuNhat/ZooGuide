@@ -26,6 +26,7 @@ public static class ZooGuideDataSeeder
         }
 
         // 1. Seed USERS
+        var nowUtc = DateTime.UtcNow;
         var adminUser = new User
         {
             Username = "admin",
@@ -34,7 +35,8 @@ public static class ZooGuideDataSeeder
             FullName = "Hệ Thống Quản Trị Viên",
             Role = UserRole.Admin,
             Status = UserStatus.Active,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = nowUtc,
+            PasswordChangedAt = nowUtc
         };
 
         var staffUser = new User
@@ -45,7 +47,8 @@ public static class ZooGuideDataSeeder
             FullName = "Nguyễn Văn Hoàng (Cán bộ phụ trách)",
             Role = UserRole.Staff,
             Status = UserStatus.Active,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = nowUtc,
+            PasswordChangedAt = nowUtc
         };
 
         var visitorUser = new User
@@ -56,7 +59,7 @@ public static class ZooGuideDataSeeder
             FullName = "Nguyễn Văn An",
             Role = UserRole.Visitor,
             Status = UserStatus.Active,
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = nowUtc
         };
 
         context.Users.AddRange(adminUser, staffUser, visitorUser);

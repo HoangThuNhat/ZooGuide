@@ -15,6 +15,7 @@ export default function AdminProtectedRoute() {
     const location = useLocation();
     const [isVerifying, setIsVerifying] = useState(true);
     const [isAuthorized, setIsAuthorized] = useState(false);
+    const [mustChangePassword, setMustChangePassword] = useState(false);
     const [redirectReason, setRedirectReason] = useState('unauthorized');
 
     useEffect(() => {
@@ -32,6 +33,7 @@ export default function AdminProtectedRoute() {
                 if (isMounted) {
                     setRedirectReason(isExpired ? 'session_expired' : 'unauthorized');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                     setIsVerifying(false);
                 }
                 return;
@@ -42,6 +44,7 @@ export default function AdminProtectedRoute() {
                 if (isMounted) {
                     setRedirectReason('session_expired');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                     setIsVerifying(false);
                 }
                 return;
@@ -53,6 +56,7 @@ export default function AdminProtectedRoute() {
                 if (isMounted) {
                     setRedirectReason('unauthorized');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                     setIsVerifying(false);
                 }
                 return;
@@ -66,26 +70,33 @@ export default function AdminProtectedRoute() {
                 if (res.success && userProfile) {
                     const role = userProfile.role;
                     if (role === 'Admin' || role === 'Staff') {
+                        const requireChange = Boolean(res.mustChangePassword || userProfile.mustChangePassword);
+                        setMustChangePassword(requireChange);
                         setIsAuthorized(true);
                     } else {
                         clearAuthSession();
                         setRedirectReason('unauthorized');
                         setIsAuthorized(false);
+                        setMustChangePassword(false);
                     }
                 } else {
                     clearAuthSession();
                     setRedirectReason('session_expired');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                 }
             } catch (err) {
                 console.warn('Session verification network error:', err);
                 const stillValid = checkAdminSessionValidity().valid;
                 if (stillValid && storedUser && (storedUser.role === 'Admin' || storedUser.role === 'Staff')) {
+                    // Never allow bypassing mandatory password change on network error
+                    setMustChangePassword(Boolean(storedUser.mustChangePassword));
                     setIsAuthorized(true);
                 } else {
                     clearAuthSession();
                     setRedirectReason('session_expired');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                 }
             } finally {
                 if (isMounted) setIsVerifying(false);
@@ -100,6 +111,13 @@ export default function AdminProtectedRoute() {
             if (isMounted) {
                 setRedirectReason(reason === 'manual_logout' ? 'logged_out' : 'session_expired');
                 setIsAuthorized(false);
+                setMustChangePassword(false);
+            }
+        };
+
+        const handlePasswordChangeRequired = () => {
+            if (isMounted) {
+                setMustChangePassword(true);
             }
         };
 
@@ -113,6 +131,7 @@ export default function AdminProtectedRoute() {
                 if (!validity.valid && isMounted) {
                     setRedirectReason('session_expired');
                     setIsAuthorized(false);
+                    setMustChangePassword(false);
                 }
             }
         };
@@ -127,6 +146,9 @@ export default function AdminProtectedRoute() {
                         clearAuthSession();
                         setRedirectReason(msg.reason === 'manual_logout' ? 'logged_out' : 'session_expired');
                         setIsAuthorized(false);
+                        setMustChangePassword(false);
+                    } else if (msg?.type === 'ADMIN_PASSWORD_CHANGED' && isMounted) {
+                        setMustChangePassword(false);
                     }
                 };
             } catch {
@@ -135,10 +157,12 @@ export default function AdminProtectedRoute() {
         }
 
         window.addEventListener('zooguide:unauthorized', handleUnauthorized);
+        window.addEventListener('zooguide:password-change-required', handlePasswordChangeRequired);
         window.addEventListener('storage', handleStorageChange);
         return () => {
             isMounted = false;
             window.removeEventListener('zooguide:unauthorized', handleUnauthorized);
+            window.removeEventListener('zooguide:password-change-required', handlePasswordChangeRequired);
             window.removeEventListener('storage', handleStorageChange);
             if (channel) {
                 try {
@@ -146,7 +170,7 @@ export default function AdminProtectedRoute() {
                 } catch {}
             }
         };
-    }, []);
+    }, [location.pathname]);
 
     if (isVerifying) {
         return (
@@ -179,6 +203,11 @@ export default function AdminProtectedRoute() {
         }
         const redirectParam = encodeURIComponent(location.pathname + location.search);
         return <Navigate to={`/admin/login?redirect=${redirectParam}&reason=${redirectReason}`} replace />;
+    }
+
+    if (mustChangePassword) {
+        const redirectParam = encodeURIComponent(location.pathname + location.search);
+        return <Navigate to={`/admin/change-password?redirect=${redirectParam}`} replace />;
     }
 
     return <Outlet />;
