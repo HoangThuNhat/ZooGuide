@@ -13,7 +13,7 @@ import SpeciesAudioTab from '../../components/species/SpeciesAudioTab';
 import AnimalsTab from '../../components/animals/AnimalsTab';
 import TicketsTab from '../../components/tickets/TicketsTab';
 
-// Modals & Floating Features
+// Modals & Floating Featuress
 import TicketModal from '../../components/tickets/TicketModal';
 import ElectronicTicketModal from '../../components/tickets/ElectronicTicketModal';
 import AnimalDetailModal from '../../components/animals/AnimalDetailModal';
@@ -133,7 +133,7 @@ export default function VisitorPortal() {
                 triggerSource,
                 isSuccess: false,
                 errorCode: 'MISSING_AUDIO_SRC',
-                errorMessage: 'Bài thuyết minh chưa có đường dẫn file âm thanh'
+                errorMessage: 'Bài thuyết minh chưa có đường dẫn file âm thanhh'
             });
             const missingMsg = t?.audioMissingDesc || 'Chưa có file âm thanh cho ngôn ngữ này.';
             showToast(missingMsg, 'error');
@@ -203,7 +203,7 @@ export default function VisitorPortal() {
                     const realSec = Math.round(audio.duration);
                     setAudioState(prev => ({
                         ...prev,
-                        duration: realSec > 0 ? realSec : prev.duration
+                        duration: realSec > 1 ? realSec : prev.duration
                     }));
                 }
             };
