@@ -201,6 +201,12 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
     const routeLayerRef = useRef(null);
     const userLocationLayerRef = useRef(null);
     const geofenceLayerRef = useRef(null);
+    const measureLayerRef = useRef(null);
+
+    // State đo khoảng cách giữa 2 POI / Khu vực trên bản đồ
+    const [measurePoiAId, setMeasurePoiAId] = useState('');
+    const [measurePoiBId, setMeasurePoiBId] = useState('');
+    const [measureDistanceM, setMeasureDistanceM] = useState(null);
 
     // --- STATE ĐỊNH VỊ GPS & THUYẾT MINH TỰ ĐỘNG (Task 5) ---
     const [userGpsLocation, setUserGpsLocation] = useState(null);
@@ -491,15 +497,17 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
 
     
 
-        // Lớp chứa Marker, Tuyến đường, Geofence và Vị trí GPS
+        // Lớp chứa Marker, Tuyến đường, Geofence, Vị trí GPS và Đo khoảng cách 2 POI
         const geofenceLayer = L.layerGroup().addTo(map);
         const routeLayer = L.layerGroup().addTo(map);
+        const measureLayer = L.layerGroup().addTo(map);
         const markersLayer = L.layerGroup().addTo(map);
         const userLocationLayer = L.layerGroup().addTo(map);
 
         geofenceLayerRef.current = geofenceLayer;
         markersLayerRef.current = markersLayer;
         routeLayerRef.current = routeLayer;
+        measureLayerRef.current = measureLayer;
         userLocationLayerRef.current = userLocationLayer;
         mapInstanceRef.current = map;
 
@@ -773,6 +781,65 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
             leafletMarker.addTo(markersLayerRef.current);
         });
     }, [filteredMarkers, selectedMarker, mapZoom, activeCategory, searchKeyword, createCustomDivIcon, handleSelectMarker]);
+
+    // Tính khoảng cách giữa 2 POI / Khu vực (Haversine) và vẽ trực tiếp lên bản đồ Leaflet
+    useEffect(() => {
+        if (!measureLayerRef.current || !mapInstanceRef.current) return;
+        measureLayerRef.current.clearLayers();
+
+        if (!measurePoiAId || !measurePoiBId) {
+            setMeasureDistanceM(null);
+            return;
+        }
+
+        const poiA = mergedMarkers.find(m => m.id === measurePoiAId);
+        const poiB = mergedMarkers.find(m => m.id === measurePoiBId);
+        if (!poiA || !poiB) {
+            setMeasureDistanceM(null);
+            return;
+        }
+
+        const distM = Math.round(calculateHaversineDistance(poiA.lat, poiA.lng, poiB.lat, poiB.lng));
+        setMeasureDistanceM(distM);
+
+        // Vẽ đường nối giữa 2 POI / Khu vực
+        L.polyline(
+            [[poiA.lat, poiA.lng], [poiB.lat, poiB.lng]],
+            { color: '#EA580C', weight: 4, opacity: 0.95, dashArray: '6, 8' }
+        ).addTo(measureLayerRef.current);
+
+        // Hiển thị nhãn khoảng cách ngay tại trung điểm trên bản đồ
+        const midLat = (poiA.lat + poiB.lat) / 2;
+        const midLng = (poiA.lng + poiB.lng) / 2;
+        const distLabel = distM >= 1000 ? `${(distM / 1000).toFixed(2)} km` : `${distM} m`;
+
+        const labelIcon = L.divIcon({
+            className: 'poi-distance-badge',
+            html: `<div style="
+                background: #EA580C;
+                color: #FFFFFF;
+                padding: 4px 10px;
+                border-radius: 999px;
+                font-size: 12px;
+                font-weight: 800;
+                white-space: nowrap;
+                border: 2px solid #FFFFFF;
+                box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+                transform: translate(-50%, -50%);
+            ">📏 ${distLabel}</div>`,
+            iconSize: [0, 0],
+            iconAnchor: [0, 0]
+        });
+
+        L.marker([midLat, midLng], { icon: labelIcon, zIndexOffset: 1200 }).addTo(measureLayerRef.current);
+
+        if (poiA.id !== poiB.id) {
+            mapInstanceRef.current.fitBounds(
+                [[poiA.lat, poiA.lng], [poiB.lat, poiB.lng]],
+                { padding: [60, 60], maxZoom: 18 }
+            );
+        }
+    }, [measurePoiAId, measurePoiBId, mergedMarkers]);
 
     // 7. Nhận điều hướng từ trang Động vật (navTargetAnimal)
     useEffect(() => {
@@ -1442,6 +1509,93 @@ export default function MapTab({ onPlayAudio, onOpenDetail, onOpenSpeciesNarrati
                             {cat.label} ({cat.count})
                         </button>
                     ))}
+                </div>
+
+                {/* Thanh tính & hiển thị khoảng cách giữa 2 POI / Khu vực lên bản đồ */}
+                <div style={{
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                    gap: '8px',
+                    paddingTop: '10px',
+                    marginTop: '10px',
+                    borderTop: '1px solid #F1F5F9',
+                    fontSize: '0.82rem'
+                }}>
+                    <span style={{ fontWeight: 700, color: '#0F172A', whiteSpace: 'nowrap' }}>
+                        📏 {isVi ? 'Đo khoảng cách 2 POI / Khu vực:' : 'Distance between 2 POIs / Areas:'}
+                    </span>
+                    <select
+                        value={measurePoiAId}
+                        onChange={(e) => setMeasurePoiAId(e.target.value)}
+                        style={{
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                            background: '#F8FAFC',
+                            fontSize: '0.8rem',
+                            maxWidth: '220px'
+                        }}
+                    >
+                        <option value="">{isVi ? '-- Chọn điểm / khu vực A --' : '-- Select POI / Area A --'}</option>
+                        {mergedMarkers.map(m => (
+                            <option key={`a_${m.id}`} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                    <span style={{ color: '#64748B', fontWeight: 700 }}>→</span>
+                    <select
+                        value={measurePoiBId}
+                        onChange={(e) => setMeasurePoiBId(e.target.value)}
+                        style={{
+                            padding: '5px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid #CBD5E1',
+                            background: '#F8FAFC',
+                            fontSize: '0.8rem',
+                            maxWidth: '220px'
+                        }}
+                    >
+                        <option value="">{isVi ? '-- Chọn điểm / khu vực B --' : '-- Select POI / Area B --'}</option>
+                        {mergedMarkers.map(m => (
+                            <option key={`b_${m.id}`} value={m.id}>{m.name}</option>
+                        ))}
+                    </select>
+                    {measureDistanceM !== null && (
+                        <span style={{
+                            padding: '4px 10px',
+                            borderRadius: '999px',
+                            background: '#FFF7ED',
+                            border: '1px solid #FB923C',
+                            color: '#C2410C',
+                            fontWeight: 800,
+                            fontSize: '0.8rem'
+                        }}>
+                            {measureDistanceM >= 1000
+                                ? `${(measureDistanceM / 1000).toFixed(2)} km (${measureDistanceM} m)`
+                                : `${measureDistanceM} m`}
+                        </span>
+                    )}
+                    {(measurePoiAId || measurePoiBId) && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setMeasurePoiAId('');
+                                setMeasurePoiBId('');
+                            }}
+                            style={{
+                                padding: '4px 10px',
+                                borderRadius: '6px',
+                                border: '1px solid #CBD5E1',
+                                background: '#FFFFFF',
+                                color: '#475569',
+                                fontSize: '0.78rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                            }}
+                        >
+                            {isVi ? 'Xóa' : 'Clear'}
+                        </button>
+                    )}
                 </div>
             </div>
 
