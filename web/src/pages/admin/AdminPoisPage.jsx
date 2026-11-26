@@ -249,22 +249,31 @@ if (
         const lat = Number(formData.latitude);
         const lng = Number(formData.longitude);
         // Kiểm tra POI có nằm gần một POI đã tồn tại không
-const toRad = (value) => (value * Math.PI) / 180;
+// Kiểm tra tọa độ hợp lệ trước
+if (
+    isNaN(lat) ||
+    isNaN(lng) ||
+    lat === 0 ||
+    lng === 0
+) {
+    showToast('Vui lòng nhập tọa độ địa lý WGS84 hợp lệ.', 'error');
+    return;
+}
 
-const calculateDistance = (lat1, lng1, lat2, lng2) => {
-    const earthRadius = 6371000;
+// Kiểm tra trùng tọa độ với POI đã tồn tại
+const duplicatePoi = pois.find(p =>
+    Number(p.latitude) === lat &&
+    Number(p.longitude) === lng &&
+    p.poiId !== editingPoi?.poiId
+);
 
-    const dLat = toRad(lat2 - lat1);
-    const dLng = toRad(lng2 - lng1);
-
-    const a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(toRad(lat1)) *
-        Math.cos(toRad(lat2)) *
-        Math.sin(dLng / 2) ** 2;
-
-    return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
+if (duplicatePoi) {
+    showToast(
+        `Tọa độ này đã được sử dụng bởi POI "${duplicatePoi.name}" (${duplicatePoi.code}).`,
+        'error'
+    );
+    return;
+}
 
 const nearbyPoi = pois.find(p => {
     const distance = calculateDistance(
